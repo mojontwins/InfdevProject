@@ -20,9 +20,9 @@ public class Block {
 	public static final StepSound soundGrassFootstep = new StepSound("grass", 1.0F, 1.0F);
 	public static final StepSound soundStoneFootstep = new StepSound("stone", 1.0F, 1.0F);
 	public static final StepSound soundMetalFootstep = new StepSound("stone", 1.0F, 1.5F);
-	public static final StepSound soundGlassFootstep = new StepSoundGlass();
+	public static final StepSound soundGlassFootstep = new StepSoundGlass("glass", 1.0F, 1.0F);
 	public static final StepSound soundClothFootstep = new StepSound("cloth", 1.0F, 1.0F);
-	public static final StepSound soundSandFootstep = new StepSoundSand();
+	public static final StepSound soundSandFootstep = new StepSoundSand("sand", 1.0F, 1.0F);
 
 	public static final Block[] blocksList = new Block[256];
 	public static final boolean[] tickOnLoad = new boolean[256];

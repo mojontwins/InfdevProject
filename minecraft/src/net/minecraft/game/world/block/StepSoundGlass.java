@@ -1,8 +1,8 @@
 package net.minecraft.game.world.block;
 
 final class StepSoundGlass extends StepSound {
-	StepSoundGlass() {
-		super("glass", 1.0F, 1.0F);
+	StepSoundGlass(String stepSoundName, float volume, float pitch) {
+		super(stepSoundName, 1.0F, 1.0F);
 	}
 
 	@Override
