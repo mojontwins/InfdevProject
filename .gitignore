@@ -1,0 +1,12 @@
+# Only the Minecraft client working sources are versioned.
+# Everything else (reference folders, workspace, runtime, outs) stays local.
+#
+# Whitelist approach: ignore everything, then re-include minecraft/src.
+
+/*
+!/.gitignore
+!/minecraft
+
+# Ignore everything inside minecraft/ except the working sources.
+/minecraft/*
+!/minecraft/src
