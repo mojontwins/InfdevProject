@@ -4,19 +4,21 @@ import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 
 public class BlockBreakable extends Block {
-	private boolean localFlag;
+	private boolean renderAllFaces;
 
-	protected BlockBreakable(int var1, int var2, Material var3, boolean var4) {
-		super(var1, var2, var3);
-		this.localFlag = var4;
+	protected BlockBreakable(int blockID, int textureIndex, Material material, boolean renderAllFaces) {
+		super(blockID, textureIndex, material);
+		this.renderAllFaces = renderAllFaces;
 	}
 
+	@Override
 	public final boolean isOpaqueCube() {
 		return false;
 	}
 
-	public final boolean shouldSideBeRendered(World var1, int var2, int var3, int var4, int var5) {
-		int var6 = var1.getBlockId(var2, var3, var4);
-		return !this.localFlag && var6 == this.blockID ? false : super.shouldSideBeRendered(var1, var2, var3, var4, var5);
+	@Override
+	public final boolean shouldSideBeRendered(World world, int x, int y, int z, int side) {
+		int neighborBlockID = world.getBlockId(x, y, z);
+		return !this.renderAllFaces && neighborBlockID == this.blockID ? false : super.shouldSideBeRendered(world, x, y, z, side);
 	}
 }

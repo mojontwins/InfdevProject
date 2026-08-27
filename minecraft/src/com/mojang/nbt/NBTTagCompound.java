@@ -7,26 +7,28 @@ import java.util.HashMap;
 import java.util.Map;
 
 public final class NBTTagCompound extends NBTBase {
+	private static final byte[] EMPTY_BYTE_ARRAY = new byte[0];
+
 	private Map<String, NBTBase> tagMap = new HashMap<>();
 
-	final void writeTagContents(DataOutput var1) throws IOException {
-		for(NBTBase var3 : this.tagMap.values()) {
-			NBTBase.writeNamedTag(var3, var1);
+	final void writeTagContents(DataOutput output) throws IOException {
+		for(NBTBase tag : this.tagMap.values()) {
+			NBTBase.writeNamedTag(tag, output);
 		}
 
-		var1.writeByte(0);
+		output.writeByte(0);
 	}
 
-	final void readTagContents(DataInput var1) throws IOException {
+	final void readTagContents(DataInput input) throws IOException {
 		this.tagMap.clear();
 
 		while(true) {
-			NBTBase var2 = NBTBase.readNamedTag(var1);
-			if(var2.getType() == 0) {
+			NBTBase tag = NBTBase.readNamedTag(input);
+			if(tag.getType() == 0) {
 				return;
 			}
 
-			this.tagMap.put(var2.getKey(), var2);
+			this.tagMap.put(tag.getKey(), tag);
 		}
 	}
 
@@ -34,91 +36,100 @@ public final class NBTTagCompound extends NBTBase {
 		return (byte)10;
 	}
 
-	public final void setTag(String var1, NBTBase var2) {
-		this.tagMap.put(var1, var2.setKey(var1));
+	public final void setTag(String key, NBTBase tag) {
+		this.tagMap.put(key, tag.setKey(key));
 	}
 
-	public final void setByte(String var1, byte var2) {
-		this.tagMap.put(var1, (new NBTTagByte(var2)).setKey(var1));
+	public final void setByte(String key, byte value) {
+		this.tagMap.put(key, new NBTTagByte(value).setKey(key));
 	}
 
-	public final void setShort(String var1, short var2) {
-		this.tagMap.put(var1, (new NBTTagShort(var2)).setKey(var1));
+	public final void setShort(String key, short value) {
+		this.tagMap.put(key, new NBTTagShort(value).setKey(key));
 	}
 
-	public final void setInteger(String var1, int var2) {
-		this.tagMap.put(var1, (new NBTTagInt(var2)).setKey(var1));
+	public final void setInteger(String key, int value) {
+		this.tagMap.put(key, new NBTTagInt(value).setKey(key));
 	}
 
-	public final void setLong(String var1, long var2) {
-		this.tagMap.put(var1, (new NBTTagLong(var2)).setKey(var1));
+	public final void setLong(String key, long value) {
+		this.tagMap.put(key, new NBTTagLong(value).setKey(key));
 	}
 
-	public final void setFloat(String var1, float var2) {
-		this.tagMap.put(var1, (new NBTTagFloat(var2)).setKey(var1));
+	public final void setFloat(String key, float value) {
+		this.tagMap.put(key, new NBTTagFloat(value).setKey(key));
 	}
 
-	public final void setString(String var1, String var2) {
-		this.tagMap.put(var1, (new NBTTagString(var2)).setKey(var1));
+	public final void setString(String key, String value) {
+		this.tagMap.put(key, new NBTTagString(value).setKey(key));
 	}
 
-	public final void setByteArray(String var1, byte[] var2) {
-		this.tagMap.put(var1, (new NBTTagByteArray(var2)).setKey(var1));
+	public final void setByteArray(String key, byte[] value) {
+		this.tagMap.put(key, new NBTTagByteArray(value).setKey(key));
 	}
 
-	public final void setCompoundTag(String var1, NBTTagCompound var2) {
-		this.tagMap.put(var1, var2.setKey(var1));
+	public final void setCompoundTag(String key, NBTTagCompound tag) {
+		this.tagMap.put(key, tag.setKey(key));
 	}
 
-	public final void setBoolean(String var1, boolean var2) {
-		this.setByte(var1, (byte)(var2 ? 1 : 0));
+	public final void setBoolean(String key, boolean value) {
+		this.setByte(key, (byte)(value ? 1 : 0));
 	}
 
-	public final boolean hasKey(String var1) {
-		return this.tagMap.containsKey(var1);
+	public final boolean hasKey(String key) {
+		return this.tagMap.containsKey(key);
 	}
 
-	public final byte getByte(String var1) {
-		return !this.tagMap.containsKey(var1) ? 0 : ((NBTTagByte)this.tagMap.get(var1)).byteValue;
+	public final byte getByte(String key) {
+		NBTBase tag = this.tagMap.get(key);
+		return tag instanceof NBTTagByte ? ((NBTTagByte)tag).byteValue : 0;
 	}
 
-	public final short getShort(String var1) {
-		return !this.tagMap.containsKey(var1) ? 0 : ((NBTTagShort)this.tagMap.get(var1)).shortValue;
+	public final short getShort(String key) {
+		NBTBase tag = this.tagMap.get(key);
+		return tag instanceof NBTTagShort ? ((NBTTagShort)tag).shortValue : 0;
 	}
 
-	public final int getInteger(String var1) {
-		return !this.tagMap.containsKey(var1) ? 0 : ((NBTTagInt)this.tagMap.get(var1)).intValue;
+	public final int getInteger(String key) {
+		NBTBase tag = this.tagMap.get(key);
+		return tag instanceof NBTTagInt ? ((NBTTagInt)tag).intValue : 0;
 	}
 
-	public final long getLong(String var1) {
-		return !this.tagMap.containsKey(var1) ? 0L : ((NBTTagLong)this.tagMap.get(var1)).longValue;
+	public final long getLong(String key) {
+		NBTBase tag = this.tagMap.get(key);
+		return tag instanceof NBTTagLong ? ((NBTTagLong)tag).longValue : 0L;
 	}
 
-	public final float getFloat(String var1) {
-		return !this.tagMap.containsKey(var1) ? 0.0F : ((NBTTagFloat)this.tagMap.get(var1)).floatValue;
+	public final float getFloat(String key) {
+		NBTBase tag = this.tagMap.get(key);
+		return tag instanceof NBTTagFloat ? ((NBTTagFloat)tag).floatValue : 0.0F;
 	}
 
-	public final String getString(String var1) {
-		return !this.tagMap.containsKey(var1) ? "" : ((NBTTagString)this.tagMap.get(var1)).stringValue;
+	public final String getString(String key) {
+		NBTBase tag = this.tagMap.get(key);
+		return tag instanceof NBTTagString ? ((NBTTagString)tag).stringValue : "";
 	}
 
-	public final byte[] getByteArray(String var1) {
-		return !this.tagMap.containsKey(var1) ? new byte[0] : ((NBTTagByteArray)this.tagMap.get(var1)).byteArray;
+	public final byte[] getByteArray(String key) {
+		NBTBase tag = this.tagMap.get(key);
+		return tag instanceof NBTTagByteArray ? ((NBTTagByteArray)tag).byteArray : EMPTY_BYTE_ARRAY;
 	}
 
-	public final NBTTagCompound getCompoundTag(String var1) {
-		return !this.tagMap.containsKey(var1) ? new NBTTagCompound() : (NBTTagCompound)this.tagMap.get(var1);
+	public final NBTTagCompound getCompoundTag(String key) {
+		NBTBase tag = this.tagMap.get(key);
+		return tag instanceof NBTTagCompound ? (NBTTagCompound)tag : new NBTTagCompound();
 	}
 
-	public final NBTTagList getTagList(String var1) {
-		return !this.tagMap.containsKey(var1) ? new NBTTagList() : (NBTTagList)this.tagMap.get(var1);
+	public final NBTTagList getTagList(String key) {
+		NBTBase tag = this.tagMap.get(key);
+		return tag instanceof NBTTagList ? (NBTTagList)tag : new NBTTagList();
 	}
 
-	public final boolean getBoolean(String var1) {
-		return this.getByte(var1) != 0;
+	public final boolean getBoolean(String key) {
+		return this.getByte(key) != 0;
 	}
 
 	public final String toString() {
-		return "" + this.tagMap.size() + " entries";
+		return this.tagMap.size() + " entries";
 	}
 }

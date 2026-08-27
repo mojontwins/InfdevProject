@@ -10,94 +10,90 @@ import net.minecraft.game.world.material.Material;
 public final class BlockFurnace extends BlockContainer {
 	private final boolean isActive;
 
-	protected BlockFurnace(int var1, boolean var2) {
-		super(var1, Material.rock);
-		this.isActive = var2;
+	protected BlockFurnace(int blockID, boolean isActive) {
+		super(blockID, Material.rock);
+		this.isActive = isActive;
 		this.blockIndexInTexture = 45;
 	}
 
-	public final void onBlockAdded(World var1, int var2, int var3, int var4) {
-		super.onBlockAdded(var1, var2, var3, var4);
-		setDefaultDirection(var1, var2, var3, var4);
+	@Override
+	public final void onBlockAdded(World world, int x, int y, int z) {
+		super.onBlockAdded(world, x, y, z);
+		setDefaultDirection(world, x, y, z);
 	}
 
-	private static void setDefaultDirection(World var0, int var1, int var2, int var3) {
-		int var4 = var0.getBlockId(var1, var2, var3 - 1);
-		int var5 = var0.getBlockId(var1, var2, var3 + 1);
-		int var6 = var0.getBlockId(var1 - 1, var2, var3);
-		int var7 = var0.getBlockId(var1 + 1, var2, var3);
-		byte var8 = 3;
-		if(Block.opaqueCubeLookup[var4] && !Block.opaqueCubeLookup[var5]) {
-			var8 = 3;
+	private static void setDefaultDirection(World world, int x, int y, int z) {
+		int neighborNegZ = world.getBlockId(x, y, z - 1);
+		int neighborPosZ = world.getBlockId(x, y, z + 1);
+		int neighborNegX = world.getBlockId(x - 1, y, z);
+		int neighborPosX = world.getBlockId(x + 1, y, z);
+		byte facing = 3;
+		if(Block.opaqueCubeLookup[neighborNegZ] && !Block.opaqueCubeLookup[neighborPosZ]) {
+			facing = 3;
 		}
-
-		if(Block.opaqueCubeLookup[var5] && !Block.opaqueCubeLookup[var4]) {
-			var8 = 2;
+		if(Block.opaqueCubeLookup[neighborPosZ] && !Block.opaqueCubeLookup[neighborNegZ]) {
+			facing = 2;
 		}
-
-		if(Block.opaqueCubeLookup[var6] && !Block.opaqueCubeLookup[var7]) {
-			var8 = 5;
+		if(Block.opaqueCubeLookup[neighborNegX] && !Block.opaqueCubeLookup[neighborPosX]) {
+			facing = 5;
 		}
-
-		if(Block.opaqueCubeLookup[var7] && !Block.opaqueCubeLookup[var6]) {
-			var8 = 4;
+		if(Block.opaqueCubeLookup[neighborPosX] && !Block.opaqueCubeLookup[neighborNegX]) {
+			facing = 4;
 		}
-
-		var0.setBlockMetadataWithNotify(var1, var2, var3, var8);
+		world.setBlockMetadataWithNotify(x, y, z, facing);
 	}
 
-	public final int getBlockTexture(World var1, int var2, int var3, int var4, int var5) {
-		if(var5 == 1) {
-			return Block.stone.blockIndexInTexture;
-		} else if(var5 == 0) {
+	@Override
+	public final int getBlockTexture(World world, int x, int y, int z, int side) {
+		if(side == 1 || side == 0) {
 			return Block.stone.blockIndexInTexture;
 		} else {
-			int var6 = var1.getBlockMetadata(var2, var3, var4);
-			if(var6 == 0) {
-				setDefaultDirection(var1, var2, var3, var4);
-				var6 = var1.getBlockMetadata(var2, var3, var4);
+			int metadata = world.getBlockMetadata(x, y, z);
+			if(metadata == 0) {
+				setDefaultDirection(world, x, y, z);
+				metadata = world.getBlockMetadata(x, y, z);
 			}
-
-			return var5 != var6 ? this.blockIndexInTexture : (this.isActive ? this.blockIndexInTexture + 16 : this.blockIndexInTexture - 1);
+			return side != metadata ? this.blockIndexInTexture : (this.isActive ? this.blockIndexInTexture + 16 : this.blockIndexInTexture - 1);
 		}
 	}
 
-	public final void randomDisplayTick(World var1, int var2, int var3, int var4, Random var5) {
+	@Override
+	public final void randomDisplayTick(World world, int x, int y, int z, Random random) {
 		if(this.isActive) {
-			int var6 = var1.getBlockMetadata(var2, var3, var4);
-			float var7 = (float)var2 + 0.5F;
-			float var8 = (float)var3 + var5.nextFloat() * 6.0F / 16.0F;
-			float var9 = (float)var4 + 0.5F;
-			float var10 = var5.nextFloat() * 0.6F - 0.3F;
-			if(var6 == 4) {
-				var1.spawnParticle("smoke", (double)(var7 - 0.52F), (double)var8, (double)(var9 + var10), 0.0D, 0.0D, 0.0D);
-				var1.spawnParticle("flame", (double)(var7 - 0.52F), (double)var8, (double)(var9 + var10), 0.0D, 0.0D, 0.0D);
-			} else if(var6 == 5) {
-				var1.spawnParticle("smoke", (double)(var7 + 0.52F), (double)var8, (double)(var9 + var10), 0.0D, 0.0D, 0.0D);
-				var1.spawnParticle("flame", (double)(var7 + 0.52F), (double)var8, (double)(var9 + var10), 0.0D, 0.0D, 0.0D);
-			} else if(var6 == 2) {
-				var1.spawnParticle("smoke", (double)(var7 + var10), (double)var8, (double)(var9 - 0.52F), 0.0D, 0.0D, 0.0D);
-				var1.spawnParticle("flame", (double)(var7 + var10), (double)var8, (double)(var9 - 0.52F), 0.0D, 0.0D, 0.0D);
-			} else {
-				if(var6 == 3) {
-					var1.spawnParticle("smoke", (double)(var7 + var10), (double)var8, (double)(var9 + 0.52F), 0.0D, 0.0D, 0.0D);
-					var1.spawnParticle("flame", (double)(var7 + var10), (double)var8, (double)(var9 + 0.52F), 0.0D, 0.0D, 0.0D);
-				}
-
+			int metadata = world.getBlockMetadata(x, y, z);
+			float centerX = (float)x + 0.5F;
+			float centerY = (float)y + random.nextFloat() * 6.0F / 16.0F;
+			float centerZ = (float)z + 0.5F;
+			float offset = random.nextFloat() * 0.6F - 0.3F;
+			if(metadata == 4) {
+				world.spawnParticle("smoke", (double)(centerX - 0.52F), (double)centerY, (double)(centerZ + offset), 0.0D, 0.0D, 0.0D);
+				world.spawnParticle("flame", (double)(centerX - 0.52F), (double)centerY, (double)(centerZ + offset), 0.0D, 0.0D, 0.0D);
+			} else if(metadata == 5) {
+				world.spawnParticle("smoke", (double)(centerX + 0.52F), (double)centerY, (double)(centerZ + offset), 0.0D, 0.0D, 0.0D);
+				world.spawnParticle("flame", (double)(centerX + 0.52F), (double)centerY, (double)(centerZ + offset), 0.0D, 0.0D, 0.0D);
+			} else if(metadata == 2) {
+				world.spawnParticle("smoke", (double)(centerX + offset), (double)centerY, (double)(centerZ - 0.52F), 0.0D, 0.0D, 0.0D);
+				world.spawnParticle("flame", (double)(centerX + offset), (double)centerY, (double)(centerZ - 0.52F), 0.0D, 0.0D, 0.0D);
+			} else if(metadata == 3) {
+				world.spawnParticle("smoke", (double)(centerX + offset), (double)centerY, (double)(centerZ + 0.52F), 0.0D, 0.0D, 0.0D);
+				world.spawnParticle("flame", (double)(centerX + offset), (double)centerY, (double)(centerZ + 0.52F), 0.0D, 0.0D, 0.0D);
 			}
 		}
 	}
 
-	public final int getBlockTextureFromSide(int var1) {
-		return var1 == 1 ? Block.stone.blockID : (var1 == 0 ? Block.stone.blockID : (var1 == 3 ? this.blockIndexInTexture - 1 : this.blockIndexInTexture));
+	@Override
+	public final int getBlockTextureFromSide(int side) {
+		return side == 1 ? Block.stone.blockID : (side == 0 ? Block.stone.blockID : (side == 3 ? this.blockIndexInTexture - 1 : this.blockIndexInTexture));
 	}
 
-	public final boolean blockActivated(World var1, int var2, int var3, int var4, EntityPlayer var5) {
-		TileEntityFurnace var6 = (TileEntityFurnace)var1.getBlockTileEntity(var2, var3, var4);
-		var5.displayFurnaceGUI(var6);
+	@Override
+	public final boolean blockActivated(World world, int x, int y, int z, EntityPlayer player) {
+		TileEntityFurnace furnace = (TileEntityFurnace)world.getBlockTileEntity(x, y, z);
+		player.displayFurnaceGUI(furnace);
 		return true;
 	}
 
+	@Override
 	protected final TileEntity getBlockEntity() {
 		return new TileEntityFurnace();
 	}

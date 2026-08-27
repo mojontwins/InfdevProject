@@ -10,31 +10,31 @@ public final class NBTTagList extends NBTBase {
 	private List<NBTBase> tagList = new ArrayList<>();
 	private byte tagType;
 
-	final void writeTagContents(DataOutput var1) throws IOException {
+	final void writeTagContents(DataOutput output) throws IOException {
 		if(this.tagList.size() > 0) {
 			this.tagType = this.tagList.get(0).getType();
 		} else {
 			this.tagType = 1;
 		}
 
-		var1.writeByte(this.tagType);
-		var1.writeInt(this.tagList.size());
+		output.writeByte(this.tagType);
+		output.writeInt(this.tagList.size());
 
-		for(int var2 = 0; var2 < this.tagList.size(); ++var2) {
-			this.tagList.get(var2).writeTagContents(var1);
+		for(NBTBase tag : this.tagList) {
+			tag.writeTagContents(output);
 		}
 
 	}
 
-	final void readTagContents(DataInput var1) throws IOException {
-		this.tagType = var1.readByte();
-		int var2 = var1.readInt();
+	final void readTagContents(DataInput input) throws IOException {
+		this.tagType = input.readByte();
+		int count = input.readInt();
 		this.tagList = new ArrayList<>();
 
-		for(int var3 = 0; var3 < var2; ++var3) {
-			NBTBase var4 = NBTBase.createTagOfType(this.tagType);
-			var4.readTagContents(var1);
-			this.tagList.add(var4);
+		for(int i = 0; i < count; i++) {
+			NBTBase tag = NBTBase.createTagOfType(this.tagType);
+			tag.readTagContents(input);
+			this.tagList.add(tag);
 		}
 
 	}
@@ -44,57 +44,45 @@ public final class NBTTagList extends NBTBase {
 	}
 
 	public final String toString() {
-		StringBuilder var10000 = (new StringBuilder()).append("").append(this.tagList.size()).append(" entries of type ");
-		byte var1 = this.tagType;
-		String var10001;
-		switch(var1) {
+		return this.tagList.size() + " entries of type " + getTagName(this.tagType);
+	}
+
+	private static String getTagName(byte type) {
+		switch(type) {
 		case 0:
-			var10001 = "TAG_End";
-			break;
+			return "TAG_End";
 		case 1:
-			var10001 = "TAG_Byte";
-			break;
+			return "TAG_Byte";
 		case 2:
-			var10001 = "TAG_Short";
-			break;
+			return "TAG_Short";
 		case 3:
-			var10001 = "TAG_Int";
-			break;
+			return "TAG_Int";
 		case 4:
-			var10001 = "TAG_Long";
-			break;
+			return "TAG_Long";
 		case 5:
-			var10001 = "TAG_Float";
-			break;
+			return "TAG_Float";
 		case 6:
-			var10001 = "TAG_Double";
-			break;
+			return "TAG_Double";
 		case 7:
-			var10001 = "TAG_Byte_Array";
-			break;
+			return "TAG_Byte_Array";
 		case 8:
-			var10001 = "TAG_String";
-			break;
+			return "TAG_String";
 		case 9:
-			var10001 = "TAG_List";
-			break;
+			return "TAG_List";
 		case 10:
-			var10001 = "TAG_Compound";
-			break;
+			return "TAG_Compound";
 		default:
-			var10001 = "UNKNOWN";
+			return "UNKNOWN";
 		}
-
-		return var10000.append(var10001).toString();
 	}
 
-	public final void setTag(NBTBase var1) {
-		this.tagType = var1.getType();
-		this.tagList.add(var1);
+	public final void setTag(NBTBase tag) {
+		this.tagType = tag.getType();
+		this.tagList.add(tag);
 	}
 
-	public final NBTBase tagAt(int var1) {
-		return this.tagList.get(var1);
+	public final NBTBase tagAt(int index) {
+		return this.tagList.get(index);
 	}
 
 	public final int tagCount() {

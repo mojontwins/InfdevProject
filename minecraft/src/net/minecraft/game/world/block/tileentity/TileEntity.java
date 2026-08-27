@@ -13,46 +13,43 @@ public class TileEntity {
 	public int yCoord;
 	public int zCoord;
 
-	private static void addMapping(Class<? extends TileEntity> var0, String var1) {
-		nameToClassMap.put(var1, var0);
-		classToNameMap.put(var0, var1);
+	private static void addMapping(Class<? extends TileEntity> tileEntityClass, String name) {
+		nameToClassMap.put(name, tileEntityClass);
+		classToNameMap.put(tileEntityClass, name);
 	}
 
-	public void readFromNBT(NBTTagCompound var1) {
-		this.xCoord = var1.getInteger("x");
-		this.yCoord = var1.getInteger("y");
-		this.zCoord = var1.getInteger("z");
+	public void readFromNBT(NBTTagCompound tag) {
+		this.xCoord = tag.getInteger("x");
+		this.yCoord = tag.getInteger("y");
+		this.zCoord = tag.getInteger("z");
 	}
 
-	public void writeToNBT(NBTTagCompound var1) {
-		var1.setString("id", classToNameMap.get(this.getClass()));
-		var1.setInteger("x", this.xCoord);
-		var1.setInteger("y", this.yCoord);
-		var1.setInteger("z", this.zCoord);
+	public void writeToNBT(NBTTagCompound tag) {
+		tag.setString("id", classToNameMap.get(this.getClass()));
+		tag.setInteger("x", this.xCoord);
+		tag.setInteger("y", this.yCoord);
+		tag.setInteger("z", this.zCoord);
 	}
 
 	public void updateEntity() {
 	}
 
-	public static TileEntity createAndLoadEntity(NBTTagCompound var0) {
-		TileEntity var1 = null;
-
+	public static TileEntity createAndLoadEntity(NBTTagCompound tag) {
+		TileEntity tileEntity = null;
 		try {
-			Class<? extends TileEntity> var2 = nameToClassMap.get(var0.getString("id"));
-			if(var2 != null) {
-				var1 = var2.newInstance();
+			Class<? extends TileEntity> tileEntityClass = nameToClassMap.get(tag.getString("id"));
+			if(tileEntityClass != null) {
+				tileEntity = tileEntityClass.newInstance();
 			}
-		} catch (Exception var3) {
-			var3.printStackTrace();
+		} catch (Exception exception) {
+			exception.printStackTrace();
 		}
-
-		if(var1 != null) {
-			var1.readFromNBT(var0);
+		if(tileEntity != null) {
+			tileEntity.readFromNBT(tag);
 		} else {
-			System.out.println("Skipping TileEntity with id " + var0.getString("id"));
+			System.out.println("Skipping TileEntity with id " + tag.getString("id"));
 		}
-
-		return var1;
+		return tileEntity;
 	}
 
 	static {

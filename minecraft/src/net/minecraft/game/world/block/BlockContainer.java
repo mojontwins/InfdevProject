@@ -5,18 +5,20 @@ import net.minecraft.game.world.block.tileentity.TileEntity;
 import net.minecraft.game.world.material.Material;
 
 public abstract class BlockContainer extends Block {
-	protected BlockContainer(int var1, Material var2) {
-		super(var1, var2);
+	protected BlockContainer(int blockID, Material material) {
+		super(blockID, material);
 	}
 
-	public void onBlockAdded(World var1, int var2, int var3, int var4) {
-		super.onBlockAdded(var1, var2, var3, var4);
-		var1.setBlockTileEntity(var2, var3, var4, this.getBlockEntity());
+	@Override
+	public void onBlockAdded(World world, int x, int y, int z) {
+		super.onBlockAdded(world, x, y, z);
+		world.setBlockTileEntity(x, y, z, this.getBlockEntity());
 	}
 
-	public void onBlockRemoval(World var1, int var2, int var3, int var4) {
-		super.onBlockRemoval(var1, var2, var3, var4);
-		var1.removeBlockTileEntity(var2, var3, var4);
+	@Override
+	public void onBlockRemoval(World world, int x, int y, int z) {
+		super.onBlockRemoval(world, x, y, z);
+		world.removeBlockTileEntity(x, y, z);
 	}
 
 	protected abstract TileEntity getBlockEntity();

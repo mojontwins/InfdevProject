@@ -9,219 +9,223 @@ public class BlockFluid extends Block {
 	protected int stillId;
 	protected int movingId;
 
-	protected BlockFluid(int var1, Material var2) {
-		super(var1, var2);
+	protected BlockFluid(int blockID, Material material) {
+		super(blockID, material);
 		this.blockIndexInTexture = 14;
-		if(var2 == Material.lava) {
+		if(material == Material.lava) {
 			this.blockIndexInTexture = 30;
 		}
-
-		Block.isBlockContainer[var1] = true;
-		this.movingId = var1;
-		this.stillId = var1 + 1;
+		Block.isBlockContainer[blockID] = true;
+		this.movingId = blockID;
+		this.stillId = blockID + 1;
 		this.setBlockBounds(0.01F, -0.09F, 0.01F, 1.01F, 0.90999997F, 1.01F);
 		this.setTickOnLoad(true);
 		this.setResistance(2.0F);
 	}
 
-	public final int getBlockTextureFromSide(int var1) {
-		return this.blockMaterial == Material.lava ? this.blockIndexInTexture : (var1 == 1 ? this.blockIndexInTexture : (var1 == 0 ? this.blockIndexInTexture : this.blockIndexInTexture + 32));
+	@Override
+	public final int getBlockTextureFromSide(int side) {
+		return this.blockMaterial == Material.lava ? this.blockIndexInTexture : (side == 1 ? this.blockIndexInTexture : (side == 0 ? this.blockIndexInTexture : this.blockIndexInTexture + 32));
 	}
 
+	@Override
 	public final boolean renderAsNormalBlock() {
 		return false;
 	}
 
-	public void onBlockAdded(World var1, int var2, int var3, int var4) {
-		var1.scheduleBlockUpdate(var2, var3, var4, this.movingId);
+	@Override
+	public void onBlockAdded(World world, int x, int y, int z) {
+		world.scheduleBlockUpdate(x, y, z, this.movingId);
 	}
 
-	public void updateTick(World var1, int var2, int var3, int var4, Random var5) {
-		this.update(var1, var2, var3, var4, 0);
+	@Override
+	public void updateTick(World world, int x, int y, int z, Random random) {
+		this.update(world, x, y, z, 0);
 	}
 
-	public boolean update(World var1, int var2, int var3, int var4, int var5) {
-		boolean var7 = false;
-		liquidSolidCheck(var1, var2, var3, var4);
+	public boolean update(World world, int x, int y, int z, int level) {
+		boolean flowing = false;
+		liquidSolidCheck(world, x, y, z);
 
-		boolean var6;
+		boolean movedDown;
 		do {
-			--var3;
-			if(!this.canFlow(var1, var2, var3, var4)) {
+			--y;
+			if(!this.canFlow(world, x, y, z)) {
 				break;
 			}
-
-			liquidSolidCheck(var1, var2, var3, var4);
-			var6 = var1.setBlockWithNotify(var2, var3, var4, this.movingId);
-			if(var6) {
-				var7 = true;
+			liquidSolidCheck(world, x, y, z);
+			movedDown = world.setBlockWithNotify(x, y, z, this.movingId);
+			if(movedDown) {
+				flowing = true;
 			}
-		} while(var6 && this.blockMaterial != Material.lava);
+		} while(movedDown && this.blockMaterial != Material.lava);
 
-		++var3;
-		if(this.blockMaterial == Material.water || !var7) {
-			var7 |= this.flow(var1, var2 - 1, var3, var4);
-			var7 |= this.flow(var1, var2 + 1, var3, var4);
-			var7 |= this.flow(var1, var2, var3, var4 - 1);
-			var7 |= this.flow(var1, var2, var3, var4 + 1);
+		++y;
+		if(this.blockMaterial == Material.water || !flowing) {
+			flowing |= this.flow(world, x - 1, y, z);
+			flowing |= this.flow(world, x + 1, y, z);
+			flowing |= this.flow(world, x, y, z - 1);
+			flowing |= this.flow(world, x, y, z + 1);
 		}
 
 		if(this.blockMaterial == Material.lava) {
-			var7 |= extinguishFireLava(var1, var2 - 1, var3, var4);
-			var7 |= extinguishFireLava(var1, var2 + 1, var3, var4);
-			var7 |= extinguishFireLava(var1, var2, var3, var4 - 1);
-			var7 |= extinguishFireLava(var1, var2, var3, var4 + 1);
+			flowing |= extinguishFireLava(world, x - 1, y, z);
+			flowing |= extinguishFireLava(world, x + 1, y, z);
+			flowing |= extinguishFireLava(world, x, y, z - 1);
+			flowing |= extinguishFireLava(world, x, y, z + 1);
 		}
 
-		if(!var7) {
-			var1.setTileNoUpdate(var2, var3, var4, this.stillId);
+		if(!flowing) {
+			world.setTileNoUpdate(x, y, z, this.stillId);
 		} else {
-			var1.scheduleBlockUpdate(var2, var3, var4, this.movingId);
+			world.scheduleBlockUpdate(x, y, z, this.movingId);
 		}
 
-		return var7;
+		return flowing;
 	}
 
-	private static boolean liquidSolidCheck(World var0, int var1, int var2, int var3) {
-		return var0.getBlockMaterial(var1, var2 - 1, var3).liquidSolidCheck();
+	private static boolean liquidSolidCheck(World world, int x, int y, int z) {
+		return world.getBlockMaterial(x, y - 1, z).liquidSolidCheck();
 	}
 
-	protected final boolean canFlow(World var1, int var2, int var3, int var4) {
-		if(!var1.getBlockMaterial(var2, var3, var4).liquidSolidCheck()) {
+	protected final boolean canFlow(World world, int x, int y, int z) {
+		if(!world.getBlockMaterial(x, y, z).liquidSolidCheck()) {
 			return false;
 		} else {
 			if(this.blockMaterial == Material.water) {
-				for(int var5 = var2 - 2; var5 <= var2 + 2; ++var5) {
-					for(int var6 = var3 - 2; var6 <= var3 + 2; ++var6) {
-						for(int var7 = var4 - 2; var7 <= var4 + 2; ++var7) {
-							if(var1.getBlockId(var5, var6, var7) == Block.sponge.blockID) {
+				for(int scanX = x - 2; scanX <= x + 2; ++scanX) {
+					for(int scanY = y - 2; scanY <= y + 2; ++scanY) {
+						for(int scanZ = z - 2; scanZ <= z + 2; ++scanZ) {
+							if(world.getBlockId(scanX, scanY, scanZ) == Block.sponge.blockID) {
 								return false;
 							}
 						}
 					}
 				}
 			}
-
 			return true;
 		}
 	}
 
-	private static boolean extinguishFireLava(World var0, int var1, int var2, int var3) {
-		if(Block.fire.getChanceOfNeighborsEncouragingFire(var0.getBlockId(var1, var2, var3))) {
-			Block.fire.fireSpread(var0, var1, var2, var3);
+	private static boolean extinguishFireLava(World world, int x, int y, int z) {
+		if(Block.fire.getChanceOfNeighborsEncouragingFire(world.getBlockId(x, y, z))) {
+			Block.fire.fireSpread(world, x, y, z);
 			return true;
 		} else {
 			return false;
 		}
 	}
 
-	private boolean flow(World var1, int var2, int var3, int var4) {
-		if(!this.canFlow(var1, var2, var3, var4)) {
+	private boolean flow(World world, int x, int y, int z) {
+		if(!this.canFlow(world, x, y, z)) {
 			return false;
 		} else {
-			boolean var5 = var1.setBlockWithNotify(var2, var3, var4, this.movingId);
-			if(var5) {
-				var1.scheduleBlockUpdate(var2, var3, var4, this.movingId);
+			boolean setBlock = world.setBlockWithNotify(x, y, z, this.movingId);
+			if(setBlock) {
+				world.scheduleBlockUpdate(x, y, z, this.movingId);
 			}
-
 			return false;
 		}
 	}
 
-	public final float getBlockBrightness(World var1, int var2, int var3, int var4) {
-		return this.blockMaterial == Material.lava ? 100.0F : super.getBlockBrightness(var1, var2, var3, var4);
+	@Override
+	public final float getBlockBrightness(World world, int x, int y, int z) {
+		return this.blockMaterial == Material.lava ? 100.0F : super.getBlockBrightness(world, x, y, z);
 	}
 
-	public boolean shouldSideBeRendered(World var1, int var2, int var3, int var4, int var5) {
-		int var6 = var1.getBlockId(var2, var3, var4);
-		return var6 != this.movingId && var6 != this.stillId ? (var5 != 1 || var1.getBlockId(var2 - 1, var3, var4) != 0 && var1.getBlockId(var2 + 1, var3, var4) != 0 && var1.getBlockId(var2, var3, var4 - 1) != 0 && var1.getBlockId(var2, var3, var4 + 1) != 0 ? super.shouldSideBeRendered(var1, var2, var3, var4, var5) : true) : false;
+	@Override
+	public boolean shouldSideBeRendered(World world, int x, int y, int z, int side) {
+		int neighborBlockID = world.getBlockId(x, y, z);
+		return neighborBlockID != this.movingId && neighborBlockID != this.stillId ? (side != 1 || world.getBlockId(x - 1, y, z) != 0 && world.getBlockId(x + 1, y, z) != 0 && world.getBlockId(x, y, z - 1) != 0 && world.getBlockId(x, y, z + 1) != 0 ? super.shouldSideBeRendered(world, x, y, z, side) : true) : false;
 	}
 
+	@Override
 	public boolean isCollidable() {
 		return false;
 	}
 
-	public AxisAlignedBB getCollisionBoundingBoxFromPool(int var1, int var2, int var3) {
+	@Override
+	public AxisAlignedBB getCollisionBoundingBoxFromPool(int x, int y, int z) {
 		return null;
 	}
 
+	@Override
 	public boolean isOpaqueCube() {
 		return false;
 	}
 
-	public void onNeighborBlockChange(World var1, int var2, int var3, int var4, int var5) {
-		if(var5 != 0) {
-			Material var6 = Block.blocksList[var5].blockMaterial;
-			if(this.blockMaterial == Material.water && var6 == Material.lava || var6 == Material.water && this.blockMaterial == Material.lava) {
-				var1.setBlockWithNotify(var2, var3, var4, Block.stone.blockID);
+	@Override
+	public void onNeighborBlockChange(World world, int x, int y, int z, int neighborID) {
+		if(neighborID != 0) {
+			Material neighborMaterial = Block.blocksList[neighborID].blockMaterial;
+			if(this.blockMaterial == Material.water && neighborMaterial == Material.lava || neighborMaterial == Material.water && this.blockMaterial == Material.lava) {
+				world.setBlockWithNotify(x, y, z, Block.stone.blockID);
 			}
 		}
-
-		var1.scheduleBlockUpdate(var2, var3, var4, this.blockID);
+		world.scheduleBlockUpdate(x, y, z, this.blockID);
 	}
 
+	@Override
 	public int tickRate() {
 		return this.blockMaterial == Material.lava ? 25 : 5;
 	}
 
-	public int quantityDropped(Random var1) {
+	@Override
+	public int quantityDropped(Random random) {
 		return 0;
 	}
 
+	@Override
 	public int getRenderBlockPass() {
 		return this.blockMaterial == Material.water ? 1 : 0;
 	}
 
-	public final void randomDisplayTick(World var1, int var2, int var3, int var4, Random var5) {
-		if(var5.nextInt(128) == -1 && var1.getBlockMaterial(var2, var3 + 1, var4).getIsSolid()) {
+	@Override
+	public final void randomDisplayTick(World world, int x, int y, int z, Random random) {
+		if(random.nextInt(128) == -1 && world.getBlockMaterial(x, y + 1, z).getIsSolid()) {
 			if(this.blockMaterial == Material.lava) {
-				var1.playSoundEffect((double)((float)var2 + 0.5F), (double)((float)var3 + 0.5F), (double)((float)var4 + 0.5F), "liquid.lava", var5.nextFloat() * 0.25F + 12.0F / 16.0F, var5.nextFloat() * 0.5F + 0.3F);
+				world.playSoundEffect((double)((float)x + 0.5F), (double)((float)y + 0.5F), (double)((float)z + 0.5F), "liquid.lava", random.nextFloat() * 0.25F + 12.0F / 16.0F, random.nextFloat() * 0.5F + 0.3F);
 			}
-
 			if(this.blockMaterial == Material.water) {
-				var1.playSoundEffect((double)((float)var2 + 0.5F), (double)((float)var3 + 0.5F), (double)((float)var4 + 0.5F), "liquid.water", var5.nextFloat() * 0.25F + 12.0F / 16.0F, var5.nextFloat() + 0.5F);
+				world.playSoundEffect((double)((float)x + 0.5F), (double)((float)y + 0.5F), (double)((float)z + 0.5F), "liquid.water", random.nextFloat() * 0.25F + 12.0F / 16.0F, random.nextFloat() + 0.5F);
 			}
 		}
 
-		if(this.blockMaterial == Material.lava && var1.getBlockMaterial(var2, var3 + 1, var4) == Material.air && !var1.isSolid(var2, var3 + 1, var4) && var5.nextInt(100) == 0) {
-			double var6 = (double)((float)var2 + var5.nextFloat());
-			double var8 = (double)var3 + this.maxY;
-			double var10 = (double)((float)var4 + var5.nextFloat());
-			var1.spawnParticle("lava", var6, var8, var10, 0.0D, 0.0D, 0.0D);
+		if(this.blockMaterial == Material.lava && world.getBlockMaterial(x, y + 1, z) == Material.air && !world.isSolid(x, y + 1, z) && random.nextInt(100) == 0) {
+			double particleX = (double)((float)x + random.nextFloat());
+			double particleY = (double)y + this.maxY;
+			double particleZ = (double)((float)z + random.nextFloat());
+			world.spawnParticle("lava", particleX, particleY, particleZ, 0.0D, 0.0D, 0.0D);
 		}
 
 		if(this.blockMaterial == Material.water) {
-			int var7;
-			if(liquidAirCheck(var1, var2 + 1, var3, var4)) {
-				for(var7 = 0; var7 < 4; ++var7) {
-					var1.spawnParticle("splash", (double)((float)(var2 + 1) + 2.0F / 16.0F), (double)var3, (double)((float)var4 + var5.nextFloat()), 0.0D, 0.0D, 0.0D);
+			int particleIndex;
+			if(liquidAirCheck(world, x + 1, y, z)) {
+				for(particleIndex = 0; particleIndex < 4; ++particleIndex) {
+					world.spawnParticle("splash", (double)((float)(x + 1) + 2.0F / 16.0F), (double)y, (double)((float)z + random.nextFloat()), 0.0D, 0.0D, 0.0D);
 				}
 			}
-
-			if(liquidAirCheck(var1, var2 - 1, var3, var4)) {
-				for(var7 = 0; var7 < 4; ++var7) {
-					var1.spawnParticle("splash", (double)((float)var2 - 2.0F / 16.0F), (double)var3, (double)((float)var4 + var5.nextFloat()), 0.0D, 0.0D, 0.0D);
+			if(liquidAirCheck(world, x - 1, y, z)) {
+				for(particleIndex = 0; particleIndex < 4; ++particleIndex) {
+					world.spawnParticle("splash", (double)((float)x - 2.0F / 16.0F), (double)y, (double)((float)z + random.nextFloat()), 0.0D, 0.0D, 0.0D);
 				}
 			}
-
-			if(liquidAirCheck(var1, var2, var3, var4 + 1)) {
-				for(var7 = 0; var7 < 4; ++var7) {
-					var1.spawnParticle("splash", (double)((float)var2 + var5.nextFloat()), (double)var3, (double)((float)(var4 + 1) + 2.0F / 16.0F), 0.0D, 0.0D, 0.0D);
+			if(liquidAirCheck(world, x, y, z + 1)) {
+				for(particleIndex = 0; particleIndex < 4; ++particleIndex) {
+					world.spawnParticle("splash", (double)((float)x + random.nextFloat()), (double)y, (double)((float)(z + 1) + 2.0F / 16.0F), 0.0D, 0.0D, 0.0D);
 				}
 			}
-
-			if(liquidAirCheck(var1, var2, var3, var4 - 1)) {
-				for(var7 = 0; var7 < 4; ++var7) {
-					var1.spawnParticle("splash", (double)((float)var2 + var5.nextFloat()), (double)var3, (double)((float)var4 - 2.0F / 16.0F), 0.0D, 0.0D, 0.0D);
+			if(liquidAirCheck(world, x, y, z - 1)) {
+				for(particleIndex = 0; particleIndex < 4; ++particleIndex) {
+					world.spawnParticle("splash", (double)((float)x + random.nextFloat()), (double)y, (double)((float)z - 2.0F / 16.0F), 0.0D, 0.0D, 0.0D);
 				}
 			}
 		}
-
 	}
 
-	private static boolean liquidAirCheck(World var0, int var1, int var2, int var3) {
-		Material var4 = var0.getBlockMaterial(var1, var2, var3);
-		Material var5 = var0.getBlockMaterial(var1, var2 - 1, var3);
-		return !var4.getIsSolid() && !var4.getIsLiquid() ? var5.getIsSolid() || var5.getIsLiquid() : false;
+	private static boolean liquidAirCheck(World world, int x, int y, int z) {
+		Material blockMaterial = world.getBlockMaterial(x, y, z);
+		Material belowMaterial = world.getBlockMaterial(x, y - 1, z);
+		return !blockMaterial.getIsSolid() && !blockMaterial.getIsLiquid() ? belowMaterial.getIsSolid() || belowMaterial.getIsLiquid() : false;
 	}
 }

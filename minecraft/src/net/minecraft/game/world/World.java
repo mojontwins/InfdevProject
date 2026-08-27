@@ -37,6 +37,8 @@ public class World {
 	private int updateLCG;
 	private int DIST_HASH_MAGIC;
 	private static float[] lightBrightnessTable = new float[16];
+	private static final int blocksToTickPerFrame = 80;
+	public static long autosavePeriod = 3600L;
 	public Entity playerEntity;
 	public int difficultySetting;
 	public final Pathfinder pathFinder;
@@ -1342,7 +1344,7 @@ public class World {
 
 	}
 
-	public final void restartTimeOfDay() {
+	public final void tick() {
 		this.chunkProvider.unload100OldestChunks();
 		if(!this.loadedEntityList.contains(this.playerEntity)) {
 			this.spawnEntityInWorld(this.playerEntity);
@@ -1369,7 +1371,7 @@ public class World {
 		}
 
 		++this.worldTime;
-		if(this.worldTime % 100L == 0L) {
+		if(this.worldTime % autosavePeriod == 0L) {
 			this.saveWorld(false);
 		}
 
@@ -1378,9 +1380,8 @@ public class World {
 			var8 = 200;
 		}
 
-		int var2;
 		int var4;
-		for(var2 = 0; var2 < var8; ++var2) {
+		for(int i = 0; i < var8; ++i) {
 			NextTickListEntry var3 = this.unloadedEntityList.remove(0);
 			if(var3.scheduledTime > 0) {
 				--var3.scheduledTime;
@@ -1393,18 +1394,33 @@ public class World {
 			}
 		}
 
-		var8 = MathHelper.floor_double(this.playerEntity.posX);
-		var2 = MathHelper.floor_double(this.playerEntity.posZ);
+		this.updateBlocksAndPlayCaveSounds();
 
-		for(int var9 = 0; var9 < 32000; ++var9) {
-			this.updateLCG = this.updateLCG * 3 + this.DIST_HASH_MAGIC;
-			var4 = this.updateLCG >> 2;
-			int var5 = (var4 & 255) - 128 + var8;
-			int var6 = (var4 >> 8 & 255) - 128 + var2;
-			var4 = var4 >> 16 & 127;
-			int var7 = this.getBlockId(var5, var4, var6);
-			if(Block.tickOnLoad[var7]) {
-				Block.blocksList[var7].updateTick(this, var5, var4, var6, this.rand);
+	}
+
+	public final void updateBlocksAndPlayCaveSounds() {
+		int playerChunkX = MathHelper.floor_double(this.playerEntity.posX / 16.0D);
+		int playerChunkZ = MathHelper.floor_double(this.playerEntity.posZ / 16.0D);
+
+		for(int chunkXOffset = -8; chunkXOffset <= 8; ++chunkXOffset) {
+			for(int chunkZOffset = -8; chunkZOffset <= 8; ++chunkZOffset) {
+				int chunkX = chunkXOffset + playerChunkX;
+				int chunkZ = chunkZOffset + playerChunkZ;
+				if(this.chunkExists(chunkX, chunkZ)) {
+					Chunk chunk = this.getChunkFromChunkCoords(chunkX, chunkZ);
+
+					for(int tick = 0; tick < blocksToTickPerFrame; ++tick) {
+						this.updateLCG = this.updateLCG * 3 + this.DIST_HASH_MAGIC;
+						int tIndex = this.updateLCG >> 2;
+						int x = tIndex & 15;
+						int z = tIndex >> 8 & 15;
+						int y = tIndex >> 16 & 127;
+						int blockID = chunk.getBlockID(x, y, z);
+						if(Block.tickOnLoad[blockID]) {
+							Block.blocksList[blockID].updateTick(this, x + chunk.xPosition * 16, y, z + chunk.zPosition * 16, this.rand);
+						}
+					}
+				}
 			}
 		}
 

@@ -10,16 +10,16 @@ public final class NBTTagLong extends NBTBase {
 	public NBTTagLong() {
 	}
 
-	public NBTTagLong(long var1) {
-		this.longValue = var1;
+	public NBTTagLong(long value) {
+		this.longValue = value;
 	}
 
-	final void writeTagContents(DataOutput var1) throws IOException {
-		var1.writeLong(this.longValue);
+	final void writeTagContents(DataOutput output) throws IOException {
+		output.writeLong(this.longValue);
 	}
 
-	final void readTagContents(DataInput var1) throws IOException {
-		this.longValue = var1.readLong();
+	final void readTagContents(DataInput input) throws IOException {
+		this.longValue = input.readLong();
 	}
 
 	public final byte getType() {
@@ -27,6 +27,6 @@ public final class NBTTagLong extends NBTBase {
 	}
 
 	public final String toString() {
-		return "" + this.longValue;
+		return String.valueOf(this.longValue);
 	}
 }

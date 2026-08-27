@@ -4,11 +4,12 @@ import java.util.Random;
 import net.minecraft.game.item.Item;
 
 public final class BlockGravel extends BlockSand {
-	public BlockGravel(int var1, int var2) {
-		super(13, 19);
+	public BlockGravel(int blockID, int textureIndex) {
+		super(blockID, textureIndex);
 	}
 
-	public final int idDropped(int var1, Random var2) {
-		return var2.nextInt(10) == 0 ? Item.flint.shiftedIndex : this.blockID;
+	@Override
+	public final int idDropped(int metadata, Random random) {
+		return random.nextInt(10) == 0 ? Item.flint.shiftedIndex : this.blockID;
 	}
 }

@@ -797,7 +797,7 @@ var3 = this.currentScreen == null && Mouse.isButtonDown(0) && this.inventoryScre
 			}
 
 			if(!this.isGamePaused) {
-				this.theWorld.restartTimeOfDay();
+				this.theWorld.tick();
 			}
 
 			if(!this.isGamePaused) {

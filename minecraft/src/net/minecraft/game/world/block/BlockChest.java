@@ -14,190 +14,169 @@ import net.minecraft.game.world.material.Material;
 public final class BlockChest extends BlockContainer {
 	private Random random = new Random();
 
-	protected BlockChest(int var1) {
-		super(54, Material.wood);
+	protected BlockChest(int blockID) {
+		super(blockID, Material.wood);
 		this.blockIndexInTexture = 26;
 	}
 
-	public final int getBlockTexture(World var1, int var2, int var3, int var4, int var5) {
-		if(var5 == 1) {
-			return this.blockIndexInTexture - 1;
-		} else if(var5 == 0) {
+	@Override
+	public final int getBlockTexture(World world, int x, int y, int z, int side) {
+		if(side == 1 || side == 0) {
 			return this.blockIndexInTexture - 1;
 		} else {
-			int var6 = var1.getBlockId(var2, var3, var4 - 1);
-			int var7 = var1.getBlockId(var2, var3, var4 + 1);
-			int var8 = var1.getBlockId(var2 - 1, var3, var4);
-			int var9 = var1.getBlockId(var2 + 1, var3, var4);
-			int var10;
-			int var11;
-			int var12;
-			byte var13;
-			if(var6 != this.blockID && var7 != this.blockID) {
-				if(var8 != this.blockID && var9 != this.blockID) {
-					byte var14 = 3;
-					if(Block.opaqueCubeLookup[var6] && !Block.opaqueCubeLookup[var7]) {
-						var14 = 3;
+			int neighborNegZ = world.getBlockId(x, y, z - 1);
+			int neighborPosZ = world.getBlockId(x, y, z + 1);
+			int neighborNegX = world.getBlockId(x - 1, y, z);
+			int neighborPosX = world.getBlockId(x + 1, y, z);
+			if(neighborNegZ != this.blockID && neighborPosZ != this.blockID) {
+				if(neighborNegX != this.blockID && neighborPosX != this.blockID) {
+					byte facing = 3;
+					if(Block.opaqueCubeLookup[neighborNegZ] && !Block.opaqueCubeLookup[neighborPosZ]) {
+						facing = 3;
 					}
-
-					if(Block.opaqueCubeLookup[var7] && !Block.opaqueCubeLookup[var6]) {
-						var14 = 2;
+					if(Block.opaqueCubeLookup[neighborPosZ] && !Block.opaqueCubeLookup[neighborNegZ]) {
+						facing = 2;
 					}
-
-					if(Block.opaqueCubeLookup[var8] && !Block.opaqueCubeLookup[var9]) {
-						var14 = 5;
+					if(Block.opaqueCubeLookup[neighborNegX] && !Block.opaqueCubeLookup[neighborPosX]) {
+						facing = 5;
 					}
-
-					if(Block.opaqueCubeLookup[var9] && !Block.opaqueCubeLookup[var8]) {
-						var14 = 4;
+					if(Block.opaqueCubeLookup[neighborPosX] && !Block.opaqueCubeLookup[neighborNegX]) {
+						facing = 4;
 					}
-
-					return var5 == var14 ? this.blockIndexInTexture + 1 : this.blockIndexInTexture;
-				} else if(var5 != 4 && var5 != 5) {
-					var10 = 0;
-					if(var8 == this.blockID) {
-						var10 = -1;
+					return side == facing ? this.blockIndexInTexture + 1 : this.blockIndexInTexture;
+				} else if(side != 4 && side != 5) {
+					int offset = 0;
+					if(neighborNegX == this.blockID) {
+						offset = -1;
 					}
-
-					var11 = var1.getBlockId(var8 == this.blockID ? var2 - 1 : var2 + 1, var3, var4 - 1);
-					var12 = var1.getBlockId(var8 == this.blockID ? var2 - 1 : var2 + 1, var3, var4 + 1);
-					if(var5 == 3) {
-						var10 = -1 - var10;
+					int cornerNegZ = world.getBlockId(neighborNegX == this.blockID ? x - 1 : x + 1, y, z - 1);
+					int cornerPosZ = world.getBlockId(neighborNegX == this.blockID ? x - 1 : x + 1, y, z + 1);
+					if(side == 3) {
+						offset = -1 - offset;
 					}
-
-					var13 = 3;
-					if((Block.opaqueCubeLookup[var6] || Block.opaqueCubeLookup[var11]) && !Block.opaqueCubeLookup[var7] && !Block.opaqueCubeLookup[var12]) {
-						var13 = 3;
+					byte facing = 3;
+					if((Block.opaqueCubeLookup[neighborNegZ] || Block.opaqueCubeLookup[cornerNegZ]) && !Block.opaqueCubeLookup[neighborPosZ] && !Block.opaqueCubeLookup[cornerPosZ]) {
+						facing = 3;
 					}
-
-					if((Block.opaqueCubeLookup[var7] || Block.opaqueCubeLookup[var12]) && !Block.opaqueCubeLookup[var6] && !Block.opaqueCubeLookup[var11]) {
-						var13 = 2;
+					if((Block.opaqueCubeLookup[neighborPosZ] || Block.opaqueCubeLookup[cornerPosZ]) && !Block.opaqueCubeLookup[neighborNegZ] && !Block.opaqueCubeLookup[cornerNegZ]) {
+						facing = 2;
 					}
-
-					return (var5 == var13 ? this.blockIndexInTexture + 16 : this.blockIndexInTexture + 32) + var10;
+					return (side == facing ? this.blockIndexInTexture + 16 : this.blockIndexInTexture + 32) + offset;
 				} else {
 					return this.blockIndexInTexture;
 				}
-			} else if(var5 != 2 && var5 != 3) {
-				var10 = 0;
-				if(var6 == this.blockID) {
-					var10 = -1;
+			} else if(side != 2 && side != 3) {
+				int offset = 0;
+				if(neighborNegZ == this.blockID) {
+					offset = -1;
 				}
-
-				var11 = var1.getBlockId(var2 - 1, var3, var6 == this.blockID ? var4 - 1 : var4 + 1);
-				var12 = var1.getBlockId(var2 + 1, var3, var6 == this.blockID ? var4 - 1 : var4 + 1);
-				if(var5 == 4) {
-					var10 = -1 - var10;
+				int cornerNegX = world.getBlockId(x - 1, y, neighborNegZ == this.blockID ? z - 1 : z + 1);
+				int cornerPosX = world.getBlockId(x + 1, y, neighborNegZ == this.blockID ? z - 1 : z + 1);
+				if(side == 4) {
+					offset = -1 - offset;
 				}
-
-				var13 = 5;
-				if((Block.opaqueCubeLookup[var8] || Block.opaqueCubeLookup[var11]) && !Block.opaqueCubeLookup[var9] && !Block.opaqueCubeLookup[var12]) {
-					var13 = 5;
+				byte facing = 5;
+				if((Block.opaqueCubeLookup[neighborNegX] || Block.opaqueCubeLookup[cornerNegX]) && !Block.opaqueCubeLookup[neighborPosX] && !Block.opaqueCubeLookup[cornerPosX]) {
+					facing = 5;
 				}
-
-				if((Block.opaqueCubeLookup[var9] || Block.opaqueCubeLookup[var12]) && !Block.opaqueCubeLookup[var8] && !Block.opaqueCubeLookup[var11]) {
-					var13 = 4;
+				if((Block.opaqueCubeLookup[neighborPosX] || Block.opaqueCubeLookup[cornerPosX]) && !Block.opaqueCubeLookup[neighborNegX] && !Block.opaqueCubeLookup[cornerNegX]) {
+					facing = 4;
 				}
-
-				return (var5 == var13 ? this.blockIndexInTexture + 16 : this.blockIndexInTexture + 32) + var10;
+				return (side == facing ? this.blockIndexInTexture + 16 : this.blockIndexInTexture + 32) + offset;
 			} else {
 				return this.blockIndexInTexture;
 			}
 		}
 	}
 
-	public final int getBlockTextureFromSide(int var1) {
-		return var1 == 1 ? this.blockIndexInTexture - 1 : (var1 == 0 ? this.blockIndexInTexture - 1 : (var1 == 3 ? this.blockIndexInTexture + 1 : this.blockIndexInTexture));
+	@Override
+	public final int getBlockTextureFromSide(int side) {
+		return side == 1 ? this.blockIndexInTexture - 1 : (side == 0 ? this.blockIndexInTexture - 1 : (side == 3 ? this.blockIndexInTexture + 1 : this.blockIndexInTexture));
 	}
 
-	public final boolean canPlaceBlockAt(World var1, int var2, int var3, int var4) {
-		int var5 = 0;
-		if(var1.getBlockId(var2 - 1, var3, var4) == this.blockID) {
-			++var5;
+	@Override
+	public final boolean canPlaceBlockAt(World world, int x, int y, int z) {
+		int neighborChestCount = 0;
+		if(world.getBlockId(x - 1, y, z) == this.blockID) {
+			++neighborChestCount;
 		}
-
-		if(var1.getBlockId(var2 + 1, var3, var4) == this.blockID) {
-			++var5;
+		if(world.getBlockId(x + 1, y, z) == this.blockID) {
+			++neighborChestCount;
 		}
-
-		if(var1.getBlockId(var2, var3, var4 - 1) == this.blockID) {
-			++var5;
+		if(world.getBlockId(x, y, z - 1) == this.blockID) {
+			++neighborChestCount;
 		}
-
-		if(var1.getBlockId(var2, var3, var4 + 1) == this.blockID) {
-			++var5;
+		if(world.getBlockId(x, y, z + 1) == this.blockID) {
+			++neighborChestCount;
 		}
-
-		return var5 > 1 ? false : (this.hasNeighborChest(var1, var2 - 1, var3, var4) ? false : (this.hasNeighborChest(var1, var2 + 1, var3, var4) ? false : (this.hasNeighborChest(var1, var2, var3, var4 - 1) ? false : !this.hasNeighborChest(var1, var2, var3, var4 + 1))));
+		return neighborChestCount <= 1 && !this.hasNeighborChest(world, x - 1, y, z) && !this.hasNeighborChest(world, x + 1, y, z) && !this.hasNeighborChest(world, x, y, z - 1) && !this.hasNeighborChest(world, x, y, z + 1);
 	}
 
-	private boolean hasNeighborChest(World var1, int var2, int var3, int var4) {
-		return var1.getBlockId(var2, var3, var4) != this.blockID ? false : (var1.getBlockId(var2 - 1, var3, var4) == this.blockID ? true : (var1.getBlockId(var2 + 1, var3, var4) == this.blockID ? true : (var1.getBlockId(var2, var3, var4 - 1) == this.blockID ? true : var1.getBlockId(var2, var3, var4 + 1) == this.blockID)));
+	private boolean hasNeighborChest(World world, int x, int y, int z) {
+		return world.getBlockId(x, y, z) != this.blockID ? false : (world.getBlockId(x - 1, y, z) == this.blockID || world.getBlockId(x + 1, y, z) == this.blockID || world.getBlockId(x, y, z - 1) == this.blockID || world.getBlockId(x, y, z + 1) == this.blockID);
 	}
 
-	public final void onBlockRemoval(World var1, int var2, int var3, int var4) {
-		TileEntityChest var5 = (TileEntityChest)var1.getBlockTileEntity(var2, var3, var4);
+	@Override
+	public final void onBlockRemoval(World world, int x, int y, int z) {
+		TileEntityChest chest = (TileEntityChest)world.getBlockTileEntity(x, y, z);
 
-		for(int var6 = 0; var6 < var5.getInventorySize(); ++var6) {
-			ItemStack var7 = var5.getStackInSlot(var6);
-			if(var7 != null) {
-				float var8 = this.random.nextFloat() * 0.8F + 0.1F;
-				float var9 = this.random.nextFloat() * 0.8F + 0.1F;
-				float var10 = this.random.nextFloat() * 0.8F + 0.1F;
+		for(int i = 0; i < chest.getInventorySize(); ++i) {
+			ItemStack itemStack = chest.getStackInSlot(i);
+			if(itemStack != null) {
+				float dropX = this.random.nextFloat() * 0.8F + 0.1F;
+				float dropY = this.random.nextFloat() * 0.8F + 0.1F;
+				float dropZ = this.random.nextFloat() * 0.8F + 0.1F;
 
-				while(var7.stackSize > 0) {
-					int var11 = this.random.nextInt(21) + 10;
-					if(var11 > var7.stackSize) {
-						var11 = var7.stackSize;
+				while(itemStack.stackSize > 0) {
+					int dropAmount = this.random.nextInt(21) + 10;
+					if(dropAmount > itemStack.stackSize) {
+						dropAmount = itemStack.stackSize;
 					}
-
-					var7.stackSize -= var11;
-					EntityItem var12 = new EntityItem(var1, (double)((float)var2 + var8), (double)((float)var3 + var9), (double)((float)var4 + var10), new ItemStack(var7.itemID, var11, var7.itemDamage));
-					var12.motionX = (double)((float)this.random.nextGaussian() * 0.05F);
-					var12.motionY = (double)((float)this.random.nextGaussian() * 0.05F + 0.2F);
-					var12.motionZ = (double)((float)this.random.nextGaussian() * 0.05F);
-					var1.spawnEntityInWorld(var12);
+					itemStack.stackSize -= dropAmount;
+					EntityItem itemEntity = new EntityItem(world, (double)((float)x + dropX), (double)((float)y + dropY), (double)((float)z + dropZ), new ItemStack(itemStack.itemID, dropAmount, itemStack.itemDamage));
+					itemEntity.motionX = (double)((float)this.random.nextGaussian() * 0.05F);
+					itemEntity.motionY = (double)((float)this.random.nextGaussian() * 0.05F + 0.2F);
+					itemEntity.motionZ = (double)((float)this.random.nextGaussian() * 0.05F);
+					world.spawnEntityInWorld(itemEntity);
 				}
 			}
 		}
 
-		super.onBlockRemoval(var1, var2, var3, var4);
+		super.onBlockRemoval(world, x, y, z);
 	}
 
-	public final boolean blockActivated(World var1, int var2, int var3, int var4, EntityPlayer var5) {
-		Object var6 = (TileEntityChest)var1.getBlockTileEntity(var2, var3, var4);
-		if(var1.isSolid(var2, var3 + 1, var4)) {
+	@Override
+	public final boolean blockActivated(World world, int x, int y, int z, EntityPlayer player) {
+		IInventory inventory = (TileEntityChest)world.getBlockTileEntity(x, y, z);
+		if(world.isSolid(x, y + 1, z)) {
 			return true;
-		} else if(var1.getBlockId(var2 - 1, var3, var4) == this.blockID && var1.isSolid(var2 - 1, var3 + 1, var4)) {
+		} else if(world.getBlockId(x - 1, y, z) == this.blockID && world.isSolid(x - 1, y + 1, z)) {
 			return true;
-		} else if(var1.getBlockId(var2 + 1, var3, var4) == this.blockID && var1.isSolid(var2 + 1, var3 + 1, var4)) {
+		} else if(world.getBlockId(x + 1, y, z) == this.blockID && world.isSolid(x + 1, y + 1, z)) {
 			return true;
-		} else if(var1.getBlockId(var2, var3, var4 - 1) == this.blockID && var1.isSolid(var2, var3 + 1, var4 - 1)) {
+		} else if(world.getBlockId(x, y, z - 1) == this.blockID && world.isSolid(x, y + 1, z - 1)) {
 			return true;
-		} else if(var1.getBlockId(var2, var3, var4 + 1) == this.blockID && var1.isSolid(var2, var3 + 1, var4 + 1)) {
+		} else if(world.getBlockId(x, y, z + 1) == this.blockID && world.isSolid(x, y + 1, z + 1)) {
 			return true;
 		} else {
-			if(var1.getBlockId(var2 - 1, var3, var4) == this.blockID) {
-				var6 = new InventoryLargeChest("Large chest", (TileEntityChest)var1.getBlockTileEntity(var2 - 1, var3, var4), (IInventory)var6);
+			if(world.getBlockId(x - 1, y, z) == this.blockID) {
+				inventory = new InventoryLargeChest("Large chest", (TileEntityChest)world.getBlockTileEntity(x - 1, y, z), inventory);
 			}
-
-			if(var1.getBlockId(var2 + 1, var3, var4) == this.blockID) {
-				var6 = new InventoryLargeChest("Large chest", (IInventory)var6, (TileEntityChest)var1.getBlockTileEntity(var2 + 1, var3, var4));
+			if(world.getBlockId(x + 1, y, z) == this.blockID) {
+				inventory = new InventoryLargeChest("Large chest", inventory, (TileEntityChest)world.getBlockTileEntity(x + 1, y, z));
 			}
-
-			if(var1.getBlockId(var2, var3, var4 - 1) == this.blockID) {
-				var6 = new InventoryLargeChest("Large chest", (TileEntityChest)var1.getBlockTileEntity(var2, var3, var4 - 1), (IInventory)var6);
+			if(world.getBlockId(x, y, z - 1) == this.blockID) {
+				inventory = new InventoryLargeChest("Large chest", (TileEntityChest)world.getBlockTileEntity(x, y, z - 1), inventory);
 			}
-
-			if(var1.getBlockId(var2, var3, var4 + 1) == this.blockID) {
-				var6 = new InventoryLargeChest("Large chest", (IInventory)var6, (TileEntityChest)var1.getBlockTileEntity(var2, var3, var4 + 1));
+			if(world.getBlockId(x, y, z + 1) == this.blockID) {
+				inventory = new InventoryLargeChest("Large chest", inventory, (TileEntityChest)world.getBlockTileEntity(x, y, z + 1));
 			}
-
-			var5.displayChestGUI((IInventory)var6);
+			player.displayChestGUI(inventory);
 			return true;
 		}
 	}
 
+	@Override
 	protected final TileEntity getBlockEntity() {
 		return new TileEntityChest();
 	}

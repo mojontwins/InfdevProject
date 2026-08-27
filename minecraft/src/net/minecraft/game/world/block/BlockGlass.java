@@ -4,11 +4,12 @@ import java.util.Random;
 import net.minecraft.game.world.material.Material;
 
 public final class BlockGlass extends BlockBreakable {
-	public BlockGlass(int var1, int var2, Material var3, boolean var4) {
-		super(20, 49, var3, false);
+	public BlockGlass(int blockID, int textureIndex, Material material, boolean allBounds) {
+		super(blockID, textureIndex, material, false);
 	}
 
-	public final int quantityDropped(Random var1) {
+	@Override
+	public final int quantityDropped(Random random) {
 		return 0;
 	}
 }

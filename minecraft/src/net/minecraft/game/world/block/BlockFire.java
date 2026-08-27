@@ -9,265 +9,264 @@ public final class BlockFire extends Block {
 	private int[] chanceToEncourageFire = new int[256];
 	private int[] abilityToCatchFire = new int[256];
 
-	protected BlockFire(int var1, int var2) {
-		super(51, 31, Material.fire);
+	protected BlockFire(int blockID, int textureIndex) {
+		super(blockID, textureIndex, Material.fire);
 		this.setBurnRate(Block.planks.blockID, 5, 20);
 		this.setBurnRate(Block.wood.blockID, 5, 5);
 		this.setBurnRate(Block.leaves.blockID, 30, 60);
 		this.setBurnRate(Block.bookshelf.blockID, 30, 20);
 		this.setBurnRate(Block.tnt.blockID, 15, 100);
 
-		for(var1 = 0; var1 < 16; ++var1) {
-			this.setBurnRate(Block.clothRed.blockID + var1, 30, 60);
+		for(int clothColor = 0; clothColor < 16; ++clothColor) {
+			this.setBurnRate(Block.clothRed.blockID + clothColor, 30, 60);
 		}
 
 		this.setTickOnLoad(true);
 	}
 
-	private void setBurnRate(int var1, int var2, int var3) {
-		this.chanceToEncourageFire[var1] = var2;
-		this.abilityToCatchFire[var1] = var3;
+	private void setBurnRate(int blockID, int burnChance, int burnTime) {
+		this.chanceToEncourageFire[blockID] = burnChance;
+		this.abilityToCatchFire[blockID] = burnTime;
 	}
 
-	public final AxisAlignedBB getCollisionBoundingBoxFromPool(int var1, int var2, int var3) {
+	@Override
+	public final AxisAlignedBB getCollisionBoundingBoxFromPool(int x, int y, int z) {
 		return null;
 	}
 
+	@Override
 	public final boolean isOpaqueCube() {
 		return false;
 	}
 
+	@Override
 	public final boolean renderAsNormalBlock() {
 		return false;
 	}
 
+	@Override
 	public final int getRenderType() {
 		return 3;
 	}
 
-	public final int quantityDropped(Random var1) {
+	@Override
+	public final int quantityDropped(Random random) {
 		return 0;
 	}
 
+	@Override
 	public final int tickRate() {
 		return 20;
 	}
 
-	public final void updateTick(World var1, int var2, int var3, int var4, Random var5) {
-		int var6 = var1.getBlockMetadata(var2, var3, var4);
-		if(var6 < 15) {
-			var1.setBlockMetadataWithNotify(var2, var3, var4, var6 + 1);
-			var1.scheduleBlockUpdate(var2, var3, var4, this.blockID);
+	@Override
+	public final void updateTick(World world, int x, int y, int z, Random random) {
+		int fireLevel = world.getBlockMetadata(x, y, z);
+		if(fireLevel < 15) {
+			world.setBlockMetadataWithNotify(x, y, z, fireLevel + 1);
+			world.scheduleBlockUpdate(x, y, z, this.blockID);
 		}
 
-		if(!this.canNeighborCatchFire(var1, var2, var3, var4)) {
-			if(!var1.isSolid(var2, var3 - 1, var4) || var6 > 3) {
-				var1.setBlockWithNotify(var2, var3, var4, 0);
+		if(!this.canNeighborCatchFire(world, x, y, z)) {
+			if(!world.isSolid(x, y - 1, z) || fireLevel > 3) {
+				world.setBlockWithNotify(x, y, z, 0);
 			}
-
-		} else if(!this.canBlockCatchFire(var1, var2, var3 - 1, var4) && var6 == 15 && var5.nextInt(4) == 0) {
-			var1.setBlockWithNotify(var2, var3, var4, 0);
+		} else if(!this.canBlockCatchFire(world, x, y - 1, z) && fireLevel == 15 && random.nextInt(4) == 0) {
+			world.setBlockWithNotify(x, y, z, 0);
 		} else {
-			if(var6 % 5 == 0 && var6 > 5) {
-				this.tryToCatchBlockOnFire(var1, var2 + 1, var3, var4, 300, var5);
-				this.tryToCatchBlockOnFire(var1, var2 - 1, var3, var4, 300, var5);
-				this.tryToCatchBlockOnFire(var1, var2, var3 - 1, var4, 100, var5);
-				this.tryToCatchBlockOnFire(var1, var2, var3 + 1, var4, 200, var5);
-				this.tryToCatchBlockOnFire(var1, var2, var3, var4 - 1, 300, var5);
-				this.tryToCatchBlockOnFire(var1, var2, var3, var4 + 1, 300, var5);
+			if(fireLevel % 5 == 0 && fireLevel > 5) {
+				this.tryToCatchBlockOnFire(world, x + 1, y, z, 300, random);
+				this.tryToCatchBlockOnFire(world, x - 1, y, z, 300, random);
+				this.tryToCatchBlockOnFire(world, x, y - 1, z, 100, random);
+				this.tryToCatchBlockOnFire(world, x, y + 1, z, 200, random);
+				this.tryToCatchBlockOnFire(world, x, y, z - 1, 300, random);
+				this.tryToCatchBlockOnFire(world, x, y, z + 1, 300, random);
 
-				for(var6 = var2 - 1; var6 <= var2 + 1; ++var6) {
-					for(int var7 = var4 - 1; var7 <= var4 + 1; ++var7) {
-						for(int var8 = var3 - 1; var8 <= var3 + 4; ++var8) {
-							if(var6 != var2 || var8 != var3 || var7 != var4) {
-								int var9 = 100;
-								if(var8 > var3 + 1) {
-									var9 = 100 + (var8 - (var3 + 1)) * 100;
+				for(int spreadX = x - 1; spreadX <= x + 1; ++spreadX) {
+					for(int spreadZ = z - 1; spreadZ <= z + 1; ++spreadZ) {
+						for(int spreadY = y - 1; spreadY <= y + 4; ++spreadY) {
+							if(spreadX != x || spreadY != y || spreadZ != z) {
+								int ignitionChance = 100;
+								if(spreadY > y + 1) {
+									ignitionChance = 100 + (spreadY - (y + 1)) * 100;
 								}
 
-								int var10000;
-								if(var1.getBlockId(var6, var8, var7) != 0) {
-									var10000 = 0;
+								int catchChance;
+								if(world.getBlockId(spreadX, spreadY, spreadZ) != 0) {
+									catchChance = 0;
 								} else {
-									int var15 = this.getChanceToEncourageFire(var1, var6 + 1, var8, var7, 0);
-									var15 = this.getChanceToEncourageFire(var1, var6 - 1, var8, var7, var15);
-									var15 = this.getChanceToEncourageFire(var1, var6, var8 - 1, var7, var15);
-									var15 = this.getChanceToEncourageFire(var1, var6, var8 + 1, var7, var15);
-									var15 = this.getChanceToEncourageFire(var1, var6, var8, var7 - 1, var15);
-									var15 = this.getChanceToEncourageFire(var1, var6, var8, var7 + 1, var15);
-									var10000 = var15;
+									int nearestFuel = this.getChanceToEncourageFire(world, spreadX + 1, spreadY, spreadZ, 0);
+									nearestFuel = this.getChanceToEncourageFire(world, spreadX - 1, spreadY, spreadZ, nearestFuel);
+									nearestFuel = this.getChanceToEncourageFire(world, spreadX, spreadY - 1, spreadZ, nearestFuel);
+									nearestFuel = this.getChanceToEncourageFire(world, spreadX, spreadY + 1, spreadZ, nearestFuel);
+									nearestFuel = this.getChanceToEncourageFire(world, spreadX, spreadY, spreadZ - 1, nearestFuel);
+									nearestFuel = this.getChanceToEncourageFire(world, spreadX, spreadY, spreadZ + 1, nearestFuel);
+									catchChance = nearestFuel;
 								}
 
-								int var10 = var10000;
-								if(var10 > 0 && var5.nextInt(var9) <= var10) {
-									var1.setBlockWithNotify(var6, var8, var7, this.blockID);
+								if(catchChance > 0 && random.nextInt(ignitionChance) <= catchChance) {
+									world.setBlockWithNotify(spreadX, spreadY, spreadZ, this.blockID);
 								}
 							}
 						}
 					}
 				}
 			}
-
 		}
 	}
 
-	private void tryToCatchBlockOnFire(World var1, int var2, int var3, int var4, int var5, Random var6) {
-		int var7 = this.abilityToCatchFire[var1.getBlockId(var2, var3, var4)];
-		if(var6.nextInt(var5) < var7) {
-			boolean var8 = var1.getBlockId(var2, var3, var4) == Block.tnt.blockID;
-			if(var6.nextInt(2) == 0) {
-				var1.setBlockWithNotify(var2, var3, var4, this.blockID);
+	private void tryToCatchBlockOnFire(World world, int x, int y, int z, int chance, Random random) {
+		int catchChance = this.abilityToCatchFire[world.getBlockId(x, y, z)];
+		if(random.nextInt(chance) < catchChance) {
+			boolean isTNT = world.getBlockId(x, y, z) == Block.tnt.blockID;
+			if(random.nextInt(2) == 0) {
+				world.setBlockWithNotify(x, y, z, this.blockID);
 			} else {
-				var1.setBlockWithNotify(var2, var3, var4, 0);
+				world.setBlockWithNotify(x, y, z, 0);
 			}
-
-			if(var8) {
-				Block.tnt.onBlockDestroyedByPlayer(var1, var2, var3, var4, 0);
+			if(isTNT) {
+				Block.tnt.onBlockDestroyedByPlayer(world, x, y, z, 0);
 			}
 		}
-
 	}
 
-	private boolean canNeighborCatchFire(World var1, int var2, int var3, int var4) {
-		return this.canBlockCatchFire(var1, var2 + 1, var3, var4) ? true : (this.canBlockCatchFire(var1, var2 - 1, var3, var4) ? true : (this.canBlockCatchFire(var1, var2, var3 - 1, var4) ? true : (this.canBlockCatchFire(var1, var2, var3 + 1, var4) ? true : (this.canBlockCatchFire(var1, var2, var3, var4 - 1) ? true : this.canBlockCatchFire(var1, var2, var3, var4 + 1)))));
+	private boolean canNeighborCatchFire(World world, int x, int y, int z) {
+		return this.canBlockCatchFire(world, x + 1, y, z) || this.canBlockCatchFire(world, x - 1, y, z) || this.canBlockCatchFire(world, x, y - 1, z) || this.canBlockCatchFire(world, x, y + 1, z) || this.canBlockCatchFire(world, x, y, z - 1) || this.canBlockCatchFire(world, x, y, z + 1);
 	}
 
+	@Override
 	public final boolean isCollidable() {
 		return false;
 	}
 
-	public final boolean canBlockCatchFire(World var1, int var2, int var3, int var4) {
-		return this.chanceToEncourageFire[var1.getBlockId(var2, var3, var4)] > 0;
+	public final boolean canBlockCatchFire(World world, int x, int y, int z) {
+		return this.chanceToEncourageFire[world.getBlockId(x, y, z)] > 0;
 	}
 
-	private int getChanceToEncourageFire(World var1, int var2, int var3, int var4, int var5) {
-		int var6 = this.chanceToEncourageFire[var1.getBlockId(var2, var3, var4)];
-		return var6 > var5 ? var6 : var5;
+	private int getChanceToEncourageFire(World world, int x, int y, int z, int currentMax) {
+		int fuelChance = this.chanceToEncourageFire[world.getBlockId(x, y, z)];
+		return Math.max(fuelChance, currentMax);
 	}
 
-	public final boolean canPlaceBlockAt(World var1, int var2, int var3, int var4) {
-		return var1.isSolid(var2, var3 - 1, var4) || this.canNeighborCatchFire(var1, var2, var3, var4);
+	@Override
+	public final boolean canPlaceBlockAt(World world, int x, int y, int z) {
+		return world.isSolid(x, y - 1, z) || this.canNeighborCatchFire(world, x, y, z);
 	}
 
-	public final void onNeighborBlockChange(World var1, int var2, int var3, int var4, int var5) {
-		if(!var1.isSolid(var2, var3 - 1, var4) && !this.canNeighborCatchFire(var1, var2, var3, var4)) {
-			var1.setBlockWithNotify(var2, var3, var4, 0);
+	@Override
+	public final void onNeighborBlockChange(World world, int x, int y, int z, int neighborID) {
+		if(!world.isSolid(x, y - 1, z) && !this.canNeighborCatchFire(world, x, y, z)) {
+			world.setBlockWithNotify(x, y, z, 0);
 		}
 	}
 
-	public final void onBlockAdded(World var1, int var2, int var3, int var4) {
-		if(!var1.isSolid(var2, var3 - 1, var4) && !this.canNeighborCatchFire(var1, var2, var3, var4)) {
-			var1.setBlockWithNotify(var2, var3, var4, 0);
+	@Override
+	public final void onBlockAdded(World world, int x, int y, int z) {
+		if(!world.isSolid(x, y - 1, z) && !this.canNeighborCatchFire(world, x, y, z)) {
+			world.setBlockWithNotify(x, y, z, 0);
 		} else {
-			var1.scheduleBlockUpdate(var2, var3, var4, this.blockID);
+			world.scheduleBlockUpdate(x, y, z, this.blockID);
 		}
 	}
 
-	public final boolean getChanceOfNeighborsEncouragingFire(int var1) {
-		return this.chanceToEncourageFire[var1] > 0;
+	public final boolean getChanceOfNeighborsEncouragingFire(int blockID) {
+		return this.chanceToEncourageFire[blockID] > 0;
 	}
 
-	public final void fireSpread(World var1, int var2, int var3, int var4) {
-		boolean var5 = false;
-		var5 = fireCheck(var1, var2, var3 + 1, var4);
-		if(!var5) {
-			var5 = fireCheck(var1, var2 - 1, var3, var4);
+	public final void fireSpread(World world, int x, int y, int z) {
+		boolean fireSet = false;
+		fireSet = fireCheck(world, x, y + 1, z);
+		if(!fireSet) {
+			fireSet = fireCheck(world, x - 1, y, z);
 		}
-
-		if(!var5) {
-			var5 = fireCheck(var1, var2 + 1, var3, var4);
+		if(!fireSet) {
+			fireSet = fireCheck(world, x + 1, y, z);
 		}
-
-		if(!var5) {
-			var5 = fireCheck(var1, var2, var3, var4 - 1);
+		if(!fireSet) {
+			fireSet = fireCheck(world, x, y, z - 1);
 		}
-
-		if(!var5) {
-			var5 = fireCheck(var1, var2, var3, var4 + 1);
+		if(!fireSet) {
+			fireSet = fireCheck(world, x, y, z + 1);
 		}
-
-		if(!var5) {
-			var5 = fireCheck(var1, var2, var3 - 1, var4);
+		if(!fireSet) {
+			fireSet = fireCheck(world, x, y - 1, z);
 		}
-
-		if(!var5) {
-			var1.setBlockWithNotify(var2, var3, var4, Block.fire.blockID);
+		if(!fireSet) {
+			world.setBlockWithNotify(x, y, z, Block.fire.blockID);
 		}
-
 	}
 
-	public final void randomDisplayTick(World var1, int var2, int var3, int var4, Random var5) {
-		if(var5.nextInt(24) == 0) {
-			var1.playSoundEffect((double)((float)var2 + 0.5F), (double)((float)var3 + 0.5F), (double)((float)var4 + 0.5F), "fire.fire", 1.0F + var5.nextFloat(), var5.nextFloat() * 0.7F + 0.3F);
+	@Override
+	public final void randomDisplayTick(World world, int x, int y, int z, Random random) {
+		if(random.nextInt(24) == 0) {
+			world.playSoundEffect((double)((float)x + 0.5F), (double)((float)y + 0.5F), (double)((float)z + 0.5F), "fire.fire", 1.0F + random.nextFloat(), random.nextFloat() * 0.7F + 0.3F);
 		}
 
-		int var6;
-		float var7;
-		float var8;
-		float var9;
-		if(!var1.isSolid(var2, var3 - 1, var4) && !Block.fire.canBlockCatchFire(var1, var2, var3 - 1, var4)) {
-			if(Block.fire.canBlockCatchFire(var1, var2 - 1, var3, var4)) {
-				for(var6 = 0; var6 < 2; ++var6) {
-					var7 = (float)var2 + var5.nextFloat() * 0.1F;
-					var8 = (float)var3 + var5.nextFloat();
-					var9 = (float)var4 + var5.nextFloat();
-					var1.spawnParticle("largesmoke", (double)var7, (double)var8, (double)var9, 0.0D, 0.0D, 0.0D);
+		int particleIndex;
+		float particleX;
+		float particleY;
+		float particleZ;
+		if(!world.isSolid(x, y - 1, z) && !Block.fire.canBlockCatchFire(world, x, y - 1, z)) {
+			if(Block.fire.canBlockCatchFire(world, x - 1, y, z)) {
+				for(particleIndex = 0; particleIndex < 2; ++particleIndex) {
+					particleX = (float)x + random.nextFloat() * 0.1F;
+					particleY = (float)y + random.nextFloat();
+					particleZ = (float)z + random.nextFloat();
+					world.spawnParticle("largesmoke", (double)particleX, (double)particleY, (double)particleZ, 0.0D, 0.0D, 0.0D);
 				}
 			}
 
-			if(Block.fire.canBlockCatchFire(var1, var2 + 1, var3, var4)) {
-				for(var6 = 0; var6 < 2; ++var6) {
-					var7 = (float)(var2 + 1) - var5.nextFloat() * 0.1F;
-					var8 = (float)var3 + var5.nextFloat();
-					var9 = (float)var4 + var5.nextFloat();
-					var1.spawnParticle("largesmoke", (double)var7, (double)var8, (double)var9, 0.0D, 0.0D, 0.0D);
+			if(Block.fire.canBlockCatchFire(world, x + 1, y, z)) {
+				for(particleIndex = 0; particleIndex < 2; ++particleIndex) {
+					particleX = (float)(x + 1) - random.nextFloat() * 0.1F;
+					particleY = (float)y + random.nextFloat();
+					particleZ = (float)z + random.nextFloat();
+					world.spawnParticle("largesmoke", (double)particleX, (double)particleY, (double)particleZ, 0.0D, 0.0D, 0.0D);
 				}
 			}
 
-			if(Block.fire.canBlockCatchFire(var1, var2, var3, var4 - 1)) {
-				for(var6 = 0; var6 < 2; ++var6) {
-					var7 = (float)var2 + var5.nextFloat();
-					var8 = (float)var3 + var5.nextFloat();
-					var9 = (float)var4 + var5.nextFloat() * 0.1F;
-					var1.spawnParticle("largesmoke", (double)var7, (double)var8, (double)var9, 0.0D, 0.0D, 0.0D);
+			if(Block.fire.canBlockCatchFire(world, x, y, z - 1)) {
+				for(particleIndex = 0; particleIndex < 2; ++particleIndex) {
+					particleX = (float)x + random.nextFloat();
+					particleY = (float)y + random.nextFloat();
+					particleZ = (float)z + random.nextFloat() * 0.1F;
+					world.spawnParticle("largesmoke", (double)particleX, (double)particleY, (double)particleZ, 0.0D, 0.0D, 0.0D);
 				}
 			}
 
-			if(Block.fire.canBlockCatchFire(var1, var2, var3, var4 + 1)) {
-				for(var6 = 0; var6 < 2; ++var6) {
-					var7 = (float)var2 + var5.nextFloat();
-					var8 = (float)var3 + var5.nextFloat();
-					var9 = (float)(var4 + 1) - var5.nextFloat() * 0.1F;
-					var1.spawnParticle("largesmoke", (double)var7, (double)var8, (double)var9, 0.0D, 0.0D, 0.0D);
+			if(Block.fire.canBlockCatchFire(world, x, y, z + 1)) {
+				for(particleIndex = 0; particleIndex < 2; ++particleIndex) {
+					particleX = (float)x + random.nextFloat();
+					particleY = (float)y + random.nextFloat();
+					particleZ = (float)(z + 1) - random.nextFloat() * 0.1F;
+					world.spawnParticle("largesmoke", (double)particleX, (double)particleY, (double)particleZ, 0.0D, 0.0D, 0.0D);
 				}
 			}
 
-			if(Block.fire.canBlockCatchFire(var1, var2, var3 + 1, var4)) {
-				for(var6 = 0; var6 < 2; ++var6) {
-					var7 = (float)var2 + var5.nextFloat();
-					var8 = (float)(var3 + 1) - var5.nextFloat() * 0.1F;
-					var9 = (float)var4 + var5.nextFloat();
-					var1.spawnParticle("largesmoke", (double)var7, (double)var8, (double)var9, 0.0D, 0.0D, 0.0D);
+			if(Block.fire.canBlockCatchFire(world, x, y + 1, z)) {
+				for(particleIndex = 0; particleIndex < 2; ++particleIndex) {
+					particleX = (float)x + random.nextFloat();
+					particleY = (float)(y + 1) - random.nextFloat() * 0.1F;
+					particleZ = (float)z + random.nextFloat();
+					world.spawnParticle("largesmoke", (double)particleX, (double)particleY, (double)particleZ, 0.0D, 0.0D, 0.0D);
 				}
 			}
-
 		} else {
-			for(var6 = 0; var6 < 3; ++var6) {
-				var7 = (float)var2 + var5.nextFloat();
-				var8 = (float)var3 + var5.nextFloat() * 0.5F + 0.5F;
-				var9 = (float)var4 + var5.nextFloat();
-				var1.spawnParticle("largesmoke", (double)var7, (double)var8, (double)var9, 0.0D, 0.0D, 0.0D);
+			for(particleIndex = 0; particleIndex < 3; ++particleIndex) {
+				particleX = (float)x + random.nextFloat();
+				particleY = (float)y + random.nextFloat() * 0.5F + 0.5F;
+				particleZ = (float)z + random.nextFloat();
+				world.spawnParticle("largesmoke", (double)particleX, (double)particleY, (double)particleZ, 0.0D, 0.0D, 0.0D);
 			}
-
 		}
 	}
 
-	private static boolean fireCheck(World var0, int var1, int var2, int var3) {
-		int var4 = var0.getBlockId(var1, var2, var3);
-		if(var4 == Block.fire.blockID) {
+	private static boolean fireCheck(World world, int x, int y, int z) {
+		int blockID = world.getBlockId(x, y, z);
+		if(blockID == Block.fire.blockID) {
 			return true;
-		} else if(var4 == 0) {
-			var0.setBlockWithNotify(var1, var2, var3, Block.fire.blockID);
+		} else if(blockID == 0) {
+			world.setBlockWithNotify(x, y, z, Block.fire.blockID);
 			return true;
 		} else {
 			return false;

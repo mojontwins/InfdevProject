@@ -10,16 +10,16 @@ public final class NBTTagDouble extends NBTBase {
 	public NBTTagDouble() {
 	}
 
-	public NBTTagDouble(double var1) {
-		this.doubleValue = var1;
+	public NBTTagDouble(double value) {
+		this.doubleValue = value;
 	}
 
-	final void writeTagContents(DataOutput var1) throws IOException {
-		var1.writeDouble(this.doubleValue);
+	final void writeTagContents(DataOutput output) throws IOException {
+		output.writeDouble(this.doubleValue);
 	}
 
-	final void readTagContents(DataInput var1) throws IOException {
-		this.doubleValue = var1.readDouble();
+	final void readTagContents(DataInput input) throws IOException {
+		this.doubleValue = input.readDouble();
 	}
 
 	public final byte getType() {
@@ -27,6 +27,6 @@ public final class NBTTagDouble extends NBTBase {
 	}
 
 	public final String toString() {
-		return "" + this.doubleValue;
+		return String.valueOf(this.doubleValue);
 	}
 }

@@ -5,57 +5,49 @@ import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 
 public final class BlockStep extends Block {
-	private boolean blockType;
+	private boolean doubleSlab;
 
-	public BlockStep(int var1, boolean var2) {
-		super(var1, 6, Material.rock);
-		this.blockType = var2;
-		if(!var2) {
+	public BlockStep(int blockID, boolean doubleSlab) {
+		super(blockID, 6, Material.rock);
+		this.doubleSlab = doubleSlab;
+		if(!doubleSlab) {
 			this.setBlockBounds(0.0F, 0.0F, 0.0F, 1.0F, 0.5F, 1.0F);
 		}
-
 		this.setLightOpacity(255);
 	}
 
-	public final int getBlockTextureFromSide(int var1) {
-		return var1 <= 1 ? 6 : 5;
+	@Override
+	public final int getBlockTextureFromSide(int side) {
+		return side <= 1 ? 6 : 5;
 	}
 
+	@Override
 	public final boolean isOpaqueCube() {
-		return this.blockType;
+		return this.doubleSlab;
 	}
 
-	public final void onNeighborBlockChange(World var1, int var2, int var3, int var4, int var5) {
-		if(this == Block.stairSingle) {
+	@Override
+	public final void onBlockAdded(World world, int x, int y, int z) {
+		int belowBlockID = world.getBlockId(x, y - 1, z);
+		if(belowBlockID == Block.stairSingle.blockID) {
+			world.setBlockWithNotify(x, y, z, 0);
+			world.setBlockWithNotify(x, y - 1, z, Block.stairDouble.blockID);
 		}
 	}
 
-	public final void onBlockAdded(World var1, int var2, int var3, int var4) {
-		if(this != Block.stairSingle) {
-			super.onBlockAdded(var1, var2, var3, var4);
-		}
-
-		int var5 = var1.getBlockId(var2, var3 - 1, var4);
-		if(var5 == stairSingle.blockID) {
-			var1.setBlockWithNotify(var2, var3, var4, 0);
-			var1.setBlockWithNotify(var2, var3 - 1, var4, Block.stairDouble.blockID);
-		}
-
-	}
-
-	public final int idDropped(int var1, Random var2) {
+	@Override
+	public final int idDropped(int metadata, Random random) {
 		return Block.stairSingle.blockID;
 	}
 
+	@Override
 	public final boolean renderAsNormalBlock() {
-		return this.blockType;
+		return this.doubleSlab;
 	}
 
-	public final boolean shouldSideBeRendered(World var1, int var2, int var3, int var4, int var5) {
-		if(this != Block.stairSingle) {
-			super.shouldSideBeRendered(var1, var2, var3, var4, var5);
-		}
-
-		return var5 == 1 ? true : (!super.shouldSideBeRendered(var1, var2, var3, var4, var5) ? false : (var5 == 0 ? true : var1.getBlockId(var2, var3, var4) != this.blockID));
+	@Override
+	public final boolean shouldSideBeRendered(World world, int x, int y, int z, int side) {
+		boolean renderSide = super.shouldSideBeRendered(world, x, y, z, side);
+		return side == 1 ? true : (!renderSide ? false : (side == 0 ? true : world.getBlockId(x, y, z) != this.blockID));
 	}
 }

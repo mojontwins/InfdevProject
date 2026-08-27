@@ -3,13 +3,17 @@ package com.mojang.nbt;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Supplier;
 
 public abstract class NBTBase {
 	private String key = null;
 
-	abstract void writeTagContents(DataOutput var1) throws IOException;
+	abstract void writeTagContents(DataOutput output) throws IOException;
 
-	abstract void readTagContents(DataInput var1) throws IOException;
+	abstract void readTagContents(DataInput input) throws IOException;
 
 	public abstract byte getType();
 
@@ -17,62 +21,56 @@ public abstract class NBTBase {
 		return this.key == null ? "" : this.key;
 	}
 
-	public final NBTBase setKey(String var1) {
-		this.key = var1;
+	public final NBTBase setKey(String key) {
+		this.key = key;
 		return this;
 	}
 
-	public static NBTBase readNamedTag(DataInput var0) throws IOException {
-		byte var1 = var0.readByte();
-		if(var1 == 0) {
+	private static final Map<Byte, Supplier<NBTBase>> TAG_FACTORIES = createTagFactories();
+
+	private static Map<Byte, Supplier<NBTBase>> createTagFactories() {
+		Map<Byte, Supplier<NBTBase>> factories = new HashMap<>();
+		factories.put((byte)0, NBTTagEnd::new);
+		factories.put((byte)1, NBTTagByte::new);
+		factories.put((byte)2, NBTTagShort::new);
+		factories.put((byte)3, NBTTagInt::new);
+		factories.put((byte)4, NBTTagLong::new);
+		factories.put((byte)5, NBTTagFloat::new);
+		factories.put((byte)6, NBTTagDouble::new);
+		factories.put((byte)7, NBTTagByteArray::new);
+		factories.put((byte)8, NBTTagString::new);
+		factories.put((byte)9, NBTTagList::new);
+		factories.put((byte)10, NBTTagCompound::new);
+		return factories;
+	}
+
+	public static NBTBase readNamedTag(DataInput input) throws IOException {
+		byte type = input.readByte();
+		if(type == 0) {
 			return new NBTTagEnd();
-		} else {
-			NBTBase var3 = createTagOfType(var1);
-			short var2 = var0.readShort();
-			byte[] var4 = new byte[var2];
-			var0.readFully(var4);
-			var3.key = new String(var4, "UTF-8");
-			var3.readTagContents(var0);
-			return var3;
+		}
+		NBTBase tag = createTagOfType(type);
+		short keyLength = input.readShort();
+		byte[] keyBytes = new byte[keyLength];
+		input.readFully(keyBytes);
+		tag.key = new String(keyBytes, StandardCharsets.UTF_8);
+		tag.readTagContents(input);
+		return tag;
+	}
+
+	public static void writeNamedTag(NBTBase tag, DataOutput output) throws IOException {
+		byte type = tag.getType();
+		output.writeByte(type);
+		if(type != 0) {
+			byte[] keyBytes = tag.getKey().getBytes(StandardCharsets.UTF_8);
+			output.writeShort(keyBytes.length);
+			output.write(keyBytes);
+			tag.writeTagContents(output);
 		}
 	}
 
-	public static void writeNamedTag(NBTBase var0, DataOutput var1) throws IOException {
-		var1.writeByte(var0.getType());
-		if(var0.getType() != 0) {
-			byte[] var2 = var0.getKey().getBytes("UTF-8");
-			var1.writeShort(var2.length);
-			var1.write(var2);
-			var0.writeTagContents(var1);
-		}
-	}
-
-	public static NBTBase createTagOfType(byte var0) {
-		switch(var0) {
-		case 0:
-			return new NBTTagEnd();
-		case 1:
-			return new NBTTagByte();
-		case 2:
-			return new NBTTagShort();
-		case 3:
-			return new NBTTagInt();
-		case 4:
-			return new NBTTagLong();
-		case 5:
-			return new NBTTagFloat();
-		case 6:
-			return new NBTTagDouble();
-		case 7:
-			return new NBTTagByteArray();
-		case 8:
-			return new NBTTagString();
-		case 9:
-			return new NBTTagList();
-		case 10:
-			return new NBTTagCompound();
-		default:
-			return null;
-		}
+	public static NBTBase createTagOfType(byte type) {
+		Supplier<NBTBase> factory = TAG_FACTORIES.get(type);
+		return factory == null ? null : factory.get();
 	}
 }

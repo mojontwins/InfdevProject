@@ -10,19 +10,19 @@ public final class NBTTagByteArray extends NBTBase {
 	public NBTTagByteArray() {
 	}
 
-	public NBTTagByteArray(byte[] var1) {
-		this.byteArray = var1;
+	public NBTTagByteArray(byte[] values) {
+		this.byteArray = values;
 	}
 
-	final void writeTagContents(DataOutput var1) throws IOException {
-		var1.writeInt(this.byteArray.length);
-		var1.write(this.byteArray);
+	final void writeTagContents(DataOutput output) throws IOException {
+		output.writeInt(this.byteArray.length);
+		output.write(this.byteArray);
 	}
 
-	final void readTagContents(DataInput var1) throws IOException {
-		int var2 = var1.readInt();
-		this.byteArray = new byte[var2];
-		var1.readFully(this.byteArray);
+	final void readTagContents(DataInput input) throws IOException {
+		int length = input.readInt();
+		this.byteArray = new byte[length];
+		input.readFully(this.byteArray);
 	}
 
 	public final byte getType() {

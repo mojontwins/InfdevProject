@@ -4,15 +4,17 @@ import java.util.Random;
 import net.minecraft.game.world.material.Material;
 
 public final class BlockBookshelf extends Block {
-	public BlockBookshelf(int var1, int var2) {
-		super(47, 35, Material.wood);
+	public BlockBookshelf(int blockID, int textureIndex) {
+		super(blockID, textureIndex, Material.wood);
 	}
 
-	public final int getBlockTextureFromSide(int var1) {
-		return var1 <= 1 ? 4 : this.blockIndexInTexture;
+	@Override
+	public final int getBlockTextureFromSide(int side) {
+		return side <= 1 ? 4 : this.blockIndexInTexture;
 	}
 
-	public final int quantityDropped(Random var1) {
+	@Override
+	public final int quantityDropped(Random random) {
 		return 0;
 	}
 }

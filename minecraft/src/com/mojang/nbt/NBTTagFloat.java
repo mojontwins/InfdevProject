@@ -10,16 +10,16 @@ public final class NBTTagFloat extends NBTBase {
 	public NBTTagFloat() {
 	}
 
-	public NBTTagFloat(float var1) {
-		this.floatValue = var1;
+	public NBTTagFloat(float value) {
+		this.floatValue = value;
 	}
 
-	final void writeTagContents(DataOutput var1) throws IOException {
-		var1.writeFloat(this.floatValue);
+	final void writeTagContents(DataOutput output) throws IOException {
+		output.writeFloat(this.floatValue);
 	}
 
-	final void readTagContents(DataInput var1) throws IOException {
-		this.floatValue = var1.readFloat();
+	final void readTagContents(DataInput input) throws IOException {
+		this.floatValue = input.readFloat();
 	}
 
 	public final byte getType() {
@@ -27,6 +27,6 @@ public final class NBTTagFloat extends NBTBase {
 	}
 
 	public final String toString() {
-		return "" + this.floatValue;
+		return String.valueOf(this.floatValue);
 	}
 }

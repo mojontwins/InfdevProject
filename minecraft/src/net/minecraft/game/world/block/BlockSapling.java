@@ -5,26 +5,25 @@ import net.minecraft.game.world.World;
 import net.minecraft.game.world.terrain.generate.WorldGenBigTree;
 
 public final class BlockSapling extends BlockFlower {
-	protected BlockSapling(int var1, int var2) {
-		super(6, 15);
+	protected BlockSapling(int blockID, int textureIndex) {
+		super(blockID, textureIndex);
 		this.setBlockBounds(10.0F * 0.01F, 0.0F, 10.0F * 0.01F, 0.9F, 0.8F, 0.9F);
 	}
 
-	public final void updateTick(World var1, int var2, int var3, int var4, Random var5) {
-		super.updateTick(var1, var2, var3, var4, var5);
-		if(var1.getBlockLightValue(var2, var3 + 1, var4) >= 9 && var5.nextInt(5) == 0) {
-			int var6 = var1.getBlockMetadata(var2, var3, var4);
-			if(var6 < 15) {
-				var1.setBlockMetadataWithNotify(var2, var3, var4, var6 + 1);
+	@Override
+	public final void updateTick(World world, int x, int y, int z, Random random) {
+		super.updateTick(world, x, y, z, random);
+		if(world.getBlockLightValue(x, y + 1, z) >= 9 && random.nextInt(5) == 0) {
+			int metadata = world.getBlockMetadata(x, y, z);
+			if(metadata < 15) {
+				world.setBlockMetadataWithNotify(x, y, z, metadata + 1);
 				return;
 			}
-
-			var1.setTileNoUpdate(var2, var3, var4, 0);
-			WorldGenBigTree var7 = new WorldGenBigTree();
-			if(!var7.generate(var1, var5, var2, var3, var4)) {
-				var1.setTileNoUpdate(var2, var3, var4, this.blockID);
+			world.setTileNoUpdate(x, y, z, 0);
+			WorldGenBigTree treeGenerator = new WorldGenBigTree();
+			if(!treeGenerator.generate(world, random, x, y, z)) {
+				world.setTileNoUpdate(x, y, z, this.blockID);
 			}
 		}
-
 	}
 }
