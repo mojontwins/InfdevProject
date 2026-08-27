@@ -14,6 +14,7 @@ import net.minecraft.game.entity.EntityLiving;
 import net.minecraft.game.entity.EntityPainting;
 import net.minecraft.game.entity.animal.EntityPig;
 import net.minecraft.game.entity.animal.EntitySheep;
+import net.minecraft.game.entity.misc.EntityFallingSand;
 import net.minecraft.game.entity.misc.EntityItem;
 import net.minecraft.game.entity.misc.EntityTNT;
 import net.minecraft.game.entity.monster.EntityCreeper;
@@ -54,6 +55,7 @@ public final class RenderManager {
 		this.entityRenderMap.put(EntityArrow.class, new RenderArrow());
 		this.entityRenderMap.put(EntityItem.class, new RenderItem());
 		this.entityRenderMap.put(EntityTNT.class, new RenderTNT());
+		this.entityRenderMap.put(EntityFallingSand.class, new RenderFallingSand());
 
 		for(Render var1 : this.entityRenderMap.values()) {
 			var1.setRenderManager(this);

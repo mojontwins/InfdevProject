@@ -203,6 +203,26 @@ public class World {
 		return this.chunkProvider.chunkExists(var1, var2);
 	}
 
+	public final boolean checkChunksExist(int x1, int y1, int z1, int x2, int y2, int z2) {
+		if(y2 >= 0 && y1 < 128) {
+			x1 >>= 4;
+			y1 >>= 4;
+			z1 >>= 4;
+			x2 >>= 4;
+			y2 >>= 4;
+			z2 >>= 4;
+			for(int chunkX = x1; chunkX <= x2; ++chunkX) {
+				for(int chunkZ = z1; chunkZ <= z2; ++chunkZ) {
+					if(!this.chunkExists(chunkX, chunkZ)) {
+						return false;
+					}
+				}
+			}
+			return true;
+		}
+		return false;
+	}
+
 	private Chunk getChunkFromChunkCoords(int var1, int var2) {
 		return this.chunkProvider.provideChunk(var1, var2);
 	}

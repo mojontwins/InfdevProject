@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 import net.minecraft.game.entity.animal.EntityPig;
 import net.minecraft.game.entity.animal.EntitySheep;
+import net.minecraft.game.entity.misc.EntityFallingSand;
 import net.minecraft.game.entity.misc.EntityItem;
 import net.minecraft.game.entity.misc.EntityTNT;
 import net.minecraft.game.entity.monster.EntityCreeper;
@@ -64,5 +65,6 @@ public final class EntityList {
 		addMapping(EntityPig.class, "Pig");
 		addMapping(EntitySheep.class, "Sheep");
 		addMapping(EntityTNT.class, "PrimedTnt");
+		addMapping(EntityFallingSand.class, "FallingSand");
 	}
 }

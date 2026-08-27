@@ -3,6 +3,7 @@ package net.minecraft.game.world.terrain;
 import java.util.Random;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.Block;
+import net.minecraft.game.world.block.BlockSand;
 import net.minecraft.game.world.chunk.Chunk;
 import net.minecraft.game.world.chunk.IChunkProvider;
 import net.minecraft.game.world.terrain.generate.WorldGenBigTree;
@@ -202,6 +203,7 @@ public final class ChunkProviderGenerate implements IChunkProvider {
 	}
 
 	public final void populate(IChunkProvider var1, int var2, int var3) {
+		BlockSand.fallInstantly = true;
 		this.rand.setSeed((long)var2 * 318279123L + (long)var3 * 919871212L);
 		int var8 = var2 << 4;
 		var2 = var3 << 4;
@@ -254,6 +256,7 @@ public final class ChunkProviderGenerate implements IChunkProvider {
 			var9.generate(this.worldObj, this.rand, var6, this.worldObj.getHeightValue(var6, var7), var7);
 		}
 
+		BlockSand.fallInstantly = false;
 	}
 
 	public final void saveChunks(boolean var1) {
