@@ -1,6 +1,7 @@
 package net.minecraft.game.world.block;
 
 import java.util.Random;
+import net.minecraft.game.world.IBlockAccess;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 
@@ -46,8 +47,8 @@ public final class BlockStep extends Block {
 	}
 
 	@Override
-	public final boolean shouldSideBeRendered(World world, int x, int y, int z, int side) {
-		boolean renderSide = super.shouldSideBeRendered(world, x, y, z, side);
-		return side == 1 ? true : (!renderSide ? false : (side == 0 ? true : world.getBlockId(x, y, z) != this.blockID));
+	public final boolean shouldSideBeRendered(IBlockAccess blockAccess, int x, int y, int z, int side) {
+		boolean renderSide = super.shouldSideBeRendered(blockAccess, x, y, z, side);
+		return side == 1 ? true : (!renderSide ? false : (side == 0 ? true : blockAccess.getBlockId(x, y, z) != this.blockID));
 	}
 }

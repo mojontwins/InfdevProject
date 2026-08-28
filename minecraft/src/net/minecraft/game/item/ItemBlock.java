@@ -14,7 +14,7 @@ public final class ItemBlock extends Item {
 		this.setIconIndex(Block.blocksList[var1 + 256].getBlockTextureFromSide(2));
 	}
 
-	public final boolean onItemUse(ItemStack var1, World var2, int var3, int var4, int var5, int var6) {
+	public final boolean onItemUse(ItemStack var1, World var2, int var3, int var4, int var5, int var6, float xWithinFace, float yWithinFace, float zWithinFace) {
 		if(var6 == 0) {
 			--var4;
 		}
@@ -48,7 +48,7 @@ public final class ItemBlock extends Item {
 			if(this.blockID > 0 && var10 == null || var10 == Block.waterMoving || var10 == Block.waterStill || var10 == Block.lavaMoving || var10 == Block.lavaStill || var10 == Block.fire) {
 				var10 = Block.blocksList[this.blockID];
 				if((var8 == null || var2.checkIfAABBIsClear1(var8)) && var10.canPlaceBlockAt(var2, var3, var4, var5) && var2.setBlockWithNotify(var3, var4, var5, this.blockID)) {
-					Block.blocksList[this.blockID].onBlockPlaced(var2, var3, var4, var5, var6);
+					Block.blocksList[this.blockID].onBlockPlaced(var2, var3, var4, var5, var6, xWithinFace, yWithinFace, zWithinFace);
 					double var10001 = (double)((float)var3 + 0.5F);
 					double var10002 = (double)((float)var4 + 0.5F);
 					double var10003 = (double)((float)var5 + 0.5F);

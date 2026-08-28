@@ -1,6 +1,7 @@
 package net.minecraft.client.render.entity;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.Map;
 import net.minecraft.client.model.ModelBiped;
 import net.minecraft.client.model.ModelPig;
@@ -14,7 +15,6 @@ import net.minecraft.game.entity.EntityLiving;
 import net.minecraft.game.entity.EntityPainting;
 import net.minecraft.game.entity.animal.EntityPig;
 import net.minecraft.game.entity.animal.EntitySheep;
-import net.minecraft.game.entity.misc.EntityFallingSand;
 import net.minecraft.game.entity.misc.EntityItem;
 import net.minecraft.game.entity.misc.EntityTNT;
 import net.minecraft.game.entity.monster.EntityCreeper;
@@ -55,61 +55,61 @@ public final class RenderManager {
 		this.entityRenderMap.put(EntityArrow.class, new RenderArrow());
 		this.entityRenderMap.put(EntityItem.class, new RenderItem());
 		this.entityRenderMap.put(EntityTNT.class, new RenderTNT());
-		this.entityRenderMap.put(EntityFallingSand.class, new RenderFallingSand());
+		Iterator<Render> renderIterator = this.entityRenderMap.values().iterator();
 
-		for(Render var1 : this.entityRenderMap.values()) {
-			var1.setRenderManager(this);
+		while(renderIterator.hasNext()) {
+			Render render = renderIterator.next();
+			render.setRenderManager(this);
+		}
+	}
+
+	public final Render getEntityRenderObject(Entity entity) {
+		Class<? extends Entity> entityClass = entity.getClass();
+		Render render = this.entityRenderMap.get(entityClass);
+		if(render == null && entityClass != Entity.class) {
+			render = this.entityRenderMap.get(entityClass.getSuperclass());
+			this.entityRenderMap.put(entityClass, render);
+		}
+
+		return render;
+	}
+
+	public final void cacheActiveRenderInfo(World world, RenderEngine renderEngine, EntityPlayer player, float partialTick) {
+		this.worldObj = world;
+		this.renderEngine = renderEngine;
+		this.playerViewY = player.prevRotationYaw + (player.rotationYaw - player.prevRotationYaw) * partialTick;
+		this.tickPosX = player.lastTickPosX + (player.posX - player.lastTickPosX) * (double)partialTick;
+		this.tickPosY = player.lastTickPosY + (player.posY - player.lastTickPosY) * (double)partialTick;
+		this.tickPosZ = player.lastTickPosZ + (player.posZ - player.lastTickPosZ) * (double)partialTick;
+	}
+
+	public final void renderEntity(Entity entity, float partialTick) {
+		double interpolatedPosX = entity.lastTickPosX + (entity.posX - entity.lastTickPosX) * (double)partialTick;
+		double interpolatedPosY = entity.lastTickPosY + (entity.posY - entity.lastTickPosY) * (double)partialTick;
+		double interpolatedPosZ = entity.lastTickPosZ + (entity.posZ - entity.lastTickPosZ) * (double)partialTick;
+		float interpolatedYaw = entity.prevRotationYaw + (entity.rotationYaw - entity.prevRotationYaw) * partialTick;
+		float brightness = entity.getEntityBrightness(partialTick);
+		GL11.glColor3f(brightness, brightness, brightness);
+		this.renderEntityWithPosYaw(entity, interpolatedPosX - renderPosX, interpolatedPosY - renderPosY, interpolatedPosZ - renderPosZ, interpolatedYaw, partialTick);
+	}
+
+	public final void renderEntityWithPosYaw(Entity entity, double x, double y, double z, float yaw, float partialTick) {
+		Render render = this.getEntityRenderObject(entity);
+		if(render != null) {
+			render.doRender(entity, x, y, z, yaw, partialTick);
+			render.renderShadow(entity, x, y, z, partialTick);
 		}
 
 	}
 
-	public final Render getEntityRenderObject(Entity var1) {
-		Class<? extends Entity> var2 = var1.getClass();
-		Render var3 = this.entityRenderMap.get(var2);
-		if(var3 == null && var2 != Entity.class) {
-			var3 = this.entityRenderMap.get(var2.getSuperclass());
-			this.entityRenderMap.put(var2, var3);
-		}
-
-		return var3;
+	public final void set(World world) {
+		this.worldObj = world;
 	}
 
-	public final void cacheActiveRenderInfo(World var1, RenderEngine var2, EntityPlayer var3, float var4) {
-		this.worldObj = var1;
-		this.renderEngine = var2;
-		this.playerViewY = var3.prevRotationYaw + (var3.rotationYaw - var3.prevRotationYaw) * var4;
-		this.tickPosX = var3.lastTickPosX + (var3.posX - var3.lastTickPosX) * (double)var4;
-		this.tickPosY = var3.lastTickPosY + (var3.posY - var3.lastTickPosY) * (double)var4;
-		this.tickPosZ = var3.lastTickPosZ + (var3.posZ - var3.lastTickPosZ) * (double)var4;
-	}
-
-	public final void renderEntity(Entity var1, float var2) {
-		double var3 = var1.lastTickPosX + (var1.posX - var1.lastTickPosX) * (double)var2;
-		double var5 = var1.lastTickPosY + (var1.posY - var1.lastTickPosY) * (double)var2;
-		double var7 = var1.lastTickPosZ + (var1.posZ - var1.lastTickPosZ) * (double)var2;
-		float var9 = var1.prevRotationYaw + (var1.rotationYaw - var1.prevRotationYaw) * var2;
-		float var10 = var1.getEntityBrightness(var2);
-		GL11.glColor3f(var10, var10, var10);
-		this.renderEntityWithPosYaw(var1, var3 - renderPosX, var5 - renderPosY, var7 - renderPosZ, var9, var2);
-	}
-
-	public final void renderEntityWithPosYaw(Entity var1, double var2, double var4, double var6, float var8, float var9) {
-		Render var10 = this.getEntityRenderObject(var1);
-		if(var10 != null) {
-			var10.doRender(var1, var2, var4, var6, var8, var9);
-			var10.renderShadow(var1, var2, var4, var6, var9);
-		}
-
-	}
-
-	public final void set(World var1) {
-		this.worldObj = var1;
-	}
-
-	public final double getDistanceToCamera(double var1, double var3, double var5) {
-		double var7 = var1 - this.tickPosX;
-		double var9 = var3 - this.tickPosY;
-		double var11 = var5 - this.tickPosZ;
-		return var7 * var7 + var9 * var9 + var11 * var11;
+	public final double getDistanceToCamera(double x, double y, double z) {
+		double deltaX = x - this.tickPosX;
+		double deltaY = y - this.tickPosY;
+		double deltaZ = z - this.tickPosZ;
+		return deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
 	}
 }

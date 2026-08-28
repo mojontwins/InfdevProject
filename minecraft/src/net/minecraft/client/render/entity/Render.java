@@ -1,7 +1,5 @@
 package net.minecraft.client.render.entity;
 
-import net.minecraft.client.model.ModelBiped;
-import net.minecraft.client.render.RenderBlocks;
 import net.minecraft.client.render.RenderEngine;
 import net.minecraft.client.render.Tessellator;
 import net.minecraft.game.entity.Entity;
@@ -16,78 +14,70 @@ public abstract class Render {
 	protected float shadowOpaque;
 
 	public Render() {
-		new ModelBiped();
-		new RenderBlocks();
 		this.shadowSize = 0.0F;
 		this.shadowOpaque = 1.0F;
 	}
 
-	public abstract void doRender(Entity var1, double var2, double var4, double var6, float var8, float var9);
+	public abstract void doRender(Entity entity, double x, double y, double z, float yaw, float partialTick);
 
-	protected final void loadTexture(String var1) {
-		RenderEngine var2 = this.renderManager.renderEngine;
-		RenderEngine.bindTexture(var2.getTexture(var1));
+	protected final void loadTexture(String textureName) {
+		RenderEngine renderEngine = this.renderManager.renderEngine;
+		RenderEngine.bindTexture(renderEngine.getTexture(textureName));
 	}
 
-	protected final void loadDownloadableImageTexture(String var1, String var2) {
-		RenderEngine var3 = this.renderManager.renderEngine;
-		RenderEngine.bindTexture(var3.getTextureForDownloadableImage(var1, var2));
+	protected final void loadDownloadableImageTexture(String imageName, String fallbackName) {
+		RenderEngine renderEngine = this.renderManager.renderEngine;
+		RenderEngine.bindTexture(renderEngine.getTextureForDownloadableImage(imageName, fallbackName));
 	}
 
-	public final void setRenderManager(RenderManager var1) {
-		this.renderManager = var1;
+	public final void setRenderManager(RenderManager renderManager) {
+		this.renderManager = renderManager;
 	}
 
-	public final void renderShadow(Entity var1, double var2, double var4, double var6, float var8) {
-		int var68;
-		float var11;
+	public final void renderShadow(Entity entity, double x, double y, double z, float partialTick) {
 		if(this.shadowSize > 0.0F) {
-			double var9 = this.renderManager.getDistanceToCamera(var2, var4, var6);
-			var8 = (float)((1.0D - var9 / 256.0D) * (double)this.shadowOpaque);
-			if(var8 > 0.0F) {
-				float var19 = var8;
-				double var17 = var6;
-				double var15 = var4;
-				double var13 = var2;
-				Render var66 = this;
+			double distance = this.renderManager.getDistanceToCamera(x, y, z);
+			partialTick = (float)((1.0D - distance / 256.0D) * (double)this.shadowOpaque);
+			if(partialTick > 0.0F) {
+				float shadowAlpha = partialTick;
+				World world = this.renderManager.worldObj;
 				GL11.glEnable(GL11.GL_BLEND);
-				RenderEngine var67 = this.renderManager.renderEngine;
-				RenderEngine.bindTexture(var67.getTexture("%%/shadow.png"));
-				World var10 = this.renderManager.worldObj;
+				RenderEngine renderEngine = this.renderManager.renderEngine;
+				RenderEngine.bindTexture(renderEngine.getTexture("%%/shadow.png"));
 				GL11.glDepthMask(false);
-				var11 = this.shadowSize;
-				var68 = MathHelper.floor_double(var2 - (double)var11);
-				int var12 = MathHelper.floor_double(var2 + (double)var11);
-				int var20 = MathHelper.floor_double(var4 - (double)var11);
-				int var21 = MathHelper.floor_double(var4);
-				int var22 = MathHelper.floor_double(var6 - (double)var11);
-				int var23 = MathHelper.floor_double(var6 + (double)var11);
+				float shadowRadius = this.shadowSize;
+				int x0 = MathHelper.floor_double(x - (double)shadowRadius);
+				int x1 = MathHelper.floor_double(x + (double)shadowRadius);
+				int y0 = MathHelper.floor_double(y - (double)shadowRadius);
+				int y1 = MathHelper.floor_double(y);
+				int z0 = MathHelper.floor_double(z - (double)shadowRadius);
+				int z1 = MathHelper.floor_double(z + (double)shadowRadius);
 
-				for(; var68 <= var12; ++var68) {
-					for(int var24 = var20; var24 <= var21; ++var24) {
-						for(int var25 = var22; var25 <= var23; ++var25) {
-							int var26 = var10.getBlockId(var68, var24 - 1, var25);
-							if(var26 > 0 && var10.getBlockLightValue(var68, var24, var25) > 3) {
-								Block var27 = Block.blocksList[var26];
-								Tessellator var33 = Tessellator.instance;
-								double var48 = ((double)var19 - (var15 - (double)var24) / 2.0D) * 0.5D * (double)var66.renderManager.worldObj.getBrightness(var68, var24, var25);
-								if(var48 >= 0.0D) {
-									GL11.glColor4f(1.0F, 1.0F, 1.0F, (float)var48);
-									var33.startDrawingQuads();
-									double var50 = (double)var68 + var27.minX;
-									double var52 = (double)var68 + var27.maxX;
-									double var54 = (double)var24 + var27.minY;
-									double var56 = (double)var25 + var27.minZ;
-									double var58 = (double)var25 + var27.maxZ;
-									float var79 = (float)((var13 - var50) / 2.0D / (double)var11 + 0.5D);
-									float var80 = (float)((var13 - var52) / 2.0D / (double)var11 + 0.5D);
-									float var28 = (float)((var17 - var56) / 2.0D / (double)var11 + 0.5D);
-									float var29 = (float)((var17 - var58) / 2.0D / (double)var11 + 0.5D);
-									var33.addVertexWithUV(var50, var54, var56, (double)var79, (double)var28);
-									var33.addVertexWithUV(var50, var54, var58, (double)var79, (double)var29);
-									var33.addVertexWithUV(var52, var54, var58, (double)var80, (double)var29);
-									var33.addVertexWithUV(var52, var54, var56, (double)var80, (double)var28);
-									var33.draw();
+				for(int blockX = x0; blockX <= x1; ++blockX) {
+					for(int blockY = y0; blockY <= y1; ++blockY) {
+						for(int blockZ = z0; blockZ <= z1; ++blockZ) {
+							int blockId = world.getBlockId(blockX, blockY - 1, blockZ);
+							if(blockId > 0 && world.getBlockLightValue(blockX, blockY, blockZ) > 3) {
+								Block block = Block.blocksList[blockId];
+								Tessellator tessellator = Tessellator.instance;
+								double fade = ((double)shadowAlpha - (y - (double)blockY) / 2.0D) * 0.5D * (double)this.renderManager.worldObj.getBrightness(blockX, blockY, blockZ);
+								if(fade >= 0.0D) {
+									GL11.glColor4f(1.0F, 1.0F, 1.0F, (float)fade);
+									tessellator.startDrawingQuads();
+									double minX = (double)blockX + block.minX;
+									double maxX = (double)blockX + block.maxX;
+									double minY = (double)blockY + block.minY;
+									double minZ = (double)blockZ + block.minZ;
+									double maxZ = (double)blockZ + block.maxZ;
+									float uMin = (float)((x - minX) / 2.0D / (double)shadowRadius + 0.5D);
+									float uMax = (float)((x - maxX) / 2.0D / (double)shadowRadius + 0.5D);
+									float vMin = (float)((z - minZ) / 2.0D / (double)shadowRadius + 0.5D);
+									float vMax = (float)((z - maxZ) / 2.0D / (double)shadowRadius + 0.5D);
+									tessellator.addVertexWithUV(minX, minY, minZ, (double)uMin, (double)vMin);
+									tessellator.addVertexWithUV(minX, minY, maxZ, (double)uMin, (double)vMax);
+									tessellator.addVertexWithUV(maxX, minY, maxZ, (double)uMax, (double)vMax);
+									tessellator.addVertexWithUV(maxX, minY, minZ, (double)uMax, (double)vMin);
+									tessellator.draw();
 								}
 							}
 						}
@@ -100,44 +90,43 @@ public abstract class Render {
 			}
 		}
 
-		if(var1.fire > 0) {
+		if(entity.fire > 0) {
 			GL11.glDisable(GL11.GL_LIGHTING);
-			int var65 = Block.fire.blockIndexInTexture;
-			var68 = (var65 & 15) << 4;
-			int var69 = var65 & 240;
-			var11 = (float)var68 / 256.0F;
-			float var70 = ((float)var68 + 15.99F) / 256.0F;
-			float var71 = (float)var69 / 256.0F;
-			float var73 = ((float)var69 + 15.99F) / 256.0F;
+			int fireTextureIndex = Block.fire.blockIndexInTexture;
+			int texU = (fireTextureIndex & 15) << 4;
+			int texV = fireTextureIndex & 240;
+			float uMin = (float)texU / 256.0F;
+			float uMax = ((float)texU + 15.99F) / 256.0F;
+			float vMin = (float)texV / 256.0F;
+			float vMax = ((float)texV + 15.99F) / 256.0F;
 			GL11.glPushMatrix();
-			GL11.glTranslatef((float)var2, (float)var4, (float)var6);
-			float var74 = var1.width * 1.4F;
-			GL11.glScalef(var74, var74, var74);
+			GL11.glTranslatef((float)x, (float)y, (float)z);
+			float fireScale = entity.width * 1.4F;
+			GL11.glScalef(fireScale, fireScale, fireScale);
 			this.loadTexture("/terrain.png");
-			Tessellator var75 = Tessellator.instance;
-			float var76 = 1.0F;
-			float var77 = 0.0F;
-			float var78 = var1.height / var1.width;
+			Tessellator tessellator = Tessellator.instance;
+			float fireWidth = 1.0F;
+			float yOffset = 0.0F;
+			float remainingLayers = entity.height / entity.width;
 			GL11.glRotatef(-this.renderManager.playerViewY, 0.0F, 1.0F, 0.0F);
-			GL11.glTranslatef(0.0F, 0.0F, 0.4F + (float)((int)var78) * 0.02F);
+			GL11.glTranslatef(0.0F, 0.0F, 0.4F + (float)((int)remainingLayers) * 0.02F);
 			GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-			var75.startDrawingQuads();
+			tessellator.startDrawingQuads();
 
-			while(var78 > 0.0F) {
-				var75.addVertexWithUV((double)(var76 - 0.5F), (double)(0.0F - var77), 0.0D, (double)var70, (double)var73);
-				var75.addVertexWithUV(-0.5D, (double)(0.0F - var77), 0.0D, (double)var11, (double)var73);
-				var75.addVertexWithUV(-0.5D, (double)(1.4F - var77), 0.0D, (double)var11, (double)var71);
-				var75.addVertexWithUV((double)(var76 - 0.5F), (double)(1.4F - var77), 0.0D, (double)var70, (double)var71);
-				--var78;
-				--var77;
-				var76 *= 0.9F;
+			while(remainingLayers > 0.0F) {
+				tessellator.addVertexWithUV((double)(fireWidth - 0.5F), (double)(0.0F - yOffset), 0.0D, (double)uMax, (double)vMax);
+				tessellator.addVertexWithUV(-0.5D, (double)(0.0F - yOffset), 0.0D, (double)uMin, (double)vMax);
+				tessellator.addVertexWithUV(-0.5D, (double)(1.4F - yOffset), 0.0D, (double)uMin, (double)vMin);
+				tessellator.addVertexWithUV((double)(fireWidth - 0.5F), (double)(1.4F - yOffset), 0.0D, (double)uMax, (double)vMin);
+				--remainingLayers;
+				--yOffset;
+				fireWidth *= 0.9F;
 				GL11.glTranslatef(0.0F, 0.0F, -0.04F);
 			}
 
-			var75.draw();
+			tessellator.draw();
 			GL11.glPopMatrix();
 			GL11.glEnable(GL11.GL_LIGHTING);
 		}
-
 	}
 }

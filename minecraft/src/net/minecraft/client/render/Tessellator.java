@@ -45,10 +45,10 @@ public final class Tessellator {
 		} else {
 			this.isDrawing = false;
 			if(this.vertexCount > 0) {
-				IntBuffer var1 = this.byteBuffer.asIntBuffer();
-				FloatBuffer var2 = this.byteBuffer.asFloatBuffer();
-				var1.clear();
-				var1.put(this.rawBuffer, 0, this.rawBufferIndex);
+				IntBuffer intBuffer = this.byteBuffer.asIntBuffer();
+				FloatBuffer floatBuffer = this.byteBuffer.asFloatBuffer();
+				intBuffer.clear();
+				intBuffer.put(this.rawBuffer, 0, this.rawBufferIndex);
 				this.byteBuffer.position(0);
 				this.byteBuffer.limit(this.rawBufferIndex << 2);
 				if(this.useVBO) {
@@ -61,8 +61,8 @@ public final class Tessellator {
 					if(this.useVBO) {
 						GL11.glTexCoordPointer(2, GL11.GL_FLOAT, 32, 12L);
 					} else {
-						var2.position(3);
-						GL11.glTexCoordPointer(2, 32, var2);
+						floatBuffer.position(3);
+						GL11.glTexCoordPointer(2, 32, (FloatBuffer)floatBuffer);
 					}
 
 					GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
@@ -82,8 +82,8 @@ public final class Tessellator {
 				if(this.useVBO) {
 					GL11.glVertexPointer(3, GL11.GL_FLOAT, 32, 0L);
 				} else {
-					var2.position(0);
-					GL11.glVertexPointer(3, 32, var2);
+					floatBuffer.position(0);
+					GL11.glVertexPointer(3, 32, (FloatBuffer)floatBuffer);
 				}
 
 				GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
@@ -112,78 +112,78 @@ public final class Tessellator {
 		this.startDrawing(7);
 	}
 
-	public final void startDrawing(int var1) {
+	public final void startDrawing(int drawMode) {
 		if(this.isDrawing) {
 			throw new IllegalStateException("Already tesselating!");
 		} else {
 			this.isDrawing = true;
 			this.reset();
-			this.drawMode = var1;
+			this.drawMode = drawMode;
 			this.hasColor = false;
 			this.hasTexture = false;
 			this.isColorDisabled = false;
 		}
 	}
 
-	public final void setColorOpaque_F(float var1, float var2, float var3) {
-		this.setColorOpaque((int)(var1 * 255.0F), (int)(var2 * 255.0F), (int)(var3 * 255.0F));
+	public final void setColorOpaque_F(float red, float green, float blue) {
+		this.setColorOpaque((int)(red * 255.0F), (int)(green * 255.0F), (int)(blue * 255.0F));
 	}
 
-	public final void setColorRGBA_F(float var1, float var2, float var3, float var4) {
-		this.setColorRGBA((int)(var1 * 255.0F), (int)(var2 * 255.0F), (int)(var3 * 255.0F), (int)(var4 * 255.0F));
+	public final void setColorRGBA_F(float red, float green, float blue, float alpha) {
+		this.setColorRGBA((int)(red * 255.0F), (int)(green * 255.0F), (int)(blue * 255.0F), (int)(alpha * 255.0F));
 	}
 
-	private void setColorOpaque(int var1, int var2, int var3) {
-		this.setColorRGBA(var1, var2, var3, 255);
+	private void setColorOpaque(int red, int green, int blue) {
+		this.setColorRGBA(red, green, blue, 255);
 	}
 
-	private void setColorRGBA(int var1, int var2, int var3, int var4) {
+	private void setColorRGBA(int red, int green, int blue, int alpha) {
 		if(!this.isColorDisabled) {
-			if(var1 > 255) {
-				var1 = 255;
+			if(red > 255) {
+				red = 255;
 			}
 
-			if(var2 > 255) {
-				var2 = 255;
+			if(green > 255) {
+				green = 255;
 			}
 
-			if(var3 > 255) {
-				var3 = 255;
+			if(blue > 255) {
+				blue = 255;
 			}
 
-			if(var4 > 255) {
-				var4 = 255;
+			if(alpha > 255) {
+				alpha = 255;
 			}
 
-			if(var1 < 0) {
-				var1 = 0;
+			if(red < 0) {
+				red = 0;
 			}
 
-			if(var2 < 0) {
-				var2 = 0;
+			if(green < 0) {
+				green = 0;
 			}
 
-			if(var3 < 0) {
-				var3 = 0;
+			if(blue < 0) {
+				blue = 0;
 			}
 
-			if(var4 < 0) {
-				var4 = 0;
+			if(alpha < 0) {
+				alpha = 0;
 			}
 
 			this.hasColor = true;
-			this.color = var4 << 24 | var3 << 16 | var2 << 8 | var1;
+			this.color = alpha << 24 | blue << 16 | green << 8 | red;
 		}
 	}
 
-	public final void addVertexWithUV(double var1, double var3, double var5, double var7, double var9) {
+	public final void addVertexWithUV(double x, double y, double z, double u, double v) {
 		this.hasTexture = true;
-		this.textureU = var7;
-		this.textureV = var9;
-		this.addVertex(var1, var3, var5);
+		this.textureU = u;
+		this.textureV = v;
+		this.addVertex(x, y, z);
 	}
 
-	public final void addVertex(double var1, double var3, double var5) {
+	public final void addVertex(double x, double y, double z) {
 		if(this.hasTexture) {
 			this.rawBuffer[this.rawBufferIndex + 3] = Float.floatToRawIntBits((float)this.textureU);
 			this.rawBuffer[this.rawBufferIndex + 4] = Float.floatToRawIntBits((float)this.textureV);
@@ -193,9 +193,9 @@ public final class Tessellator {
 			this.rawBuffer[this.rawBufferIndex + 5] = this.color;
 		}
 
-		this.rawBuffer[this.rawBufferIndex] = Float.floatToRawIntBits((float)(var1 + this.xOffset));
-		this.rawBuffer[this.rawBufferIndex + 1] = Float.floatToRawIntBits((float)(var3 + this.yOffset));
-		this.rawBuffer[this.rawBufferIndex + 2] = Float.floatToRawIntBits((float)(var5 + this.zOffset));
+		this.rawBuffer[this.rawBufferIndex] = Float.floatToRawIntBits((float)(x + this.xOffset));
+		this.rawBuffer[this.rawBufferIndex + 1] = Float.floatToRawIntBits((float)(y + this.yOffset));
+		this.rawBuffer[this.rawBufferIndex + 2] = Float.floatToRawIntBits((float)(z + this.zOffset));
 		this.rawBufferIndex += 8;
 		++this.vertexCount;
 		if(this.vertexCount % 4 == 0 && this.rawBufferIndex >= 2097120) {
@@ -204,24 +204,24 @@ public final class Tessellator {
 
 	}
 
-	public final void setColorOpaque_I(int var1) {
-		int var2 = var1 >> 16 & 255;
-		int var3 = var1 >> 8 & 255;
-		var1 &= 255;
-		this.setColorOpaque(var2, var3, var1);
+	public final void setColorOpaque_I(int colorValue) {
+		int red = colorValue >> 16 & 255;
+		int green = colorValue >> 8 & 255;
+		int blue = colorValue & 255;
+		this.setColorOpaque(red, green, blue);
 	}
 
 	public final void disableColor() {
 		this.isColorDisabled = true;
 	}
 
-	public static void setNormal(float var0, float var1, float var2) {
-		GL11.glNormal3f(var0, var1, var2);
+	public static void setNormal(float x, float y, float z) {
+		GL11.glNormal3f(x, y, z);
 	}
 
-	public final void setTranslationD(double var1, double var3, double var5) {
-		this.xOffset = var1;
-		this.yOffset = var3;
-		this.zOffset = var5;
+	public final void setTranslationD(double x, double y, double z) {
+		this.xOffset = x;
+		this.yOffset = y;
+		this.zOffset = z;
 	}
 }

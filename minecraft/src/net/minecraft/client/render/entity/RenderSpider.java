@@ -11,25 +11,23 @@ public final class RenderSpider extends RenderLiving {
 		this.setRenderPassModel(new ModelSpider());
 	}
 
-	protected final float getDeathMaxRotation(EntityLiving var1) {
+	protected final float getDeathMaxRotation(EntityLiving entity) {
 		return 180.0F;
 	}
 
-	protected final boolean shouldRenderPass(EntityLiving var1, int var2) {
-		EntitySpider var10001 = (EntitySpider)var1;
-		int var3 = var2;
-		EntitySpider var5 = var10001;
-		if(var3 != 0) {
+	protected final boolean shouldRenderPass(EntityLiving entity, int renderPass) {
+		if(renderPass != 0) {
 			return false;
-		} else if(var3 != 0) {
+		} else if(renderPass != 0) {
 			return false;
 		} else {
+			EntitySpider spider = (EntitySpider)entity;
 			this.loadTexture("/mob/spider_eyes.png");
-			float var4 = (1.0F - var5.getEntityBrightness(1.0F)) * 0.5F;
+			float alpha = (1.0F - spider.getEntityBrightness(1.0F)) * 0.5F;
 			GL11.glEnable(GL11.GL_BLEND);
 			GL11.glDisable(GL11.GL_ALPHA_TEST);
 			GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_ONE_MINUS_SRC_ALPHA);
-			GL11.glColor4f(1.0F, 1.0F, 1.0F, var4);
+			GL11.glColor4f(1.0F, 1.0F, 1.0F, alpha);
 			return true;
 		}
 	}

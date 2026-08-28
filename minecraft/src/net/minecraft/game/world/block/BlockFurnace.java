@@ -2,6 +2,7 @@ package net.minecraft.game.world.block;
 
 import java.util.Random;
 import net.minecraft.game.entity.player.EntityPlayer;
+import net.minecraft.game.world.IBlockAccess;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.tileentity.TileEntity;
 import net.minecraft.game.world.block.tileentity.TileEntityFurnace;
@@ -44,15 +45,11 @@ public final class BlockFurnace extends BlockContainer {
 	}
 
 	@Override
-	public final int getBlockTexture(World world, int x, int y, int z, int side) {
+	public final int getBlockTexture(IBlockAccess blockAccess, int x, int y, int z, int side) {
 		if(side == 1 || side == 0) {
 			return Block.stone.blockIndexInTexture;
 		} else {
-			int metadata = world.getBlockMetadata(x, y, z);
-			if(metadata == 0) {
-				setDefaultDirection(world, x, y, z);
-				metadata = world.getBlockMetadata(x, y, z);
-			}
+			int metadata = blockAccess.getBlockMetadata(x, y, z);
 			return side != metadata ? this.blockIndexInTexture : (this.isActive ? this.blockIndexInTexture + 16 : this.blockIndexInTexture - 1);
 		}
 	}

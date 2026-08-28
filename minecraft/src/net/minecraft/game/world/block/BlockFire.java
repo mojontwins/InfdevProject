@@ -2,6 +2,7 @@ package net.minecraft.game.world.block;
 
 import java.util.Random;
 import net.minecraft.game.physics.AxisAlignedBB;
+import net.minecraft.game.world.IBlockAccess;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 
@@ -139,8 +140,8 @@ public final class BlockFire extends Block {
 		return false;
 	}
 
-	public final boolean canBlockCatchFire(World world, int x, int y, int z) {
-		return this.chanceToEncourageFire[world.getBlockId(x, y, z)] > 0;
+	public final boolean canBlockCatchFire(IBlockAccess blockAccess, int x, int y, int z) {
+		return this.chanceToEncourageFire[blockAccess.getBlockId(x, y, z)] > 0;
 	}
 
 	private int getChanceToEncourageFire(World world, int x, int y, int z, int currentMax) {

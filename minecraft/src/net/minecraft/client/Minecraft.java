@@ -515,10 +515,13 @@ var2 = var12.inventory.getCurrentItem();
 							return;
 						}
 
-						var16 = var9.stackSize;
-						int var18 = var15;
-						var5 = this.theWorld;
-						if(var9.getItem().onItemUse(var9, var5, var10, var3, var13, var18)) {
+					var16 = var9.stackSize;
+					int var18 = var15;
+					var5 = this.theWorld;
+					float xWithinFace = (float)(this.objectMouseOver.hitVec.xCoord - (double)var10);
+					float yWithinFace = (float)(this.objectMouseOver.hitVec.yCoord - (double)var3);
+					float zWithinFace = (float)(this.objectMouseOver.hitVec.zCoord - (double)var13);
+					if(var9.getItem().onItemUse(var9, var5, var10, var3, var13, var18, xWithinFace, yWithinFace, zWithinFace)) {
 							this.entityRenderer.itemRenderer.equippedItemRender();
 						}
 

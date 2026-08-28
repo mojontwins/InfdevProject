@@ -14,72 +14,63 @@ public final class TextureLavaFX extends TextureFX {
 	}
 
 	public final void onTick() {
-		int var1;
-		int var2;
-		float var3;
-		int var5;
-		int var6;
-		int var7;
-		int var8;
-		int var9;
-		for(var1 = 0; var1 < 16; ++var1) {
-			for(var2 = 0; var2 < 16; ++var2) {
-				var3 = 0.0F;
-				int var4 = (int)(MathHelper.sin((float)var2 * (float)Math.PI * 2.0F / 16.0F) * 1.2F);
-				var5 = (int)(MathHelper.sin((float)var1 * (float)Math.PI * 2.0F / 16.0F) * 1.2F);
+		for(int x = 0; x < 16; ++x) {
+			for(int y = 0; y < 16; ++y) {
+				float accumulator = 0.0F;
+				int xOffset = (int)(MathHelper.sin((float)y * (float)Math.PI * 2.0F / 16.0F) * 1.2F);
+				int yOffset = (int)(MathHelper.sin((float)x * (float)Math.PI * 2.0F / 16.0F) * 1.2F);
 
-				for(var6 = var1 - 1; var6 <= var1 + 1; ++var6) {
-					for(var7 = var2 - 1; var7 <= var2 + 1; ++var7) {
-						var8 = var6 + var4 & 15;
-						var9 = var7 + var5 & 15;
-						var3 += this.red[var8 + (var9 << 4)];
+				for(int neighborX = x - 1; neighborX <= x + 1; ++neighborX) {
+					for(int neighborY = y - 1; neighborY <= y + 1; ++neighborY) {
+						int sampleX = neighborX + xOffset & 15;
+						int sampleY = neighborY + yOffset & 15;
+						accumulator += this.red[sampleX + (sampleY << 4)];
 					}
 				}
 
-				this.green[var1 + (var2 << 4)] = var3 / 10.0F + (this.blue[(var1 & 15) + ((var2 & 15) << 4)] + this.blue[(var1 + 1 & 15) + ((var2 & 15) << 4)] + this.blue[(var1 + 1 & 15) + ((var2 + 1 & 15) << 4)] + this.blue[(var1 & 15) + ((var2 + 1 & 15) << 4)]) / 4.0F * 0.8F;
-				this.blue[var1 + (var2 << 4)] += this.alpha[var1 + (var2 << 4)] * 0.01F;
-				if(this.blue[var1 + (var2 << 4)] < 0.0F) {
-					this.blue[var1 + (var2 << 4)] = 0.0F;
+				this.green[x + (y << 4)] = accumulator / 10.0F + (this.blue[(x & 15) + ((y & 15) << 4)] + this.blue[(x + 1 & 15) + ((y & 15) << 4)] + this.blue[(x + 1 & 15) + ((y + 1 & 15) << 4)] + this.blue[(x & 15) + ((y + 1 & 15) << 4)]) / 4.0F * 0.8F;
+				this.blue[x + (y << 4)] += this.alpha[x + (y << 4)] * 0.01F;
+				if(this.blue[x + (y << 4)] < 0.0F) {
+					this.blue[x + (y << 4)] = 0.0F;
 				}
 
-				this.alpha[var1 + (var2 << 4)] -= 0.06F;
+				this.alpha[x + (y << 4)] -= 0.06F;
 				if(Math.random() < 0.005D) {
-					this.alpha[var1 + (var2 << 4)] = 1.5F;
+					this.alpha[x + (y << 4)] = 1.5F;
 				}
 			}
 		}
 
-		float[] var10 = this.green;
+		float[] swap = this.green;
 		this.green = this.red;
-		this.red = var10;
+		this.red = swap;
 
-		for(var2 = 0; var2 < 256; ++var2) {
-			var3 = this.red[var2] * 2.0F;
-			if(var3 > 1.0F) {
-				var3 = 1.0F;
+		for(int pixel = 0; pixel < 256; ++pixel) {
+			float value = this.red[pixel] * 2.0F;
+			if(value > 1.0F) {
+				value = 1.0F;
 			}
 
-			if(var3 < 0.0F) {
-				var3 = 0.0F;
+			if(value < 0.0F) {
+				value = 0.0F;
 			}
 
-			var5 = (int)(var3 * 100.0F + 155.0F);
-			var6 = (int)(var3 * var3 * 255.0F);
-			var7 = (int)(var3 * var3 * var3 * var3 * 128.0F);
+			int redChannel = (int)(value * 100.0F + 155.0F);
+			int greenChannel = (int)(value * value * 255.0F);
+			int blueChannel = (int)(value * value * value * value * 128.0F);
 			if(this.anaglyphEnabled) {
-				var8 = (var5 * 30 + var6 * 59 + var7 * 11) / 100;
-				var9 = (var5 * 30 + var6 * 70) / 100;
-				var1 = (var5 * 30 + var7 * 70) / 100;
-				var5 = var8;
-				var6 = var9;
-				var7 = var1;
+				int anaglyphRed = (redChannel * 30 + greenChannel * 59 + blueChannel * 11) / 100;
+				int anaglyphGreen = (redChannel * 30 + greenChannel * 70) / 100;
+				int anaglyphBlue = (redChannel * 30 + blueChannel * 70) / 100;
+				redChannel = anaglyphRed;
+				greenChannel = anaglyphGreen;
+				blueChannel = anaglyphBlue;
 			}
 
-			this.imageData[var2 << 2] = (byte)var5;
-			this.imageData[(var2 << 2) + 1] = (byte)var6;
-			this.imageData[(var2 << 2) + 2] = (byte)var7;
-			this.imageData[(var2 << 2) + 3] = -1;
+			this.imageData[pixel << 2] = (byte)redChannel;
+			this.imageData[(pixel << 2) + 1] = (byte)greenChannel;
+			this.imageData[(pixel << 2) + 2] = (byte)blueChannel;
+			this.imageData[(pixel << 2) + 3] = -1;
 		}
-
 	}
 }

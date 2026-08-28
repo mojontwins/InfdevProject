@@ -5,7 +5,6 @@ import com.mojang.nbt.NBTTagList;
 import net.minecraft.game.IInventory;
 import net.minecraft.game.item.Item;
 import net.minecraft.game.item.ItemStack;
-import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.Block;
 import net.minecraft.game.world.material.Material;
 

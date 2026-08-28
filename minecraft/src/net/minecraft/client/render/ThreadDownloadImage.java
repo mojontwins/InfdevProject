@@ -9,36 +9,35 @@ final class ThreadDownloadImage extends Thread {
 	private ImageBufferDownload buffer;
 	private ThreadDownloadImageData imageData;
 
-	ThreadDownloadImage(ThreadDownloadImageData var1, String var2, ImageBufferDownload var3) {
-		this.imageData = var1;
-		this.location = var2;
-		this.buffer = var3;
+	ThreadDownloadImage(ThreadDownloadImageData imageData, String location, ImageBufferDownload buffer) {
+		this.imageData = imageData;
+		this.location = location;
+		this.buffer = buffer;
 	}
 
 	public final void run() {
-		HttpURLConnection var1 = null;
+		HttpURLConnection connection = null;
 
 		try {
-			URL var2 = new URL(this.location);
-			var1 = (HttpURLConnection)var2.openConnection();
-			var1.setDoInput(true);
-			var1.setDoOutput(false);
-			var1.connect();
-			if(var1.getResponseCode() != 404) {
+			URL url = new URL(this.location);
+			connection = (HttpURLConnection)url.openConnection();
+			connection.setDoInput(true);
+			connection.setDoOutput(false);
+			connection.connect();
+			if(connection.getResponseCode() != 404) {
 				if(this.buffer == null) {
-					this.imageData.image = ImageIO.read(var1.getInputStream());
+					this.imageData.image = ImageIO.read(connection.getInputStream());
 				} else {
-					this.imageData.image = this.buffer.parseUserSkin(ImageIO.read(var1.getInputStream()));
+					this.imageData.image = this.buffer.parseUserSkin(ImageIO.read(connection.getInputStream()));
 				}
 
 				return;
 			}
-		} catch (Exception var5) {
-			var5.printStackTrace();
+		} catch (Exception exception) {
+			exception.printStackTrace();
 			return;
 		} finally {
-			var1.disconnect();
+			connection.disconnect();
 		}
-
 	}
 }

@@ -13,38 +13,36 @@ public final class RenderTNT extends Render {
 		this.shadowSize = 0.5F;
 	}
 
-	public final void doRender(Entity var1, double var2, double var4, double var6, float var8, float var9) {
-		EntityTNT var10001 = (EntityTNT)var1;
-		double var12 = var2;
-		EntityTNT var18 = var10001;
+	public final void doRender(Entity entity, double x, double y, double z, float yaw, float partialTick) {
+		EntityTNT tnt = (EntityTNT)entity;
 		GL11.glPushMatrix();
-		GL11.glTranslatef((float)var12, (float)var4, (float)var6);
-		float var19;
-		if((float)var18.fuse - var9 + 1.0F < 10.0F) {
-			var19 = 1.0F - ((float)var18.fuse - var9 + 1.0F) / 10.0F;
-			if(var19 < 0.0F) {
-				var19 = 0.0F;
+		GL11.glTranslatef((float)x, (float)y, (float)z);
+		float expansion;
+		if((float)tnt.fuse - partialTick + 1.0F < 10.0F) {
+			expansion = 1.0F - ((float)tnt.fuse - partialTick + 1.0F) / 10.0F;
+			if(expansion < 0.0F) {
+				expansion = 0.0F;
 			}
 
-			if(var19 > 1.0F) {
-				var19 = 1.0F;
+			if(expansion > 1.0F) {
+				expansion = 1.0F;
 			}
 
-			var19 *= var19;
-			var19 *= var19;
-			var19 = 1.0F + var19 * 0.3F;
-			GL11.glScalef(var19, var19, var19);
+			expansion *= expansion;
+			expansion *= expansion;
+			expansion = 1.0F + expansion * 0.3F;
+			GL11.glScalef(expansion, expansion, expansion);
 		}
 
-		var19 = (1.0F - ((float)var18.fuse - var9 + 1.0F) / 100.0F) * 0.8F;
+		expansion = (1.0F - ((float)tnt.fuse - partialTick + 1.0F) / 100.0F) * 0.8F;
 		this.loadTexture("/terrain.png");
 		this.blockRenderer.renderBlockOnInventory(Block.tnt);
-		if(var18.fuse / 5 % 2 == 0) {
+		if(tnt.fuse / 5 % 2 == 0) {
 			GL11.glDisable(GL11.GL_TEXTURE_2D);
 			GL11.glDisable(GL11.GL_LIGHTING);
 			GL11.glEnable(GL11.GL_BLEND);
 			GL11.glBlendFunc(GL11.GL_SRC_ALPHA, GL11.GL_DST_ALPHA);
-			GL11.glColor4f(1.0F, 1.0F, 1.0F, var19);
+			GL11.glColor4f(1.0F, 1.0F, 1.0F, expansion);
 			this.blockRenderer.renderBlockOnInventory(Block.tnt);
 			GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
 			GL11.glDisable(GL11.GL_BLEND);

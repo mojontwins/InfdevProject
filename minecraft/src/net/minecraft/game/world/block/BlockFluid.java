@@ -2,6 +2,7 @@ package net.minecraft.game.world.block;
 
 import java.util.Random;
 import net.minecraft.game.physics.AxisAlignedBB;
+import net.minecraft.game.world.IBlockAccess;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 
@@ -129,14 +130,14 @@ public class BlockFluid extends Block {
 	}
 
 	@Override
-	public final float getBlockBrightness(World world, int x, int y, int z) {
-		return this.blockMaterial == Material.lava ? 100.0F : super.getBlockBrightness(world, x, y, z);
+	public final float getBlockBrightness(IBlockAccess blockAccess, int x, int y, int z) {
+		return this.blockMaterial == Material.lava ? 100.0F : super.getBlockBrightness(blockAccess, x, y, z);
 	}
 
 	@Override
-	public boolean shouldSideBeRendered(World world, int x, int y, int z, int side) {
-		int neighborBlockID = world.getBlockId(x, y, z);
-		return neighborBlockID != this.movingId && neighborBlockID != this.stillId ? (side != 1 || world.getBlockId(x - 1, y, z) != 0 && world.getBlockId(x + 1, y, z) != 0 && world.getBlockId(x, y, z - 1) != 0 && world.getBlockId(x, y, z + 1) != 0 ? super.shouldSideBeRendered(world, x, y, z, side) : true) : false;
+	public boolean shouldSideBeRendered(IBlockAccess blockAccess, int x, int y, int z, int side) {
+		int neighborBlockID = blockAccess.getBlockId(x, y, z);
+		return neighborBlockID != this.movingId && neighborBlockID != this.stillId ? (side != 1 || blockAccess.getBlockId(x - 1, y, z) != 0 && blockAccess.getBlockId(x + 1, y, z) != 0 && blockAccess.getBlockId(x, y, z - 1) != 0 && blockAccess.getBlockId(x, y, z + 1) != 0 ? super.shouldSideBeRendered(blockAccess, x, y, z, side) : true) : false;
 	}
 
 	@Override

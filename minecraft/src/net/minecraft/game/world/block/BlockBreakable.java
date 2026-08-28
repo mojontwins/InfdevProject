@@ -1,6 +1,6 @@
 package net.minecraft.game.world.block;
 
-import net.minecraft.game.world.World;
+import net.minecraft.game.world.IBlockAccess;
 import net.minecraft.game.world.material.Material;
 
 public class BlockBreakable extends Block {
@@ -17,8 +17,8 @@ public class BlockBreakable extends Block {
 	}
 
 	@Override
-	public final boolean shouldSideBeRendered(World world, int x, int y, int z, int side) {
-		int neighborBlockID = world.getBlockId(x, y, z);
-		return !this.renderAllFaces && neighborBlockID == this.blockID ? false : super.shouldSideBeRendered(world, x, y, z, side);
+	public final boolean shouldSideBeRendered(IBlockAccess blockAccess, int x, int y, int z, int side) {
+		int neighborBlockID = blockAccess.getBlockId(x, y, z);
+		return !this.renderAllFaces && neighborBlockID == this.blockID ? false : super.shouldSideBeRendered(blockAccess, x, y, z, side);
 	}
 }

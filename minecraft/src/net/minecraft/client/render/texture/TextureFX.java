@@ -6,8 +6,8 @@ public class TextureFX {
 	public boolean anaglyphEnabled = false;
 	public int textureId = 0;
 
-	public TextureFX(int var1) {
-		this.iconIndex = var1;
+	public TextureFX(int iconIndex) {
+		this.iconIndex = iconIndex;
 	}
 
 	public void onTick() {

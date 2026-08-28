@@ -10,6 +10,7 @@ import net.minecraft.game.item.ItemStack;
 import net.minecraft.game.physics.AxisAlignedBB;
 import net.minecraft.game.physics.MovingObjectPosition;
 import net.minecraft.game.physics.Vec3D;
+import net.minecraft.game.world.IBlockAccess;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 
@@ -178,16 +179,16 @@ public class Block {
 		this.maxZ = (double)maxZ;
 	}
 
-	public float getBlockBrightness(World world, int x, int y, int z) {
-		return world.getBrightness(x, y, z);
+	public float getBlockBrightness(IBlockAccess blockAccess, int x, int y, int z) {
+		return blockAccess.getBrightness(x, y, z);
 	}
 
-	public boolean shouldSideBeRendered(World world, int x, int y, int z, int side) {
-		return !world.isSolid(x, y, z);
+	public boolean shouldSideBeRendered(IBlockAccess blockAccess, int x, int y, int z, int side) {
+		return !blockAccess.isSolid(x, y, z);
 	}
 
-	public int getBlockTexture(World world, int x, int y, int z, int side) {
-		return this.getBlockTextureFromSideAndMetadata(side, world.getBlockMetadata(x, y, z));
+	public int getBlockTexture(IBlockAccess blockAccess, int x, int y, int z, int side) {
+		return this.getBlockTextureFromSideAndMetadata(side, blockAccess.getBlockMetadata(x, y, z));
 	}
 
 	public int getBlockTextureFromSideAndMetadata(int side, int metadata) {
@@ -418,6 +419,10 @@ public class Block {
 	}
 
 	public void onBlockPlaced(World world, int x, int y, int z, int side) {
+	}
+
+	public void onBlockPlaced(World world, int x, int y, int z, int side, float xWithinFace, float yWithinFace, float zWithinFace) {
+		this.onBlockPlaced(world, x, y, z, side);
 	}
 
 	static {

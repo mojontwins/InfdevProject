@@ -102,6 +102,10 @@ public class Item {
 		return false;
 	}
 
+	public boolean onItemUse(ItemStack itemStack, World world, int x, int y, int z, int side, float xWithinFace, float yWithinFace, float zWithinFace) {
+		return this.onItemUse(itemStack, world, x, y, z, side);
+	}
+
 	public float getStrVsBlock(Block var1) {
 		return 1.0F;
 	}

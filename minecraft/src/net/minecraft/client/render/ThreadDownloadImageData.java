@@ -8,7 +8,7 @@ public final class ThreadDownloadImageData {
 	public int textureIntDownload = -1;
 	public boolean textureSetupComplete = false;
 
-	public ThreadDownloadImageData(String var1, ImageBufferDownload var2) {
-		(new ThreadDownloadImage(this, var1, var2)).start();
+	public ThreadDownloadImageData(String location, ImageBufferDownload buffer) {
+		(new ThreadDownloadImage(this, location, buffer)).start();
 	}
 }

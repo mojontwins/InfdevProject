@@ -6,6 +6,7 @@ import net.minecraft.game.InventoryLargeChest;
 import net.minecraft.game.entity.misc.EntityItem;
 import net.minecraft.game.entity.player.EntityPlayer;
 import net.minecraft.game.item.ItemStack;
+import net.minecraft.game.world.IBlockAccess;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.tileentity.TileEntity;
 import net.minecraft.game.world.block.tileentity.TileEntityChest;
@@ -20,14 +21,14 @@ public final class BlockChest extends BlockContainer {
 	}
 
 	@Override
-	public final int getBlockTexture(World world, int x, int y, int z, int side) {
+	public final int getBlockTexture(IBlockAccess blockAccess, int x, int y, int z, int side) {
 		if(side == 1 || side == 0) {
 			return this.blockIndexInTexture - 1;
 		} else {
-			int neighborNegZ = world.getBlockId(x, y, z - 1);
-			int neighborPosZ = world.getBlockId(x, y, z + 1);
-			int neighborNegX = world.getBlockId(x - 1, y, z);
-			int neighborPosX = world.getBlockId(x + 1, y, z);
+			int neighborNegZ = blockAccess.getBlockId(x, y, z - 1);
+			int neighborPosZ = blockAccess.getBlockId(x, y, z + 1);
+			int neighborNegX = blockAccess.getBlockId(x - 1, y, z);
+			int neighborPosX = blockAccess.getBlockId(x + 1, y, z);
 			if(neighborNegZ != this.blockID && neighborPosZ != this.blockID) {
 				if(neighborNegX != this.blockID && neighborPosX != this.blockID) {
 					byte facing = 3;
@@ -49,8 +50,8 @@ public final class BlockChest extends BlockContainer {
 					if(neighborNegX == this.blockID) {
 						offset = -1;
 					}
-					int cornerNegZ = world.getBlockId(neighborNegX == this.blockID ? x - 1 : x + 1, y, z - 1);
-					int cornerPosZ = world.getBlockId(neighborNegX == this.blockID ? x - 1 : x + 1, y, z + 1);
+					int cornerNegZ = blockAccess.getBlockId(neighborNegX == this.blockID ? x - 1 : x + 1, y, z - 1);
+					int cornerPosZ = blockAccess.getBlockId(neighborNegX == this.blockID ? x - 1 : x + 1, y, z + 1);
 					if(side == 3) {
 						offset = -1 - offset;
 					}
@@ -70,8 +71,8 @@ public final class BlockChest extends BlockContainer {
 				if(neighborNegZ == this.blockID) {
 					offset = -1;
 				}
-				int cornerNegX = world.getBlockId(x - 1, y, neighborNegZ == this.blockID ? z - 1 : z + 1);
-				int cornerPosX = world.getBlockId(x + 1, y, neighborNegZ == this.blockID ? z - 1 : z + 1);
+				int cornerNegX = blockAccess.getBlockId(x - 1, y, neighborNegZ == this.blockID ? z - 1 : z + 1);
+				int cornerPosX = blockAccess.getBlockId(x + 1, y, neighborNegZ == this.blockID ? z - 1 : z + 1);
 				if(side == 4) {
 					offset = -1 - offset;
 				}
