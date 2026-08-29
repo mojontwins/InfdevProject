@@ -17,38 +17,43 @@ import net.minecraft.game.entity.monster.EntityZombie;
 import net.minecraft.game.entity.projectile.EntityArrow;
 import net.minecraft.game.world.World;
 
+/**
+ * Registry that maps the string ids written into save files ("Mob", "PrimedTnt",
+ * "FallingSand", ...) to their entity classes and back. The string is the source
+ * of truth that must never change — it is what older saves carry.
+ */
 public final class EntityList {
-	private static Map<String, Class<? extends Entity>> stringToClassMapping = new HashMap<>();
-	private static Map<Class<? extends Entity>, String> classToStringMapping = new HashMap<>();
+	private static final Map<String, Class<? extends Entity>> STRING_TO_CLASS = new HashMap<>();
+	private static final Map<Class<? extends Entity>, String> CLASS_TO_STRING = new HashMap<>();
 
-	private static void addMapping(Class<? extends Entity> var0, String var1) {
-		stringToClassMapping.put(var1, var0);
-		classToStringMapping.put(var0, var1);
+	private static void addMapping(Class<? extends Entity> entityClass, String id) {
+		STRING_TO_CLASS.put(id, entityClass);
+		CLASS_TO_STRING.put(entityClass, id);
 	}
 
-	public static Entity createEntityFromNBT(NBTTagCompound var0, World var1) {
-		Entity var2 = null;
+	public static Entity createEntityFromNBT(NBTTagCompound tag, World world) {
+		Entity entity = null;
 
 		try {
-			Class<? extends Entity> var3 = stringToClassMapping.get(var0.getString("id"));
-			if(var3 != null) {
-				var2 = (Entity)var3.getConstructor(new Class<?>[]{World.class}).newInstance(new Object[]{var1});
+			Class<? extends Entity> entityClass = STRING_TO_CLASS.get(tag.getString("id"));
+			if (entityClass != null) {
+				entity = entityClass.getConstructor(World.class).newInstance(world);
 			}
-		} catch (Exception var4) {
-			var4.printStackTrace();
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 
-		if(var2 != null) {
-			var2.readFromNBT(var0);
+		if (entity != null) {
+			entity.readFromNBT(tag);
 		} else {
-			System.out.println("Skipping Entity with id " + var0.getString("id"));
+			System.out.println("Skipping Entity with id " + tag.getString("id"));
 		}
 
-		return var2;
+		return entity;
 	}
 
-	public static String getEntityString(Entity var0) {
-		return classToStringMapping.get(var0.getClass());
+	public static String getEntityString(Entity entity) {
+		return CLASS_TO_STRING.get(entity.getClass());
 	}
 
 	static {

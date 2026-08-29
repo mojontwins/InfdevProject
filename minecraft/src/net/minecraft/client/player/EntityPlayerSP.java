@@ -16,28 +16,35 @@ import net.minecraft.game.item.ItemStack;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.tileentity.TileEntityFurnace;
 
+/**
+ * The client's own player: wired to the keyboard and mouse through
+ * {@link MovementInput}, able to open chests, workbenches and furnaces, and —
+ * being the only player class with an inventory to save — the one that
+ * serializes items into the world data.
+ */
 public class EntityPlayerSP extends EntityPlayer {
 	public MovementInput movementInput;
 	private Minecraft mc;
 
-	public EntityPlayerSP(Minecraft var1, World var2, Session var3) {
-		super(var2);
-		this.mc = var1;
-		if(var2 != null) {
-			if(var2.playerEntity != null) {
-				World.setEntityDead(var2.playerEntity);
+	public EntityPlayerSP(Minecraft mc, World world, Session session) {
+		super(world);
+		this.mc = mc;
+		if(world != null) {
+			if(world.playerEntity != null) {
+				World.setEntityDead(world.playerEntity);
 			}
 
-			var2.playerEntity = this;
+			world.playerEntity = this;
 		}
 
-		if(var3 != null) {
-			this.skinUrl = "http://www.minecraft.net/skin/" + var3.name + ".png";
+		if(session != null) {
+			this.skinUrl = "http://www.minecraft.net/skin/" + session.name + ".png";
 		}
 
-		this.username = var3.name;
+		this.username = session.name;
 	}
 
+	/** Takes the movement values straight off the keyboard/mouse input. */
 	public final void updatePlayerActionState() {
 		this.moveStrafing = this.movementInput.moveStrafe;
 		this.moveForward = this.movementInput.moveForward;
@@ -49,76 +56,72 @@ public class EntityPlayerSP extends EntityPlayer {
 		super.onLivingUpdate();
 	}
 
-	public final void writeEntityToNBT(NBTTagCompound var1) {
-		super.writeEntityToNBT(var1);
-		var1.setInteger("Score", this.score);
-		InventoryPlayer var10002 = this.inventory;
-		NBTTagList var2 = new NBTTagList();
-		InventoryPlayer var5 = var10002;
+	public final void writeEntityToNBT(NBTTagCompound tag) {
+		super.writeEntityToNBT(tag);
+		tag.setInteger("Score", this.score);
+		NBTTagList inventoryTag = new NBTTagList();
 
-		int var3;
-		NBTTagCompound var4;
-		for(var3 = 0; var3 < var5.mainInventory.length; ++var3) {
-			if(var5.mainInventory[var3] != null) {
-				var4 = new NBTTagCompound();
-				var4.setByte("Slot", (byte)var3);
-				var5.mainInventory[var3].writeToNBT(var4);
-				var2.setTag(var4);
+		for(int slot = 0; slot < this.inventory.mainInventory.length; ++slot) {
+			ItemStack stack = this.inventory.mainInventory[slot];
+			if(stack != null) {
+				NBTTagCompound itemTag = new NBTTagCompound();
+				itemTag.setByte("Slot", (byte)slot);
+				stack.writeToNBT(itemTag);
+				inventoryTag.setTag(itemTag);
 			}
 		}
 
-		for(var3 = 0; var3 < var5.armorInventory.length; ++var3) {
-			if(var5.armorInventory[var3] != null) {
-				var4 = new NBTTagCompound();
-				var4.setByte("Slot", (byte)(var3 + 100));
-				var5.armorInventory[var3].writeToNBT(var4);
-				var2.setTag(var4);
+		for(int slot = 0; slot < this.inventory.armorInventory.length; ++slot) {
+			ItemStack stack = this.inventory.armorInventory[slot];
+			if(stack != null) {
+				NBTTagCompound itemTag = new NBTTagCompound();
+				itemTag.setByte("Slot", (byte)(slot + 100));
+				stack.writeToNBT(itemTag);
+				inventoryTag.setTag(itemTag);
 			}
 		}
 
-		var1.setTag("Inventory", var2);
+		tag.setTag("Inventory", inventoryTag);
 	}
 
-	public final void readEntityFromNBT(NBTTagCompound var1) {
-		super.readEntityFromNBT(var1);
-		this.score = var1.getInteger("Score");
-		NBTTagList var6 = var1.getTagList("Inventory");
-		NBTTagList var2 = var6;
-		InventoryPlayer var7 = this.inventory;
-		var7.mainInventory = new ItemStack[36];
-		var7.armorInventory = new ItemStack[4];
+	public final void readEntityFromNBT(NBTTagCompound tag) {
+		super.readEntityFromNBT(tag);
+		this.score = tag.getInteger("Score");
+		NBTTagList inventoryTag = tag.getTagList("Inventory");
+		this.inventory.mainInventory = new ItemStack[36];
+		this.inventory.armorInventory = new ItemStack[4];
 
-		for(int var3 = 0; var3 < var2.tagCount(); ++var3) {
-			NBTTagCompound var4 = (NBTTagCompound)var2.tagAt(var3);
-			int var5 = var4.getByte("Slot") & 255;
-			if(var5 >= 0 && var5 < var7.mainInventory.length) {
-				var7.mainInventory[var5] = new ItemStack(var4);
+		for(int index = 0; index < inventoryTag.tagCount(); ++index) {
+			NBTTagCompound itemTag = (NBTTagCompound)inventoryTag.tagAt(index);
+			int slot = itemTag.getByte("Slot") & 255;
+			if(slot >= 0 && slot < this.inventory.mainInventory.length) {
+				this.inventory.mainInventory[slot] = new ItemStack(itemTag);
 			}
 
-			if(var5 >= 100 && var5 < var7.armorInventory.length + 100) {
-				var7.armorInventory[var5 - 100] = new ItemStack(var4);
+			if(slot >= 100 && slot < this.inventory.armorInventory.length + 100) {
+				this.inventory.armorInventory[slot - 100] = new ItemStack(itemTag);
 			}
 		}
 
 	}
 
-	public final void displayChestGUI(IInventory var1) {
-		this.mc.displayGuiScreen(new GuiChest(this.inventory, var1));
+	public final void displayChestGUI(IInventory inventory) {
+		this.mc.displayGuiScreen(new GuiChest(this.inventory, inventory));
 	}
 
 	public final void displayWorkbenchGUI() {
 		this.mc.displayGuiScreen(new GuiCrafting(this.inventory));
 	}
 
-	public final void displayFurnaceGUI(TileEntityFurnace var1) {
-		this.mc.displayGuiScreen(new GuiFurnace(this.inventory, var1));
+	public final void displayFurnaceGUI(TileEntityFurnace tileEntityFurnace) {
+		this.mc.displayGuiScreen(new GuiFurnace(this.inventory, tileEntityFurnace));
 	}
 
 	public final void displayInventoryGUI() {
 		this.inventory.setInventorySlotContents(this.inventory.currentItem, (ItemStack)null);
 	}
 
-	public final void onItemPickup(Entity var1) {
-		this.mc.effectRenderer.addEffect(new EntityPickupFX(this.mc.theWorld, var1, this, -0.5F));
+	public final void onItemPickup(Entity item) {
+		this.mc.effectRenderer.addEffect(new EntityPickupFX(this.mc.theWorld, item, this, -0.5F));
 	}
 }

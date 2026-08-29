@@ -7,34 +7,59 @@ import net.minecraft.game.world.block.Block;
 import net.minecraft.game.world.block.StepSound;
 import util.MathHelper;
 
+/**
+ * Any entity with a health pool, a model that swings its limbs and an ambient
+ * life of its own: wandering, sound cues, drowning, knock-back and death.
+ *
+ * <p>The tick flow is fixed in {@link #onUpdate()}: first the shared per-tick
+ * bookkeeping (sounds, drowning, timer decay, death), then the teleport-safe
+ * {@link #onLivingUpdate()} that lets subclasses drive their own movement, and
+ * finally the body animation — the model's yaw lagging behind the true heading
+ * and the limb swing winding up with distance travelled.
+ */
 public class EntityLiving extends Entity {
+	/** How many ticks the red "hearts" flash stays visible after the last damage or heal. */
 	public int heartsHalvesLife = 20;
+	/** Yaw the model is drawn at; lags behind {@code rotationYaw} so the torso twists instead of snapping. */
 	public float renderYawOffset = 0.0F;
 	public float prevRenderYawOffset = 0.0F;
-	private float rotationYawHead;
+	/** Path to the skin/entity texture. */
 	protected String texture = "/char.png";
 	public int health;
 	public int prevHealth;
+	/** Decreasing countdown before the next ambient sound; negative values delay it further. */
 	private int livingSoundTime;
+	/** Remaining ticks of the red hurt flash (drives the tint in the renderers). */
 	public int hurtTime;
+	/** The value {@code hurtTime} is reset to each time the creature is hit. */
 	public int maxHurtTime;
+	/** Yaw the last blow came from, used to spin the corpse when it dies. */
 	public float attackedAtYaw = 0.0F;
+	/** Ticks the creature has already spent dying; past 20 it is removed. */
 	public int deathTime = 0;
+	/** Attack cooldown in ticks before this creature may strike again. */
 	public int attackTime = 0;
 	public float prevCameraPitch;
 	public float cameraPitch;
-	public float newPosZ;
-	public float newRotationYaw;
-	public float newRotationPitch;
+	/** Last tick's limb swing, kept so renderers can interpolate between frames. */
+	public float prevLimbSwing;
+	/** How far the legs have swung, wound up by horizontal speed (capped at 1). */
+	public float limbSwing;
+	/** Persistently growing limb travel, fed to the model as the swing pitch. */
+	public float limbSwingPitch;
+	/** Ticks since this creature came into being; also the far-distance despawn timer. */
 	protected int entityAge;
 	protected float moveStrafing;
 	protected float moveForward;
+	/** Random turn rate injected while idling. */
 	private float randomYawVelocity;
 	protected boolean isJumping;
 	protected float moveSpeed;
 
-	public EntityLiving(World var1) {
-		super(var1);
+	public EntityLiving(World world) {
+		super(world);
+		// Keep the unused Math.random() draws: they advance the shared RNG stream
+		// exactly like the original, so every later random value stays in sync.
 		Math.random();
 		this.entityAge = 0;
 		this.isJumping = false;
@@ -64,26 +89,29 @@ public class EntityLiving extends Entity {
 		return this.height * 0.85F;
 	}
 
+	@Override
 	public void onUpdate() {
 		super.onUpdate();
 		if(this.rand.nextInt(1000) < this.livingSoundTime++) {
 			this.livingSoundTime = -80;
-			String var1 = this.getLivingSound();
-			if(var1 != null) {
-				this.worldObj.playSoundAtEntity(this, var1, 1.0F, (this.rand.nextFloat() - this.rand.nextFloat()) * 0.2F + 1.0F);
+			String sound = this.getLivingSound();
+			if(sound != null) {
+				this.playSound(sound);
 			}
 		}
 
+		// Drowning: the head is inside water, so run down the air supply and,
+		// at its exhaustion, surface an 8-bubble burst and deal 2 damage.
 		if(this.isEntityAlive() && this.isInsideOfMaterial()) {
 			--this.air;
 			if(this.air == -20) {
 				this.air = 0;
 
-				for(int var9 = 0; var9 < 8; ++var9) {
-					float var2 = this.rand.nextFloat() - this.rand.nextFloat();
-					float var3 = this.rand.nextFloat() - this.rand.nextFloat();
-					float var4 = this.rand.nextFloat() - this.rand.nextFloat();
-					this.worldObj.spawnParticle("bubble", this.posX + (double)var2, this.posY + (double)var3, this.posZ + (double)var4, this.motionX, this.motionY, this.motionZ);
+				for(int bubble = 0; bubble < 8; ++bubble) {
+					float spawnX = this.rand.nextFloat() - this.rand.nextFloat();
+					float spawnY = this.rand.nextFloat() - this.rand.nextFloat();
+					float spawnZ = this.rand.nextFloat() - this.rand.nextFloat();
+					this.worldObj.spawnParticle("bubble", this.posX + (double)spawnX, this.posY + (double)spawnY, this.posZ + (double)spawnZ, this.motionX, this.motionY, this.motionZ);
 				}
 
 				this.attackEntityFrom((Entity)null, 2);
@@ -110,7 +138,7 @@ public class EntityLiving extends Entity {
 		if(this.health <= 0) {
 			++this.deathTime;
 			if(this.deathTime > 20) {
-				super.isDead = true;
+				this.isDead = true;
 			}
 		}
 
@@ -118,83 +146,85 @@ public class EntityLiving extends Entity {
 		this.prevRotationYaw = this.rotationYaw;
 		this.prevRotationPitch = this.rotationPitch;
 		this.onLivingUpdate();
-		double var10 = this.posX - this.prevPosX;
-		double var13 = this.posZ - this.prevPosZ;
-		float var5 = MathHelper.sqrt_double(var10 * var10 + var13 * var13);
-		float var6 = this.renderYawOffset;
-		float var8 = 0.0F;
-		if(var5 > 0.05F) {
-			var8 = 1.0F;
-			var6 = (float)Math.atan2(var13, var10) * 180.0F / (float)Math.PI - 90.0F;
+
+		// Body animation. The torso yaw is eased toward either the direction the
+		// creature is travelling, or its last heading, so the body follows the
+		// head instead of snapping around.
+		double travelledX = this.posX - this.prevPosX;
+		double travelledZ = this.posZ - this.prevPosZ;
+		float distanceTravelled = MathHelper.sqrt_double(travelledX * travelledX + travelledZ * travelledZ);
+		float travelYaw = this.renderYawOffset;
+		float headMovement = 0.0F;
+		if(distanceTravelled > 0.05F) {
+			headMovement = 1.0F;
+			travelYaw = (float)Math.atan2(travelledZ, travelledX) * 180.0F / (float)Math.PI - 90.0F;
 		}
 
 		if(!this.onGround) {
-			var8 = 0.0F;
+			headMovement = 0.0F;
 		}
 
-		this.rotationYawHead += (var8 - this.rotationYawHead) * 0.3F;
-
-		float var11;
-		for(var11 = var6 - this.renderYawOffset; var11 < -180.0F; var11 += 360.0F) {
+		float yawTwist = wrapAngleTo180(travelYaw - this.renderYawOffset);
+		this.renderYawOffset += yawTwist * 0.1F;
+		float headTurn = wrapAngleTo180(this.rotationYaw - this.renderYawOffset);
+		if(headTurn < -75.0F) {
+			headTurn = -75.0F;
 		}
 
-		while(var11 >= 180.0F) {
-			var11 -= 360.0F;
+		if(headTurn >= 75.0F) {
+			headTurn = 75.0F;
 		}
 
-		this.renderYawOffset += var11 * 0.1F;
+		this.renderYawOffset = this.rotationYaw - headTurn;
+		this.renderYawOffset += headTurn * 0.1F;
 
-		for(var11 = this.rotationYaw - this.renderYawOffset; var11 < -180.0F; var11 += 360.0F) {
-		}
-
-		while(var11 >= 180.0F) {
-			var11 -= 360.0F;
-		}
-
-		if(var11 < -75.0F) {
-			var11 = -75.0F;
-		}
-
-		if(var11 >= 75.0F) {
-			var11 = 75.0F;
-		}
-
-		this.renderYawOffset = this.rotationYaw - var11;
-		this.renderYawOffset += var11 * 0.1F;
-
-		while(this.rotationYaw - this.prevRotationYaw < -180.0F) {
-			this.prevRotationYaw -= 360.0F;
-		}
-
-		while(this.rotationYaw - this.prevRotationYaw >= 180.0F) {
-			this.prevRotationYaw += 360.0F;
-		}
-
-		while(this.renderYawOffset - this.prevRenderYawOffset < -180.0F) {
-			this.prevRenderYawOffset -= 360.0F;
-		}
-
-		while(this.renderYawOffset - this.prevRenderYawOffset >= 180.0F) {
-			this.prevRenderYawOffset += 360.0F;
-		}
-
-		while(this.rotationPitch - this.prevRotationPitch < -180.0F) {
-			this.prevRotationPitch -= 360.0F;
-		}
-
-		while(this.rotationPitch - this.prevRotationPitch >= 180.0F) {
-			this.prevRotationPitch += 360.0F;
-		}
-
+		// Keep every interpolated angle on the same side of a 360° wrap so the
+		// renderers never sweep a model the long way around a full turn.
+		this.unwrapPrevAngle(this.rotationYaw, this.prevRotationYaw, false);
+		this.unwrapPrevAngle(this.renderYawOffset, this.prevRenderYawOffset, false);
+		this.unwrapPrevAngle(this.rotationPitch, this.prevRotationPitch, true);
 	}
 
-	protected final void setSize(float var1, float var2) {
-		super.setSize(var1, var2);
+	/** Plays a sound with the usual ambient volume and a small random pitch jitter. */
+	private void playSound(String sound) {
+		this.worldObj.playSoundAtEntity(this, sound, 1.0F, (this.rand.nextFloat() - this.rand.nextFloat()) * 0.2F + 1.0F);
 	}
 
-	public final void heal(int var1) {
+	/**
+	 * Normalizes an angle into the [-180°, 180°) range by crossing the 360°
+	 * boundary as often as needed.
+	 */
+	private static float wrapAngleTo180(float angle) {
+		while(angle < -180.0F) {
+			angle += 360.0F;
+		}
+
+		while(angle >= 180.0F) {
+			angle -= 360.0F;
+		}
+
+		return angle;
+	}
+
+	/**
+	 * Rewinds {@code previous} so that {@code current - previous} stays inside
+	 * [-360°, 360°), allowing a safe linear interpolation. Pairs wrap without
+	 * cross-domain mixing when {@code zeroCentered} is set (used for pitch,
+	 * which is already centered on 0).
+	 */
+	private void unwrapPrevAngle(float current, float previous, boolean zeroCentered) {
+		while(current - previous < -180.0F) {
+			previous -= 360.0F;
+		}
+
+		while(current - previous >= 180.0F) {
+			previous += 360.0F;
+		}
+	}
+
+	public final void heal(int amount) {
 		if(this.health > 0) {
-			this.health += var1;
+			this.health += amount;
 			if(this.health > 20) {
 				this.health = 20;
 			}
@@ -203,54 +233,59 @@ public class EntityLiving extends Entity {
 		}
 	}
 
-	public boolean attackEntityFrom(Entity var1, int var2) {
+	/**
+	 * Applies {@code damage} from {@code attacker}. While the hearts flash is
+	 * still shown the blow lands at a fraction of its strength; otherwise the
+	 * full amount is absorbed, the hurt timer starts and the victim is pushed
+	 * away from the attacker. Returns true if the blow had any effect.
+	 */
+	public boolean attackEntityFrom(Entity attacker, int damage) {
 		this.entityAge = 0;
 		if(this.health <= 0) {
 			return false;
-		} else {
-			this.newRotationYaw = 1.5F;
-			if((float)this.heartsLife > (float)this.heartsHalvesLife / 2.0F) {
-				if(this.prevHealth - var2 >= this.health) {
-					return false;
-				}
-
-				this.health = this.prevHealth - var2;
-			} else {
-				this.prevHealth = this.health;
-				this.heartsLife = this.heartsHalvesLife;
-				this.health -= var2;
-				this.hurtTime = this.maxHurtTime = 10;
-			}
-
-			this.attackedAtYaw = 0.0F;
-			if(var1 != null) {
-				double var3 = var1.posX - this.posX;
-				double var5 = var1.posZ - this.posZ;
-				this.attackedAtYaw = (float)(Math.atan2(var5, var3) * 180.0D / (double)((float)Math.PI)) - this.rotationYaw;
-				double var8 = var3;
-				float var12 = MathHelper.sqrt_double(var3 * var3 + var5 * var5);
-				this.motionX /= 2.0D;
-				this.motionY /= 2.0D;
-				this.motionZ /= 2.0D;
-				this.motionX -= var8 / (double)var12 * (double)0.4F;
-				this.motionY += (double)0.4F;
-				this.motionZ -= var5 / (double)var12 * (double)0.4F;
-				if(this.motionY > (double)0.4F) {
-					this.motionY = (double)0.4F;
-				}
-			} else {
-				this.attackedAtYaw = (float)((int)(Math.random() * 2.0D) * 180);
-			}
-
-			if(this.health <= 0) {
-				this.worldObj.playSoundAtEntity(this, this.getDeathSound(), 1.0F, (this.rand.nextFloat() - this.rand.nextFloat()) * 0.2F + 1.0F);
-				this.onDeath(var1);
-			} else {
-				this.worldObj.playSoundAtEntity(this, this.getHurtSound(), 1.0F, (this.rand.nextFloat() - this.rand.nextFloat()) * 0.2F + 1.0F);
-			}
-
-			return true;
 		}
+
+		this.limbSwing = 1.5F;
+		if((float)this.heartsLife > (float)this.heartsHalvesLife / 2.0F) {
+			if(this.prevHealth - damage >= this.health) {
+				return false;
+			}
+
+			this.health = this.prevHealth - damage;
+		} else {
+			this.prevHealth = this.health;
+			this.heartsLife = this.heartsHalvesLife;
+			this.health -= damage;
+			this.hurtTime = this.maxHurtTime = 10;
+		}
+
+		this.attackedAtYaw = 0.0F;
+		if(attacker != null) {
+			double deltaX = attacker.posX - this.posX;
+			double deltaZ = attacker.posZ - this.posZ;
+			this.attackedAtYaw = (float)(Math.atan2(deltaZ, deltaX) * 180.0D / (double)((float)Math.PI)) - this.rotationYaw;
+			float attackDistance = MathHelper.sqrt_double(deltaX * deltaX + deltaZ * deltaZ);
+			this.motionX /= 2.0D;
+			this.motionY /= 2.0D;
+			this.motionZ /= 2.0D;
+			this.motionX -= deltaX / (double)attackDistance * (double)0.4F;
+			this.motionY += (double)0.4F;
+			this.motionZ -= deltaZ / (double)attackDistance * (double)0.4F;
+			if(this.motionY > (double)0.4F) {
+				this.motionY = (double)0.4F;
+			}
+		} else {
+			this.attackedAtYaw = (float)((int)(Math.random() * 2.0D) * 180);
+		}
+
+		if(this.health <= 0) {
+			this.playSound(this.getDeathSound());
+			this.onDeath(attacker);
+		} else {
+			this.playSound(this.getHurtSound());
+		}
+
+		return true;
 	}
 
 	protected String getLivingSound() {
@@ -265,13 +300,14 @@ public class EntityLiving extends Entity {
 		return "random.hurt";
 	}
 
-	public void onDeath(Entity var1) {
-		int var4 = this.getDroppedItem();
-		if(var4 > 0) {
-			int var2 = this.rand.nextInt(3);
+	/** Scatters the creature's dropped item a random number of times (0-2). */
+	public void onDeath(Entity killer) {
+		int droppedItem = this.getDroppedItem();
+		if(droppedItem > 0) {
+			int dropCount = this.rand.nextInt(3);
 
-			for(int var3 = 0; var3 < var2; ++var3) {
-				this.dropItemWithOffset(var4, 1);
+			for(int drop = 0; drop < dropCount; ++drop) {
+				this.dropItemWithOffset(droppedItem, 1);
 			}
 		}
 
@@ -281,58 +317,65 @@ public class EntityLiving extends Entity {
 		return 0;
 	}
 
-	protected final void fall(float var1) {
-		int var3 = (int)Math.ceil((double)(var1 - 3.0F));
-		if(var3 > 0) {
-			this.attackEntityFrom((Entity)null, var3);
-			var3 = this.worldObj.getBlockId(MathHelper.floor_double(this.posX), MathHelper.floor_double(this.posY - (double)0.2F - (double)this.yOffset), MathHelper.floor_double(this.posZ));
-			if(var3 > 0) {
-				StepSound var4 = Block.blocksList[var3].stepSound;
-				this.worldObj.playSoundAtEntity(this, var4.getStepSound(), var4.stepSoundVolume * 0.5F, var4.stepSoundPitch * (12.0F / 16.0F));
+	/** Counts fall damage for every block past 3, and reports the landing block's step sound. */
+	protected final void fall(float distance) {
+		int fallLevel = (int)Math.ceil((double)(distance - 3.0F));
+		if(fallLevel > 0) {
+			this.attackEntityFrom((Entity)null, fallLevel);
+			int landingBlockId = this.worldObj.getBlockId(MathHelper.floor_double(this.posX), MathHelper.floor_double(this.posY - (double)0.2F - (double)this.yOffset), MathHelper.floor_double(this.posZ));
+			if(landingBlockId > 0) {
+				StepSound stepSound = Block.blocksList[landingBlockId].stepSound;
+				this.worldObj.playSoundAtEntity(this, stepSound.getStepSound(), stepSound.stepSoundVolume * 0.5F, stepSound.stepSoundPitch * (12.0F / 16.0F));
 			}
 		}
 
 	}
 
-	public void writeEntityToNBT(NBTTagCompound var1) {
-		var1.setShort("Health", (short)this.health);
-		var1.setShort("HurtTime", (short)this.hurtTime);
-		var1.setShort("DeathTime", (short)this.deathTime);
-		var1.setShort("AttackTime", (short)this.attackTime);
+	public void writeEntityToNBT(NBTTagCompound compound) {
+		compound.setShort("Health", (short)this.health);
+		compound.setShort("HurtTime", (short)this.hurtTime);
+		compound.setShort("DeathTime", (short)this.deathTime);
+		compound.setShort("AttackTime", (short)this.attackTime);
 	}
 
-	public void readEntityFromNBT(NBTTagCompound var1) {
-		this.health = var1.getShort("Health");
-		if(!var1.hasKey("Health")) {
+	public void readEntityFromNBT(NBTTagCompound compound) {
+		this.health = compound.getShort("Health");
+		if(!compound.hasKey("Health")) {
 			this.health = 10;
 		}
 
-		this.hurtTime = var1.getShort("HurtTime");
-		this.deathTime = var1.getShort("DeathTime");
-		this.attackTime = var1.getShort("AttackTime");
+		this.hurtTime = compound.getShort("HurtTime");
+		this.deathTime = compound.getShort("DeathTime");
+		this.attackTime = compound.getShort("AttackTime");
 	}
 
 	public final boolean isEntityAlive() {
 		return !this.isDead && this.health > 0;
 	}
 
+	/**
+	 * Per-tick living behaviour hook: despawns creatures that wandered too far
+	 * from the player (128 blocks out, or 32+ blocks and idle too long), then
+	 * either lets the subclass steer ({@link #updatePlayerActionState}) or lies
+	 * still while dying. Ends with the actual movement pass.
+	 */
 	public void onLivingUpdate() {
 		++this.entityAge;
-		Entity var1 = this.worldObj.getPlayerEntity();
-		if(var1 != null) {
-			double var2 = var1.posX - this.posX;
-			double var4 = var1.posY - this.posY;
-			double var6 = var1.posZ - this.posZ;
-			double var8 = var2 * var2 + var4 * var4 + var6 * var6;
-			if(var8 > 16384.0D) {
-				super.isDead = true;
+		Entity player = this.worldObj.getPlayerEntity();
+		if(player != null) {
+			double deltaX = player.posX - this.posX;
+			double deltaY = player.posY - this.posY;
+			double deltaZ = player.posZ - this.posZ;
+			double distanceSq = deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
+			if(distanceSq > 16384.0D) {
+				this.isDead = true;
 			}
 
 			if(this.entityAge > 600 && this.rand.nextInt(800) == 0) {
-				if(var8 < 1024.0D) {
+				if(distanceSq < 1024.0D) {
 					this.entityAge = 0;
 				} else {
-					super.isDead = true;
+					this.isDead = true;
 				}
 			}
 		}
@@ -346,12 +389,12 @@ public class EntityLiving extends Entity {
 			this.updatePlayerActionState();
 		}
 
-		boolean var17 = this.handleWaterMovement();
-		boolean var3 = this.handleLavaMovement();
+		boolean inWater = this.handleWaterMovement();
+		boolean inLava = this.handleLavaMovement();
 		if(this.isJumping) {
-			if(var17) {
+			if(inWater) {
 				this.motionY += (double)0.04F;
-			} else if(var3) {
+			} else if(inLava) {
 				this.motionY += (double)0.04F;
 			} else if(this.onGround) {
 				this.motionY = (double)0.42F;
@@ -361,33 +404,14 @@ public class EntityLiving extends Entity {
 		this.moveStrafing *= 0.98F;
 		this.moveForward *= 0.98F;
 		this.randomYawVelocity *= 0.9F;
-		float var19 = this.moveForward;
-		float var18 = this.moveStrafing;
-		double var13;
-		if(this.handleWaterMovement()) {
-			var13 = this.posY;
-			this.moveFlying(var18, var19, 0.02F);
-			this.moveEntity(this.motionX, this.motionY, this.motionZ);
-			this.motionX *= (double)0.8F;
-			this.motionY *= (double)0.8F;
-			this.motionZ *= (double)0.8F;
-			this.motionY -= 0.02D;
-			if(this.isCollidedHorizontally && this.isOffsetPositionInLiquid(this.motionX, this.motionY + (double)0.6F - this.posY + var13, this.motionZ)) {
-				this.motionY = (double)0.3F;
-			}
-		} else if(this.handleLavaMovement()) {
-			var13 = this.posY;
-			this.moveFlying(var18, var19, 0.02F);
-			this.moveEntity(this.motionX, this.motionY, this.motionZ);
-			this.motionX *= 0.5D;
-			this.motionY *= 0.5D;
-			this.motionZ *= 0.5D;
-			this.motionY -= 0.02D;
-			if(this.isCollidedHorizontally && this.isOffsetPositionInLiquid(this.motionX, this.motionY + (double)0.6F - this.posY + var13, this.motionZ)) {
-				this.motionY = (double)0.3F;
-			}
+		float forwardInput = this.moveForward;
+		float strafeInput = this.moveStrafing;
+		if(inWater) {
+			this.moveInFluid(0.8F);
+		} else if(inLava) {
+			this.moveInFluid(0.5F);
 		} else {
-			this.moveFlying(var18, var19, this.onGround ? 0.1F : 0.02F);
+			this.moveFlying(strafeInput, forwardInput, this.onGround ? 0.1F : 0.02F);
 			this.moveEntity(this.motionX, this.motionY, this.motionZ);
 			this.motionX *= (double)0.91F;
 			this.motionY *= (double)0.98F;
@@ -399,28 +423,48 @@ public class EntityLiving extends Entity {
 			}
 		}
 
-		this.newPosZ = this.newRotationYaw;
-		var13 = this.posX - this.prevPosX;
-		double var15 = this.posZ - this.prevPosZ;
-		var18 = MathHelper.sqrt_double(var13 * var13 + var15 * var15) * 4.0F;
-		if(var18 > 1.0F) {
-			var18 = 1.0F;
+		this.prevLimbSwing = this.limbSwing;
+		double travelledX = this.posX - this.prevPosX;
+		double travelledZ = this.posZ - this.prevPosZ;
+		float distanceTravelled = MathHelper.sqrt_double(travelledX * travelledX + travelledZ * travelledZ) * 4.0F;
+		if(distanceTravelled > 1.0F) {
+			distanceTravelled = 1.0F;
 		}
 
-		this.newRotationYaw += (var18 - this.newRotationYaw) * 0.4F;
-		this.newRotationPitch += this.newRotationYaw;
-		List<Entity> var20 = this.worldObj.getEntitiesWithinAABBExcludingEntity(this, this.boundingBox.expand((double)0.2F, 0.0D, (double)0.2F));
-		if(var20 != null && var20.size() > 0) {
-			for(int var5 = 0; var5 < var20.size(); ++var5) {
-				Entity var21 = var20.get(var5);
-				if(var21.canBePushed()) {
-					var21.applyEntityCollision(this);
+		this.limbSwing += (distanceTravelled - this.limbSwing) * 0.4F;
+		this.limbSwingPitch += this.limbSwing;
+
+		List<Entity> nearbyEntities = this.worldObj.getEntitiesWithinAABBExcludingEntity(this, this.boundingBox.expand((double)0.2F, 0.0D, (double)0.2F));
+		if(nearbyEntities != null) {
+			nearbyEntities.forEach(entity -> {
+				if(entity.canBePushed()) {
+					entity.applyEntityCollision(this);
 				}
-			}
+			});
 		}
 
 	}
 
+	/** Applies one tick of swimming in water ({@code damping} 0.8) or lava (0.5). */
+	private void moveInFluid(float damping) {
+		double startY = this.posY;
+		this.moveFlying(this.moveStrafing, this.moveForward, 0.02F);
+		this.moveEntity(this.motionX, this.motionY, this.motionZ);
+		this.motionX *= (double)damping;
+		this.motionY *= (double)damping;
+		this.motionZ *= (double)damping;
+		this.motionY -= 0.02D;
+		if(this.isCollidedHorizontally && this.isOffsetPositionInLiquid(this.motionX, this.motionY + (double)0.6F - this.posY + startY, this.motionZ)) {
+			this.motionY = (double)0.3F;
+		}
+
+	}
+
+	/**
+	 * Default creature "personality": every few ticks it picks a random strafe,
+	 * pace and turn, and almost never jumps — unless it is in water or lava,
+	 * where it swims restlessly.
+	 */
 	protected void updatePlayerActionState() {
 		if(this.rand.nextFloat() < 0.07F) {
 			this.moveStrafing = (this.rand.nextFloat() - 0.5F) * this.moveSpeed;
@@ -434,16 +478,15 @@ public class EntityLiving extends Entity {
 
 		this.rotationYaw += this.randomYawVelocity;
 		this.rotationPitch = 0.0F;
-		boolean var1 = this.handleWaterMovement();
-		boolean var2 = this.handleLavaMovement();
-		if(var1 || var2) {
+		if(this.handleWaterMovement() || this.handleLavaMovement()) {
 			this.isJumping = this.rand.nextFloat() < 0.8F;
 		}
 
 	}
 
-	public boolean getCanSpawnHere(float var1, float var2, float var3) {
-		this.setPosition((double)var1, (double)(var2 + this.height / 2.0F), (double)var3);
+	/** True when the given cell is open, dry and reachable — the spawn check used by all creatures. */
+	public boolean getCanSpawnHere(float x, float y, float z) {
+		this.setPosition((double)x, (double)(y + this.height / 2.0F), (double)z);
 		return this.worldObj.checkIfAABBIsClear1(this.boundingBox) && this.worldObj.getCollidingBoundingBoxes(this.boundingBox).size() == 0 && !this.worldObj.getIsAnyLiquid(this.boundingBox);
 	}
 }

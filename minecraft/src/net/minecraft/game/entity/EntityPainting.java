@@ -2,6 +2,7 @@ package net.minecraft.game.entity;
 
 import com.mojang.nbt.NBTTagCompound;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import net.minecraft.game.entity.misc.EntityItem;
 import net.minecraft.game.item.Item;
@@ -11,177 +12,168 @@ import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 import util.MathHelper;
 
+/**
+ * A painting hanging on a wall. It occupies a fixed set of full blocks (its
+ * "backing"), keeps pointing at the wall it was placed on, breaks back into an
+ * {@link EntityItem} if the backing is destroyed, and tips off the wall one
+ * second after being placed somewhere the surface check no longer passes.
+ */
 public class EntityPainting extends Entity {
+	/** How many ticks the painting has spent in an invalid spot before dropping off. */
 	private int tickCounter;
+	/** Facing as a compass style index: 0 = -Z, 1 = -X, 2 = +Z, 3 = +X. */
 	public int direction;
+	/** The block coordinates of the anchor point (one corner of the backing). */
 	private int xPosition;
 	private int yPosition;
 	private int zPosition;
+	/** The artwork currently on display. */
 	public EnumArt art;
 
-	public EntityPainting(World var1) {
-		super(var1);
+	public EntityPainting(World world) {
+		super(world);
 		this.tickCounter = 0;
 		this.direction = 0;
 		this.yOffset = 0.0F;
 		this.setSize(0.5F, 0.5F);
 	}
 
-	public EntityPainting(World var1, int var2, int var3, int var4, int var5) {
-		this(var1);
-		this.xPosition = var2;
-		this.yPosition = var3;
-		this.zPosition = var4;
-		ArrayList<EnumArt> var7 = new ArrayList<>();
-		EnumArt[] var8 = EnumArt.values();
-		var3 = var8.length;
-
-		for(var4 = 0; var4 < var3; ++var4) {
-			EnumArt var6 = var8[var4];
-			this.art = var6;
-			this.setDirection(var5);
-			if(this.onValidSurface()) {
-				var7.add(var6);
+	/**
+	 * Places a painting on a wall at the given block coordinates. Every art whose
+	 * size fits the current wall surface becomes a candidate, and one is chosen
+	 * at random.
+	 */
+	public EntityPainting(World world, int blockX, int blockY, int blockZ, int direction) {
+		this(world);
+		this.xPosition = blockX;
+		this.yPosition = blockY;
+		this.zPosition = blockZ;
+		List<EnumArt> validArts = new ArrayList<>();
+		for (EnumArt art : EnumArt.values()) {
+			this.art = art;
+			this.setDirection(direction);
+			if (this.onValidSurface()) {
+				validArts.add(art);
 			}
 		}
-
-		if(var7.size() > 0) {
-			this.art = var7.get(this.rand.nextInt(var7.size()));
+		if (validArts.size() > 0) {
+			this.art = validArts.get(this.rand.nextInt(validArts.size()));
 		}
-
-		this.setDirection(var5);
+		this.setDirection(direction);
 	}
 
-	private void setDirection(int var1) {
-		this.direction = var1;
-		this.prevRotationYaw = this.rotationYaw = (float)(var1 * 90);
-		float var2 = (float)this.art.sizeX;
-		float var3 = (float)this.art.sizeY;
-		float var4 = (float)this.art.sizeX;
-		if(var1 != 0 && var1 != 2) {
-			var2 = 0.5F;
+	/**
+	 * Positions this painting against the wall it faces: the bounding box is
+	 * half a block wide (the thickness) by the art's height, protruding one
+	 * board's width (9/16 block) off the wall face.
+	 */
+	private void setDirection(int direction) {
+		this.direction = direction;
+		this.prevRotationYaw = this.rotationYaw = (float) (direction * 90);
+		float halfWidth = (float) this.art.sizeX;
+		float halfHeight = (float) this.art.sizeY;
+		float halfDepth = (float) this.art.sizeX;
+		if (direction != 0 && direction != 2) {
+			halfWidth = 0.5F;
 		} else {
-			var4 = 0.5F;
+			halfDepth = 0.5F;
 		}
 
-		var2 /= 32.0F;
-		var3 /= 32.0F;
-		var4 /= 32.0F;
-		float var5 = (float)this.xPosition + 0.5F;
-		float var6 = (float)this.yPosition + 0.5F;
-		float var7 = (float)this.zPosition + 0.5F;
-		if(var1 == 0) {
-			var7 -= 9.0F / 16.0F;
+		halfWidth /= 32.0F;
+		halfHeight /= 32.0F;
+		halfDepth /= 32.0F;
+		float centerX = (float) this.xPosition + 0.5F;
+		float centerY = (float) this.yPosition + 0.5F;
+		float centerZ = (float) this.zPosition + 0.5F;
+
+		// Hover the canvas one board thickness in front of the wall face it points at.
+		if (direction == 0) {
+			centerZ -= 9.0F / 16.0F;
+		}
+		if (direction == 1) {
+			centerX -= 9.0F / 16.0F;
+		}
+		if (direction == 2) {
+			centerZ += 9.0F / 16.0F;
+		}
+		if (direction == 3) {
+			centerX += 9.0F / 16.0F;
 		}
 
-		if(var1 == 1) {
-			var5 -= 9.0F / 16.0F;
+		// Sweep the (half-width, zero or half depth) anchored footprint so the
+		// canvas extends from its anchor corner.
+		if (direction == 0) {
+			centerX -= getArtSize(this.art.sizeX);
+		}
+		if (direction == 1) {
+			centerZ += getArtSize(this.art.sizeX);
+		}
+		if (direction == 2) {
+			centerX += getArtSize(this.art.sizeX);
+		}
+		if (direction == 3) {
+			centerZ -= getArtSize(this.art.sizeX);
 		}
 
-		if(var1 == 2) {
-			var7 += 9.0F / 16.0F;
-		}
-
-		if(var1 == 3) {
-			var5 += 9.0F / 16.0F;
-		}
-
-		if(var1 == 0) {
-			var5 -= getArtSize(this.art.sizeX);
-		}
-
-		if(var1 == 1) {
-			var7 += getArtSize(this.art.sizeX);
-		}
-
-		if(var1 == 2) {
-			var5 += getArtSize(this.art.sizeX);
-		}
-
-		if(var1 == 3) {
-			var7 -= getArtSize(this.art.sizeX);
-		}
-
-		var6 += getArtSize(this.art.sizeY);
-		this.setPosition((double)var5, (double)var6, (double)var7);
-		this.boundingBox = new AxisAlignedBB((double)(var5 - var2), (double)(var6 - var3), (double)(var7 - var4), (double)(var5 + var2), (double)(var6 + var3), (double)(var7 + var4));
-		AxisAlignedBB var27 = this.boundingBox;
-		double var15 = var27.minX;
-		double var17 = var27.minY;
-		double var19 = var27.minZ;
-		double var21 = var27.maxX;
-		double var23 = var27.maxY;
-		double var25 = var27.maxZ;
-		var21 -= (double)0.00625F;
-		var23 -= (double)0.00625F;
-		var25 -= (double)0.00625F;
-		this.boundingBox = new AxisAlignedBB(var15, var17, var19, var21, var23, var25);
+		centerY += getArtSize(this.art.sizeY);
+		this.setPosition((double) centerX, (double) centerY, (double) centerZ);
+		this.boundingBox = new AxisAlignedBB((double) (centerX - halfWidth), (double) (centerY - halfHeight), (double) (centerZ - halfDepth), (double) (centerX + halfWidth), (double) (centerY + halfHeight), (double) (centerZ + halfDepth));
+		this.boundingBox.maxX -= 0.00625F;
+		this.boundingBox.maxY -= 0.00625F;
+		this.boundingBox.maxZ -= 0.00625F;
 	}
 
-	private static float getArtSize(int var0) {
-		return var0 == 32 ? 0.5F : (var0 == 64 ? 0.5F : 0.0F);
+	/** Half of a 32-pixel canvas is exactly 0.5; smaller paintings sit flush at their anchor. */
+	private static float getArtSize(int size) {
+		return size == 32 ? 0.5F : (size == 64 ? 0.5F : 0.0F);
 	}
 
 	public final void onUpdate() {
-		if(this.tickCounter++ == 100 && !this.onValidSurface()) {
+		if (this.tickCounter++ == 100 && !this.onValidSurface()) {
 			this.tickCounter = 0;
 			super.isDead = true;
 			this.worldObj.spawnEntityInWorld(new EntityItem(this.worldObj, this.posX, this.posY, this.posZ, new ItemStack(Item.painting)));
 		}
-
 	}
 
+	/**
+	 * The painting stays mounted only while its bounding box is not obstructed,
+	 * the whole backing strip is made of solid material, and no other painting
+	 * already occupies the same spot.
+	 */
 	public final boolean onValidSurface() {
-		if(this.worldObj.getCollidingBoundingBoxes(this.boundingBox).size() > 0) {
+		if (!this.worldObj.getCollidingBoundingBoxes(this.boundingBox).isEmpty()) {
 			return false;
 		} else {
-			int var1 = this.art.sizeX / 16;
-			int var2 = this.art.sizeY / 16;
-			int var3 = this.xPosition;
-			int var5 = this.zPosition;
-			if(this.direction == 0) {
-				var3 = MathHelper.floor_double(this.posX - (double)((float)this.art.sizeX / 32.0F));
+			int paintingsWide = this.art.sizeX / 16;
+			int paintingsTall = this.art.sizeY / 16;
+			int anchorX = this.xPosition;
+			int anchorZ = this.zPosition;
+			if (this.direction == 0 || this.direction == 2) {
+				anchorX = MathHelper.floor_double(this.posX - (double) ((float) this.art.sizeX / 32.0F));
+			} else {
+				anchorZ = MathHelper.floor_double(this.posZ - (double) ((float) this.art.sizeX / 32.0F));
 			}
 
-			if(this.direction == 1) {
-				var5 = MathHelper.floor_double(this.posZ - (double)((float)this.art.sizeX / 32.0F));
-			}
+			int anchorY = MathHelper.floor_double(this.posY - (double) ((float) this.art.sizeY / 32.0F));
 
-			if(this.direction == 2) {
-				var3 = MathHelper.floor_double(this.posX - (double)((float)this.art.sizeX / 32.0F));
-			}
-
-			if(this.direction == 3) {
-				var5 = MathHelper.floor_double(this.posZ - (double)((float)this.art.sizeX / 32.0F));
-			}
-
-			int var4 = MathHelper.floor_double(this.posY - (double)((float)this.art.sizeY / 32.0F));
-
-			int var7;
-			for(int var6 = 0; var6 < var1; ++var6) {
-				for(var7 = 0; var7 < var2; ++var7) {
-					Material var8;
-					if(this.direction != 0 && this.direction != 2) {
-						var8 = this.worldObj.getBlockMaterial(this.xPosition, var4 + var7, var5 + var6);
+			for (int row = 0; row < paintingsWide; ++row) {
+				for (int column = 0; column < paintingsTall; ++column) {
+					Material backing;
+					if (this.direction != 0 && this.direction != 2) {
+						backing = this.worldObj.getBlockMaterial(this.xPosition, anchorY + column, anchorZ + row);
 					} else {
-						var8 = this.worldObj.getBlockMaterial(var3 + var6, var4 + var7, this.zPosition);
+						backing = this.worldObj.getBlockMaterial(anchorX + row, anchorY + column, this.zPosition);
 					}
 
-					if(!var8.isSolid()) {
+					if (!backing.isSolid()) {
 						return false;
 					}
 				}
 			}
 
-			List<Entity> var9 = this.worldObj.getEntitiesWithinAABBExcludingEntity(this, this.boundingBox);
-
-			for(var7 = 0; var7 < var9.size(); ++var7) {
-				if(var9.get(var7) instanceof EntityPainting) {
-					return false;
-				}
-			}
-
-			return true;
+			List<Entity> nearbyEntities = this.worldObj.getEntitiesWithinAABBExcludingEntity(this, this.boundingBox);
+			return nearbyEntities.stream().noneMatch(nearby -> nearby instanceof EntityPainting);
 		}
 	}
 
@@ -189,37 +181,29 @@ public class EntityPainting extends Entity {
 		return true;
 	}
 
-	public final boolean attackEntityFrom(Entity var1, int var2) {
+	public final boolean attackEntityFrom(Entity entity, int damage) {
 		super.isDead = true;
 		this.worldObj.spawnEntityInWorld(new EntityItem(this.worldObj, this.posX, this.posY, this.posZ, new ItemStack(Item.painting)));
 		return true;
 	}
 
-	public final void writeEntityToNBT(NBTTagCompound var1) {
-		var1.setByte("Dir", (byte)this.direction);
-		var1.setString("Motive", this.art.title);
-		var1.setInteger("TileX", this.xPosition);
-		var1.setInteger("TileY", this.yPosition);
-		var1.setInteger("TileZ", this.zPosition);
+	public final void writeEntityToNBT(NBTTagCompound tag) {
+		tag.setByte("Dir", (byte) this.direction);
+		tag.setString("Motive", this.art.title);
+		tag.setInteger("TileX", this.xPosition);
+		tag.setInteger("TileY", this.yPosition);
+		tag.setInteger("TileZ", this.zPosition);
 	}
 
-	public final void readEntityFromNBT(NBTTagCompound var1) {
-		this.direction = var1.getByte("Dir");
-		this.xPosition = var1.getInteger("TileX");
-		this.yPosition = var1.getInteger("TileY");
-		this.zPosition = var1.getInteger("TileZ");
-		String var6 = var1.getString("Motive");
-		EnumArt[] var2 = EnumArt.values();
-		int var3 = var2.length;
+	public final void readEntityFromNBT(NBTTagCompound tag) {
+		this.direction = tag.getByte("Dir");
+		this.xPosition = tag.getInteger("TileX");
+		this.yPosition = tag.getInteger("TileY");
+		this.zPosition = tag.getInteger("TileZ");
+		String motive = tag.getString("Motive");
+		this.art = Arrays.stream(EnumArt.values()).filter(art -> art.title.equals(motive)).findFirst().orElse(null);
 
-		for(int var4 = 0; var4 < var3; ++var4) {
-			EnumArt var5 = var2[var4];
-			if(var5.title.equals(var6)) {
-				this.art = var5;
-			}
-		}
-
-		if(this.art == null) {
+		if (this.art == null) {
 			this.art = EnumArt.Kebab;
 		}
 

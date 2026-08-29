@@ -16,9 +16,25 @@ import net.minecraft.game.world.block.StepSound;
 import net.minecraft.game.world.material.Material;
 import util.MathHelper;
 
+/**
+ * The base of every object with a position, velocity, bounding box and a life
+ * of its own: it owns the shared per-tick pass ({@link #onUpdate()}) and the
+ * axis-by-axis movement/collision solver ({@link #moveEntity}), the water and
+ * lava tests, fire and falling, and the NBT round-trip every saved entity goes
+ * through.
+ *
+ * <p>Subclasses set their shape once in the constructor with
+ * {@link #setSize} and extend the hook points ({@link #onUpdate()}, or
+ * {@link #fall} / {@link #dealFireDamage} / {@link #attackEntityFrom} / the
+ * NBT read/write pair). Fields are public because the world ticker and the
+ * client renderers read them directly.
+ */
 public abstract class Entity {
+	/** This entity blocks others from spawning inside it while it is pushed along. */
 	public boolean preventEntitySpawning = false;
 	protected World worldObj;
+
+	// --- position & look -------------------------------------------------------
 	public double prevPosX;
 	public double prevPosY;
 	public double prevPosZ;
@@ -32,41 +48,60 @@ public abstract class Entity {
 	public float rotationPitch;
 	public float prevRotationYaw;
 	public float prevRotationPitch;
+
+	// --- shape & physics state --------------------------------------------------
+	/** The solid volume this entity occupies; movement logic reads and relocates it. */
 	public AxisAlignedBB boundingBox = new AxisAlignedBB(0.0D, 0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
 	public boolean onGround = false;
 	public boolean isCollidedHorizontally = false;
-	private boolean unknownBool = true;
+	/**
+	 * When true the entity keeps its horizontal velocity after landing on (or
+	 * bumping into) something. Always true in this build — the collision
+	 * "stop-all-motion" branches in {@link #moveEntity} are dead but kept for
+	 * fidelity with the original bytecode.
+	 */
+	private boolean keepMovingOnCollide = true;
 	public boolean isDead = false;
+	/** Vertical offset from the feet to the "logical" origin, e.g. the eyes/centre of gravity. */
 	public float yOffset = 0.0F;
+	/** Horizontal footprint of the bounding box, in block units. */
 	public float width = 0.6F;
+	/** Height of the bounding box, in block units. */
 	public float height = 1.8F;
 	public float prevDistanceWalkedModified = 0.0F;
 	public float distanceWalkedModified = 0.0F;
+	/** Whether this entity paces out footsteps and plant/walk contacts over solid ground. */
 	protected boolean entityWalks = true;
+	/** Metres built up during a fall; applied through {@link #fall} on landing. */
 	private float fallDistance = 0.0F;
 	private int nextStepDistance = 1;
 	public double lastTickPosX;
 	public double lastTickPosY;
 	public double lastTickPosZ;
+	/** Depth sunk into fluid/climb (step-ups wedge it up); subtracted from posY. */
 	private float ySize = 0.0F;
+	/** How high an automatic step-up may climb (0 disables stepping). */
 	public float stepHeight = 0.0F;
 	public boolean noClip = false;
 	protected Random rand = new Random();
 	public int ticksExisted = 0;
 	public int fireResistance = 1;
+	/** Remaining fire ticks; becomes negative while fire is being resisted/extinguished. */
 	public int fire = 0;
 	protected int maxAir = 300;
 	private boolean inWater = false;
+	/** Ticks the red "hearts" flash stays visible after harm or healing. */
 	public int heartsLife = 0;
 	public int air = 300;
 	private boolean isFirstUpdate = true;
 	public String skinUrl;
 
-	public Entity(World var1) {
-		this.worldObj = var1;
+	public Entity(World world) {
+		this.worldObj = world;
 		this.setPosition(0.0D, 0.0D, 0.0D);
 	}
 
+	/** Walks the player up through any solid ground it got spawned inside. */
 	protected void preparePlayerToSpawn() {
 		if(this.worldObj != null) {
 			while(this.posY > 0.0D) {
@@ -83,35 +118,26 @@ public abstract class Entity {
 		}
 	}
 
-	protected void setSize(float var1, float var2) {
-		this.width = var1;
-		this.height = var2;
+	/** Records the entity's footprint and height; the box is recentred the next time it is positioned. */
+	protected void setSize(float width, float height) {
+		this.width = width;
+		this.height = height;
 	}
 
-	protected final void setPosition(double var1, double var3, double var5) {
-		this.posX = var1;
-		this.posY = var3;
-		this.posZ = var5;
-		float var7 = this.width / 2.0F;
-		float var8 = this.height / 2.0F;
-		double var10001 = var1 - (double)var7;
-		double var10002 = var3 - (double)var8;
-		double var10003 = var5 - (double)var7;
-		double var10004 = var1 + (double)var7;
-		double var10005 = var3 + (double)var8;
-		double var20 = var5 + (double)var7;
-		double var18 = var10005;
-		double var16 = var10004;
-		double var14 = var10003;
-		double var12 = var10002;
-		double var10 = var10001;
-		AxisAlignedBB var22 = this.boundingBox;
-		var22.minX = var10;
-		var22.minY = var12;
-		var22.minZ = var14;
-		var22.maxX = var16;
-		var22.maxY = var18;
-		var22.maxZ = var20;
+	/** Recentres the bounding box (and the entity) exactly on the given coordinates. */
+	protected final void setPosition(double x, double y, double z) {
+		this.posX = x;
+		this.posY = y;
+		this.posZ = z;
+		float halfWidth = this.width / 2.0F;
+		float halfHeight = this.height / 2.0F;
+		AxisAlignedBB box = this.boundingBox;
+		box.minX = x - (double)halfWidth;
+		box.minY = y - (double)halfHeight;
+		box.minZ = z - (double)halfWidth;
+		box.maxX = x + (double)halfWidth;
+		box.maxY = y + (double)halfHeight;
+		box.maxZ = z + (double)halfWidth;
 	}
 
 	public void onUpdate() {
@@ -123,28 +149,27 @@ public abstract class Entity {
 		this.prevRotationPitch = this.rotationPitch;
 		this.prevRotationYaw = this.rotationYaw;
 		if(this.handleWaterMovement()) {
+			// Slapping into water for the first time: a splash, a bubbly trail,
+			// and any accumulated fall is forgotten.
 			if(!this.inWater && !this.isFirstUpdate) {
-				float var1 = MathHelper.sqrt_double(this.motionX * this.motionX * (double)0.2F + this.motionY * this.motionY + this.motionZ * this.motionZ * (double)0.2F) * 0.2F;
-				if(var1 > 1.0F) {
-					var1 = 1.0F;
+				float splashVolume = MathHelper.sqrt_double(this.motionX * this.motionX * (double)0.2F + this.motionY * this.motionY + this.motionZ * this.motionZ * (double)0.2F) * 0.2F;
+				if(splashVolume > 1.0F) {
+					splashVolume = 1.0F;
 				}
 
-				this.worldObj.playSoundAtEntity(this, "random.splash", var1, 1.0F + (this.rand.nextFloat() - this.rand.nextFloat()) * 0.4F);
-				var1 = (float)MathHelper.floor_double(this.boundingBox.minY);
+				this.worldObj.playSoundAtEntity(this, "random.splash", splashVolume, 1.0F + (this.rand.nextFloat() - this.rand.nextFloat()) * 0.4F);
+				float waterLevel = (float)MathHelper.floor_double(this.boundingBox.minY);
 
-				int var2;
-				float var3;
-				float var4;
-				for(var2 = 0; (float)var2 < 1.0F + this.width * 20.0F; ++var2) {
-					var3 = (this.rand.nextFloat() * 2.0F - 1.0F) * this.width;
-					var4 = (this.rand.nextFloat() * 2.0F - 1.0F) * this.width;
-					this.worldObj.spawnParticle("bubble", this.posX + (double)var3, (double)(var1 + 1.0F), this.posZ + (double)var4, this.motionX, this.motionY - (double)(this.rand.nextFloat() * 0.2F), this.motionZ);
+				for(int particle = 0; (float)particle < 1.0F + this.width * 20.0F; ++particle) {
+					float spreadX = (this.rand.nextFloat() * 2.0F - 1.0F) * this.width;
+					float spreadZ = (this.rand.nextFloat() * 2.0F - 1.0F) * this.width;
+					this.worldObj.spawnParticle("bubble", this.posX + (double)spreadX, (double)(waterLevel + 1.0F), this.posZ + (double)spreadZ, this.motionX, this.motionY - (double)(this.rand.nextFloat() * 0.2F), this.motionZ);
 				}
 
-				for(var2 = 0; (float)var2 < 1.0F + this.width * 20.0F; ++var2) {
-					var3 = (this.rand.nextFloat() * 2.0F - 1.0F) * this.width;
-					var4 = (this.rand.nextFloat() * 2.0F - 1.0F) * this.width;
-					this.worldObj.spawnParticle("splash", this.posX + (double)var3, (double)(var1 + 1.0F), this.posZ + (double)var4, this.motionX, this.motionY, this.motionZ);
+				for(int particle = 0; (float)particle < 1.0F + this.width * 20.0F; ++particle) {
+					float spreadX = (this.rand.nextFloat() * 2.0F - 1.0F) * this.width;
+					float spreadZ = (this.rand.nextFloat() * 2.0F - 1.0F) * this.width;
+					this.worldObj.spawnParticle("splash", this.posX + (double)spreadX, (double)(waterLevel + 1.0F), this.posZ + (double)spreadZ, this.motionX, this.motionY, this.motionZ);
 				}
 			}
 
@@ -155,6 +180,7 @@ public abstract class Entity {
 			this.inWater = false;
 		}
 
+		// Burning: one fire tick deals a heart of damage every 20 fires ticks.
 		if(this.fire > 0) {
 			if(this.fire % 20 == 0) {
 				this.attackEntityFrom((Entity)null, 1);
@@ -171,116 +197,128 @@ public abstract class Entity {
 		this.isFirstUpdate = false;
 	}
 
-	public final boolean isOffsetPositionInLiquid(double var1, double var3, double var5) {
-		AxisAlignedBB var7 = this.boundingBox.offsetCopy(var1, var3, var5);
-		List<AxisAlignedBB> var2 = this.worldObj.getCollidingBoundingBoxes(var7);
-		return var2.size() > 0 ? false : !this.worldObj.getIsAnyLiquid(var7);
+	/** False if the given offset would leave the entity overlapping a solid block (or in fluid). */
+	public final boolean isOffsetPositionInLiquid(double xOffset, double yOffset, double zOffset) {
+		AxisAlignedBB offsetBox = this.boundingBox.offsetCopy(xOffset, yOffset, zOffset);
+		List<AxisAlignedBB> colliding = this.worldObj.getCollidingBoundingBoxes(offsetBox);
+		return colliding.size() > 0 ? false : !this.worldObj.getIsAnyLiquid(offsetBox);
 	}
 
-	public final void moveEntity(double var1, double var3, double var5) {
+	/**
+	 * The one shared movement solver. Each axis of the requested
+	 * (motionX, motionY, motionZ) is clipped against every collider it would
+	 * cross, the survivors are applied and the position is recomputed from the
+	 * resulting box. Also handles floor contact (fall damage, stop velocity),
+	 * fires on contact, footsteps, and — for walkers — automatic single-step
+	 * climbing. Hottest path in the game: deliberately kept on plain loops.
+	 */
+	public final void moveEntity(double motionX, double motionY, double motionZ) {
 		if(this.noClip) {
-			this.boundingBox.offset(var1, var3, var5);
+			this.boundingBox.offset(motionX, motionY, motionZ);
 			this.posX = (this.boundingBox.minX + this.boundingBox.maxX) / 2.0D;
 			this.posY = this.boundingBox.minY + (double)this.yOffset - (double)this.ySize;
 			this.posZ = (this.boundingBox.minZ + this.boundingBox.maxZ) / 2.0D;
 		} else {
-			double var7 = this.posX;
-			double var9 = this.posZ;
-			double var11 = var1;
-			double var13 = var3;
-			double var15 = var5;
-			AxisAlignedBB var17 = this.boundingBox.copy();
-			List<AxisAlignedBB> var18 = this.worldObj.getCollidingBoundingBoxes(this.boundingBox.addCoord(var1, var3, var5));
+			double startX = this.posX;
+			double startZ = this.posZ;
+			double wantedX = motionX;
+			double wantedY = motionY;
+			double wantedZ = motionZ;
+			AxisAlignedBB startBox = this.boundingBox.copy();
+			List<AxisAlignedBB> colliders = this.worldObj.getCollidingBoundingBoxes(this.boundingBox.addCoord(motionX, motionY, motionZ));
 
-			int var19;
-			for(var19 = 0; var19 < var18.size(); ++var19) {
-				var3 = var18.get(var19).calculateYOffset(this.boundingBox, var3);
+			// Clip vertically first so the box is on solid ground before the sides.
+			for(AxisAlignedBB collider : colliders) {
+				motionY = collider.calculateYOffset(this.boundingBox, motionY);
 			}
 
-			this.boundingBox.offset(0.0D, var3, 0.0D);
-			if(!this.unknownBool && var13 != var3) {
-				var5 = 0.0D;
-				var3 = var5;
-				var1 = var5;
+			this.boundingBox.offset(0.0D, motionY, 0.0D);
+			if(!this.keepMovingOnCollide && wantedY != motionY) {
+				motionZ = 0.0D;
+				motionY = 0.0D;
+				motionX = 0.0D;
 			}
 
-			boolean var28 = this.onGround || var13 != var3 && var13 < 0.0D;
+			boolean touchDown = this.onGround || wantedY != motionY && wantedY < 0.0D;
 
-			int var20;
-			for(var20 = 0; var20 < var18.size(); ++var20) {
-				var1 = var18.get(var20).calculateXOffset(this.boundingBox, var1);
+			for(AxisAlignedBB collider : colliders) {
+				motionX = collider.calculateXOffset(this.boundingBox, motionX);
 			}
 
-			this.boundingBox.offset(var1, 0.0D, 0.0D);
-			if(!this.unknownBool && var11 != var1) {
-				var5 = 0.0D;
-				var3 = var5;
-				var1 = var5;
+			this.boundingBox.offset(motionX, 0.0D, 0.0D);
+			if(!this.keepMovingOnCollide && wantedX != motionX) {
+				motionZ = 0.0D;
+				motionY = 0.0D;
+				motionX = 0.0D;
 			}
 
-			for(var20 = 0; var20 < var18.size(); ++var20) {
-				var5 = var18.get(var20).calculateZOffset(this.boundingBox, var5);
+			for(AxisAlignedBB collider : colliders) {
+				motionZ = collider.calculateZOffset(this.boundingBox, motionZ);
 			}
 
-			this.boundingBox.offset(0.0D, 0.0D, var5);
-			if(!this.unknownBool && var15 != var5) {
-				var5 = 0.0D;
-				var3 = var5;
-				var1 = var5;
+			this.boundingBox.offset(0.0D, 0.0D, motionZ);
+			if(!this.keepMovingOnCollide && wantedZ != motionZ) {
+				motionZ = 0.0D;
+				motionY = 0.0D;
+				motionX = 0.0D;
 			}
 
-			double var22;
-			int var27;
-			double var30;
-			if(this.stepHeight > 0.0F && var28 && this.ySize < 0.05F && (var11 != var1 || var15 != var5)) {
-				var30 = var1;
-				var22 = var3;
-				double var24 = var5;
-				var1 = var11;
-				var3 = (double)this.stepHeight;
-				var5 = var15;
-				AxisAlignedBB var29 = this.boundingBox.copy();
-				this.boundingBox = var17.copy();
-				var18 = this.worldObj.getCollidingBoundingBoxes(this.boundingBox.addCoord(var11, var3, var15));
+			double sideResultX;
+			double sideResultY;
+			double sideResultZ;
+			// Step-up: a walker blocked horizontally while grounded replays the same
+			// move from the original box raised by one stepHeight, and keeps the
+			// steppy result only if it actually advanced further sideways.
+			if(this.stepHeight > 0.0F && touchDown && this.ySize < 0.05F && (wantedX != motionX || wantedZ != motionZ)) {
+				sideResultX = motionX;
+				sideResultY = motionY;
+				sideResultZ = motionZ;
+				motionX = wantedX;
+				motionY = (double)this.stepHeight;
+				motionZ = wantedZ;
+				AxisAlignedBB steppedBox = this.boundingBox.copy();
+				this.boundingBox = startBox.copy();
+				colliders = this.worldObj.getCollidingBoundingBoxes(this.boundingBox.addCoord(wantedX, motionY, wantedZ));
 
-				for(var27 = 0; var27 < var18.size(); ++var27) {
-					var3 = var18.get(var27).calculateYOffset(this.boundingBox, var3);
+				for(AxisAlignedBB collider : colliders) {
+					motionY = collider.calculateYOffset(this.boundingBox, motionY);
 				}
 
-				this.boundingBox.offset(0.0D, var3, 0.0D);
-				if(!this.unknownBool && var13 != var3) {
-					var5 = 0.0D;
-					var3 = var5;
-					var1 = var5;
+				this.boundingBox.offset(0.0D, motionY, 0.0D);
+				if(!this.keepMovingOnCollide && wantedY != motionY) {
+					motionZ = 0.0D;
+					motionY = 0.0D;
+					motionX = 0.0D;
 				}
 
-				for(var27 = 0; var27 < var18.size(); ++var27) {
-					var1 = var18.get(var27).calculateXOffset(this.boundingBox, var1);
+				for(AxisAlignedBB collider : colliders) {
+					motionX = collider.calculateXOffset(this.boundingBox, motionX);
 				}
 
-				this.boundingBox.offset(var1, 0.0D, 0.0D);
-				if(!this.unknownBool && var11 != var1) {
-					var5 = 0.0D;
-					var3 = var5;
-					var1 = var5;
+				this.boundingBox.offset(motionX, 0.0D, 0.0D);
+				if(!this.keepMovingOnCollide && wantedX != motionX) {
+					motionZ = 0.0D;
+					motionY = 0.0D;
+					motionX = 0.0D;
 				}
 
-				for(var27 = 0; var27 < var18.size(); ++var27) {
-					var5 = var18.get(var27).calculateZOffset(this.boundingBox, var5);
+				for(AxisAlignedBB collider : colliders) {
+					motionZ = collider.calculateZOffset(this.boundingBox, motionZ);
 				}
 
-				this.boundingBox.offset(0.0D, 0.0D, var5);
-				if(!this.unknownBool && var15 != var5) {
-					var5 = 0.0D;
-					var3 = var5;
-					var1 = var5;
+				this.boundingBox.offset(0.0D, 0.0D, motionZ);
+				if(!this.keepMovingOnCollide && wantedZ != motionZ) {
+					motionZ = 0.0D;
+					motionY = 0.0D;
+					motionX = 0.0D;
 				}
 
-				if(var30 * var30 + var24 * var24 >= var1 * var1 + var5 * var5) {
-					var1 = var30;
-					var3 = var22;
-					var5 = var24;
-					this.boundingBox = var29.copy();
+				// The step path won; otherwise fall back to the side-hit result.
+				if(sideResultX * sideResultX + sideResultZ * sideResultZ >= motionX * motionX + motionZ * motionZ) {
+					motionX = sideResultX;
+					motionY = sideResultY;
+					motionZ = sideResultZ;
+					this.boundingBox = steppedBox.copy();
 				} else {
 					this.ySize = (float)((double)this.ySize + 0.5D);
 				}
@@ -289,53 +327,56 @@ public abstract class Entity {
 			this.posX = (this.boundingBox.minX + this.boundingBox.maxX) / 2.0D;
 			this.posY = this.boundingBox.minY + (double)this.yOffset - (double)this.ySize;
 			this.posZ = (this.boundingBox.minZ + this.boundingBox.maxZ) / 2.0D;
-			this.isCollidedHorizontally = var11 != var1 || var15 != var5;
-			this.onGround = var13 != var3 && var13 < 0.0D;
+			this.isCollidedHorizontally = wantedX != motionX || wantedZ != motionZ;
+			this.onGround = wantedY != motionY && wantedY < 0.0D;
 			if(this.onGround) {
 				if(this.fallDistance > 0.0F) {
 					this.fall(this.fallDistance);
 					this.fallDistance = 0.0F;
 				}
-			} else if(var3 < 0.0D) {
-				this.fallDistance = (float)((double)this.fallDistance - var3);
+			} else if(motionY < 0.0D) {
+				this.fallDistance = (float)((double)this.fallDistance - motionY);
 			}
 
-			if(var11 != var1) {
+			// An axis that collided is fully stopped: kill that velocity component.
+			if(wantedX != motionX) {
 				this.motionX = 0.0D;
 			}
 
-			if(var13 != var3) {
+			if(wantedY != motionY) {
 				this.motionY = 0.0D;
 			}
 
-			if(var15 != var5) {
+			if(wantedZ != motionZ) {
 				this.motionZ = 0.0D;
 			}
 
-			var30 = this.posX - var7;
-			var22 = this.posZ - var9;
-			this.distanceWalkedModified = (float)((double)this.distanceWalkedModified + (double)MathHelper.sqrt_double(var30 * var30 + var22 * var22) * 0.6D);
+			// Accumulate horizontal metres travelled, for footstep pacing and
+			// block walk/contact callbacks.
+			double travelledX = this.posX - startX;
+			double travelledZ = this.posZ - startZ;
+			this.distanceWalkedModified = (float)((double)this.distanceWalkedModified + (double)MathHelper.sqrt_double(travelledX * travelledX + travelledZ * travelledZ) * 0.6D);
 			if(this.entityWalks) {
-				int var31 = MathHelper.floor_double(this.posX);
-				int var25 = MathHelper.floor_double(this.posY - (double)0.2F - (double)this.yOffset);
-				var19 = MathHelper.floor_double(this.posZ);
-				var27 = this.worldObj.getBlockId(var31, var25, var19);
-				if(this.distanceWalkedModified > (float)this.nextStepDistance && var27 > 0) {
+				int footX = MathHelper.floor_double(this.posX);
+				int footY = MathHelper.floor_double(this.posY - (double)0.2F - (double)this.yOffset);
+				int footZ = MathHelper.floor_double(this.posZ);
+				int blockId = this.worldObj.getBlockId(footX, footY, footZ);
+				if(this.distanceWalkedModified > (float)this.nextStepDistance && blockId > 0) {
 					++this.nextStepDistance;
-					StepSound var26 = Block.blocksList[var27].stepSound;
-					if(!Block.blocksList[var27].blockMaterial.getIsLiquid()) {
-						this.worldObj.playSoundAtEntity(this, var26.getStepSound(), var26.stepSoundVolume * 0.15F, var26.stepSoundPitch);
+					StepSound stepSound = Block.blocksList[blockId].stepSound;
+					if(!Block.blocksList[blockId].blockMaterial.getIsLiquid()) {
+						this.worldObj.playSoundAtEntity(this, stepSound.getStepSound(), stepSound.stepSoundVolume * 0.15F, stepSound.stepSoundPitch);
 					}
 
-					Block.blocksList[var27].onEntityWalking(this.worldObj, var31, var25, var19);
+					Block.blocksList[blockId].onEntityWalking(this.worldObj, footX, footY, footZ);
 				}
 			}
 
 			this.ySize *= 0.4F;
-			boolean var32 = this.handleWaterMovement();
+			boolean inWater = this.handleWaterMovement();
 			if(this.worldObj.isBoundingBoxBurning(this.boundingBox)) {
 				this.dealFireDamage(1);
-				if(!var32) {
+				if(!inWater) {
 					++this.fire;
 					if(this.fire == 0) {
 						this.fire = 300;
@@ -345,7 +386,7 @@ public abstract class Entity {
 				this.fire = -this.fireResistance;
 			}
 
-			if(var32 && this.fire > 0) {
+			if(inWater && this.fire > 0) {
 				this.worldObj.playSoundAtEntity(this, "random.fizz", 0.7F, 1.6F + (this.rand.nextFloat() - this.rand.nextFloat()) * 0.4F);
 				this.fire = -this.fireResistance;
 			}
@@ -353,20 +394,23 @@ public abstract class Entity {
 		}
 	}
 
-	protected void dealFireDamage(int var1) {
+	/** Deals the periodic damage a burning entity takes. */
+	protected void dealFireDamage(int damage) {
 		this.attackEntityFrom((Entity)null, 1);
 	}
 
-	protected void fall(float var1) {
+	/** Called with the accumulated fall distance when the entity lands. */
+	protected void fall(float distance) {
 	}
 
 	public final boolean handleWaterMovement() {
 		return this.worldObj.isMaterialInBB(this.boundingBox.expand(0.0D, (double)-0.4F, 0.0D), Material.water);
 	}
 
+	/** True when the head (at eye height) is inside water. */
 	public final boolean isInsideOfMaterial() {
-		int var1 = this.worldObj.getBlockId(MathHelper.floor_double(this.posX), MathHelper.floor_double(this.posY + (double)this.getEyeHeight()), MathHelper.floor_double(this.posZ));
-		return var1 != 0 ? Block.blocksList[var1].blockMaterial == Material.water : false;
+		int blockId = this.worldObj.getBlockId(MathHelper.floor_double(this.posX), MathHelper.floor_double(this.posY + (double)this.getEyeHeight()), MathHelper.floor_double(this.posZ));
+		return blockId != 0 ? Block.blocksList[blockId].blockMaterial == Material.water : false;
 	}
 
 	protected float getEyeHeight() {
@@ -377,73 +421,82 @@ public abstract class Entity {
 		return this.worldObj.isMaterialInBB(this.boundingBox.expand(0.0D, (double)-0.4F, 0.0D), Material.lava);
 	}
 
-	public final void moveFlying(float var1, float var2, float var3) {
-		float var4 = MathHelper.sqrt_float(var1 * var1 + var2 * var2);
-		if(var4 >= 0.01F) {
-			if(var4 < 1.0F) {
-				var4 = 1.0F;
+	/**
+	 * Mixes the strafe (left/right) and forward (run/walk) inputs into
+	 * horizontal motion, rotated by the current yaw and scaled so the result
+	 * stays within {@code maxSpeed}.
+	 */
+	public final void moveFlying(float strafe, float forward, float maxSpeed) {
+		float magnitude = MathHelper.sqrt_float(strafe * strafe + forward * forward);
+		if(magnitude >= 0.01F) {
+			if(magnitude < 1.0F) {
+				magnitude = 1.0F;
 			}
 
-			var4 = var3 / var4;
-			var1 *= var4;
-			var2 *= var4;
-			var3 = MathHelper.sin(this.rotationYaw * (float)Math.PI / 180.0F);
-			var4 = MathHelper.cos(this.rotationYaw * (float)Math.PI / 180.0F);
-			this.motionX += (double)(var1 * var4 - var2 * var3);
-			this.motionZ += (double)(var2 * var4 + var1 * var3);
+			magnitude = maxSpeed / magnitude;
+			strafe *= magnitude;
+			forward *= magnitude;
+			float sinYaw = MathHelper.sin(this.rotationYaw * (float)Math.PI / 180.0F);
+			float cosYaw = MathHelper.cos(this.rotationYaw * (float)Math.PI / 180.0F);
+			this.motionX += (double)(strafe * cosYaw - forward * sinYaw);
+			this.motionZ += (double)(forward * cosYaw + strafe * sinYaw);
 		}
 	}
 
-	public float getEntityBrightness(float var1) {
-		int var4 = MathHelper.floor_double(this.posX);
-		int var2 = MathHelper.floor_double(this.posY + (double)(this.yOffset / 2.0F));
-		int var3 = MathHelper.floor_double(this.posZ);
-		return this.worldObj.getBrightness(var4, var2, var3);
+	/** Daylight at the entity's position; the {@code partialTick} is unused by the base implementation. */
+	public float getEntityBrightness(float partialTick) {
+		int blockX = MathHelper.floor_double(this.posX);
+		int blockY = MathHelper.floor_double(this.posY + (double)(this.yOffset / 2.0F));
+		int blockZ = MathHelper.floor_double(this.posZ);
+		return this.worldObj.getBrightness(blockX, blockY, blockZ);
 	}
 
-	public final void setLocationAndAngles(double var1, double var3, double var5, float var7, float var8) {
-		this.prevPosX = this.posX = var1;
-		this.prevPosY = this.posY = var3 + (double)this.yOffset;
-		this.prevPosZ = this.posZ = var5;
-		this.rotationYaw = var7;
-		this.rotationPitch = var8;
+	/** Teleport-and-align; y is offset by yOffset because the caller passes the "feet" position. */
+	public final void setLocationAndAngles(double x, double y, double z, float yaw, float pitch) {
+		this.prevPosX = this.posX = x;
+		this.prevPosY = this.posY = y + (double)this.yOffset;
+		this.prevPosZ = this.posZ = z;
+		this.rotationYaw = yaw;
+		this.rotationPitch = pitch;
 		this.setPosition(this.posX, this.posY, this.posZ);
 	}
 
-	public final double getDistanceSqToEntity(Entity var1) {
-		double var2 = this.posX - var1.posX;
-		double var4 = this.posY - var1.posY;
-		double var6 = this.posZ - var1.posZ;
-		return var2 * var2 + var4 * var4 + var6 * var6;
+	public final double getDistanceSqToEntity(Entity target) {
+		double deltaX = this.posX - target.posX;
+		double deltaY = this.posY - target.posY;
+		double deltaZ = this.posZ - target.posZ;
+		return deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ;
 	}
 
-	public void onCollideWithPlayer(EntityPlayer var1) {
+	public void onCollideWithPlayer(EntityPlayer player) {
 	}
 
-	public final void applyEntityCollision(Entity var1) {
-		double var2 = var1.posX - this.posX;
-		double var4 = var1.posZ - this.posZ;
-		double var6 = var2 * var2 + var4 * var4;
-		if(var6 >= (double)0.01F) {
-			var6 = (double)MathHelper.sqrt_double(var6);
-			var2 /= var6;
-			var4 /= var6;
-			var2 /= var6;
-			var4 /= var6;
-			var2 *= (double)0.05F;
-			var4 *= (double)0.05F;
-			this.addVelocity(-var2, 0.0D, -var4);
-			var1.addVelocity(var2, 0.0D, var4);
+	/** Gently shoves two overlapping entities apart, each a fraction of the gap. */
+	public final void applyEntityCollision(Entity pushed) {
+		double deltaX = pushed.posX - this.posX;
+		double deltaZ = pushed.posZ - this.posZ;
+		double distanceSq = deltaX * deltaX + deltaZ * deltaZ;
+		if(distanceSq >= (double)0.01F) {
+			distanceSq = (double)MathHelper.sqrt_double(distanceSq);
+			deltaX /= distanceSq;
+			deltaZ /= distanceSq;
+			deltaX /= distanceSq;
+			deltaZ /= distanceSq;
+			deltaX *= (double)0.05F;
+			deltaZ *= (double)0.05F;
+			this.addVelocity(-deltaX, 0.0D, -deltaZ);
+			pushed.addVelocity(deltaX, 0.0D, deltaZ);
 		}
 
 	}
 
-	private void addVelocity(double var1, double var3, double var5) {
-		this.motionX += var1;
-		this.motionZ += var5;
+	/** Adds to horizontal motion; the y component exists but is unused. */
+	private void addVelocity(double deltaX, double unusedDeltaY, double deltaZ) {
+		this.motionX += deltaX;
+		this.motionZ += deltaZ;
 	}
 
-	public boolean attackEntityFrom(Entity var1, int var2) {
+	public boolean attackEntityFrom(Entity attacker, int damage) {
 		return false;
 	}
 
@@ -459,80 +512,78 @@ public abstract class Entity {
 		return null;
 	}
 
-	public final boolean addEntityID(NBTTagCompound var1) {
-		String var2 = EntityList.getEntityString(this);
-		if(!this.isDead && var2 != null) {
-			var1.setString("id", var2);
-			this.writeToNBT(var1);
+	/** Writes the entity's registry id plus full state; returns false when dead or unknown to the registry. */
+	public final boolean addEntityID(NBTTagCompound tag) {
+		String id = EntityList.getEntityString(this);
+		if(!this.isDead && id != null) {
+			tag.setString("id", id);
+			this.writeToNBT(tag);
 			return true;
 		} else {
 			return false;
 		}
 	}
 
-	public final void writeToNBT(NBTTagCompound var1) {
-		var1.setTag("Pos", newDoubleNBTList(new double[]{this.posX, this.posY, this.posZ}));
-		var1.setTag("Motion", newDoubleNBTList(new double[]{this.motionX, this.motionY, this.motionZ}));
-		float[] var2 = new float[]{this.rotationYaw, this.rotationPitch};
-		NBTTagList var3 = new NBTTagList();
-		int var4 = var2.length;
+	public final void writeToNBT(NBTTagCompound tag) {
+		tag.setTag("Pos", newDoubleNBTList(new double[]{this.posX, this.posY, this.posZ}));
+		tag.setTag("Motion", newDoubleNBTList(new double[]{this.motionX, this.motionY, this.motionZ}));
+		NBTTagList rotationTag = new NBTTagList();
 
-		for(int var5 = 0; var5 < var4; ++var5) {
-			float var6 = var2[var5];
-			var3.setTag(new NBTTagFloat(var6));
+		for(float angle : new float[]{this.rotationYaw, this.rotationPitch}) {
+			rotationTag.setTag(new NBTTagFloat(angle));
 		}
 
-		var1.setTag("Rotation", var3);
-		var1.setFloat("FallDistance", this.fallDistance);
-		var1.setShort("Fire", (short)this.fire);
-		var1.setShort("Air", (short)this.air);
-		this.writeEntityToNBT(var1);
+		tag.setTag("Rotation", rotationTag);
+		tag.setFloat("FallDistance", this.fallDistance);
+		tag.setShort("Fire", (short)this.fire);
+		tag.setShort("Air", (short)this.air);
+		this.writeEntityToNBT(tag);
 	}
 
-	public final void readFromNBT(NBTTagCompound var1) {
-		NBTTagList var2 = var1.getTagList("Pos");
-		NBTTagList var3 = var1.getTagList("Motion");
-		NBTTagList var4 = var1.getTagList("Rotation");
-		this.prevPosX = this.lastTickPosX = this.posX = ((NBTTagDouble)var2.tagAt(0)).doubleValue;
-		this.prevPosY = this.lastTickPosY = this.posY = ((NBTTagDouble)var2.tagAt(1)).doubleValue;
-		this.prevPosZ = this.lastTickPosZ = this.posZ = ((NBTTagDouble)var2.tagAt(2)).doubleValue;
-		this.motionX = ((NBTTagDouble)var3.tagAt(0)).doubleValue;
-		this.motionY = ((NBTTagDouble)var3.tagAt(1)).doubleValue;
-		this.motionZ = ((NBTTagDouble)var3.tagAt(2)).doubleValue;
-		this.prevRotationYaw = this.rotationYaw = ((NBTTagFloat)var4.tagAt(0)).floatValue;
-		this.prevRotationPitch = this.rotationPitch = ((NBTTagFloat)var4.tagAt(1)).floatValue;
-		this.fallDistance = var1.getFloat("FallDistance");
-		this.fire = var1.getShort("Fire");
-		this.air = var1.getShort("Air");
+	public final void readFromNBT(NBTTagCompound tag) {
+		NBTTagList posTag = tag.getTagList("Pos");
+		NBTTagList motionTag = tag.getTagList("Motion");
+		NBTTagList rotationTag = tag.getTagList("Rotation");
+		this.prevPosX = this.lastTickPosX = this.posX = ((NBTTagDouble)posTag.tagAt(0)).doubleValue;
+		this.prevPosY = this.lastTickPosY = this.posY = ((NBTTagDouble)posTag.tagAt(1)).doubleValue;
+		this.prevPosZ = this.lastTickPosZ = this.posZ = ((NBTTagDouble)posTag.tagAt(2)).doubleValue;
+		this.motionX = ((NBTTagDouble)motionTag.tagAt(0)).doubleValue;
+		this.motionY = ((NBTTagDouble)motionTag.tagAt(1)).doubleValue;
+		this.motionZ = ((NBTTagDouble)motionTag.tagAt(2)).doubleValue;
+		this.prevRotationYaw = this.rotationYaw = ((NBTTagFloat)rotationTag.tagAt(0)).floatValue;
+		this.prevRotationPitch = this.rotationPitch = ((NBTTagFloat)rotationTag.tagAt(1)).floatValue;
+		this.fallDistance = tag.getFloat("FallDistance");
+		this.fire = tag.getShort("Fire");
+		this.air = tag.getShort("Air");
 		this.setLocationAndAngles(this.posX, this.posY, this.posZ, this.rotationYaw, this.rotationPitch);
-		this.readEntityFromNBT(var1);
+		this.readEntityFromNBT(tag);
 	}
 
-	protected abstract void readEntityFromNBT(NBTTagCompound var1);
+	protected abstract void readEntityFromNBT(NBTTagCompound tag);
 
-	protected abstract void writeEntityToNBT(NBTTagCompound var1);
+	protected abstract void writeEntityToNBT(NBTTagCompound tag);
 
-	private static NBTTagList newDoubleNBTList(double... var0) {
-		NBTTagList var1 = new NBTTagList();
-		int var2 = var0.length;
+	private static NBTTagList newDoubleNBTList(double... values) {
+		NBTTagList tag = new NBTTagList();
 
-		for(int var3 = 0; var3 < var2; ++var3) {
-			double var5 = var0[var3];
-			var1.setTag(new NBTTagDouble(var5));
+		for(double value : values) {
+			tag.setTag(new NBTTagDouble(value));
 		}
 
-		return var1;
+		return tag;
 	}
 
-	public final EntityItem dropItemWithOffset(int var1, int var2) {
-		return this.entityDropItem(var1, 1, 0.0F);
+	/** Drops one of the item at the entity's feet (the amount argument is ignored — always a single item). */
+	public final EntityItem dropItemWithOffset(int itemID, int amount) {
+		return this.entityDropItem(itemID, 1, 0.0F);
 	}
 
-	public final EntityItem entityDropItem(int var1, int var2, float var3) {
-		EntityItem var4 = new EntityItem(this.worldObj, this.posX, this.posY + (double)var3, this.posZ, new ItemStack(var1, var2));
-		var4.delayBeforeCanPickup = 10;
-		this.worldObj.spawnEntityInWorld(var4);
-		return var4;
+	/** Drops a pickable item entity at the entity's feet, nudged up by {@code offsetY}. */
+	public final EntityItem entityDropItem(int itemID, int count, float offsetY) {
+		EntityItem itemEntity = new EntityItem(this.worldObj, this.posX, this.posY + (double)offsetY, this.posZ, new ItemStack(itemID, count));
+		itemEntity.delayBeforeCanPickup = 10;
+		this.worldObj.spawnEntityInWorld(itemEntity);
+		return itemEntity;
 	}
 
 	public boolean isEntityAlive() {

@@ -45,8 +45,8 @@ public class RenderLiving extends Render {
 			this.preRenderCallback(entity, partialTick);
 			GL11.glTranslatef(0.0F, -24.0F, 0.0F);
 			GL11.glEnable(GL11.GL_NORMALIZE);
-			float limbSwingProgress = entity.newPosZ + (entity.newRotationYaw - entity.newPosZ) * partialTick;
-			float headPitch = entity.newRotationPitch - entity.newRotationYaw * (1.0F - partialTick);
+			float limbSwingProgress = entity.prevLimbSwing + (entity.limbSwing - entity.prevLimbSwing) * partialTick;
+			float headPitch = entity.limbSwingPitch - entity.limbSwing * (1.0F - partialTick);
 			if(limbSwingProgress > 1.0F) {
 				limbSwingProgress = 1.0F;
 			}

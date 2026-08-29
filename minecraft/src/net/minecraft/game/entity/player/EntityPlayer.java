@@ -1,6 +1,5 @@
 package net.minecraft.game.entity.player;
 
-import com.mojang.nbt.NBTTagCompound;
 import java.util.List;
 import net.minecraft.game.IInventory;
 import net.minecraft.game.entity.Entity;
@@ -17,24 +16,30 @@ import net.minecraft.game.world.block.tileentity.TileEntityFurnace;
 import net.minecraft.game.world.material.Material;
 import util.MathHelper;
 
+/**
+ * The player: health, inventory, armour and score. Movement and the key/mouse
+ * wiring live in the client subclass; what remains here is shared logic — the
+ * camera bob, the armour-tapered damage pipeline and the death sequence.
+ */
 public class EntityPlayer extends EntityLiving {
 	public InventoryPlayer inventory = new InventoryPlayer(this);
-	public byte unusedMiningCooldown = 0;
 	public int score = 0;
 	public float prevCameraYaw;
 	public float cameraYaw;
 	protected String username;
+	/** Armour damage that did not divide evenly across the armour hopper; carried over to the next blow. */
 	private int damageRemainder = 0;
 
-	public EntityPlayer(World var1) {
-		super(var1);
-		this.setLocationAndAngles((double)var1.spawnX + 0.5D, (double)var1.spawnY, (double)var1.spawnZ + 0.5D, 0.0F, 0.0F);
+	public EntityPlayer(World world) {
+		super(world);
+		this.setLocationAndAngles((double)world.spawnX + 0.5D, (double)world.spawnY, (double)world.spawnZ + 0.5D, 0.0F, 0.0F);
 		this.yOffset = 1.62F;
 		this.health = 20;
 		this.fireResistance = 20;
 		this.texture = "/char.png";
 	}
 
+	/** Teleports and sizes the player in at the world spawn point. */
 	public final void preparePlayerToSpawn() {
 		this.yOffset = 1.62F;
 		this.setSize(0.6F, 1.8F);
@@ -48,49 +53,50 @@ public class EntityPlayer extends EntityLiving {
 	}
 
 	public void onLivingUpdate() {
+		// Peaceful mode: regenerate one heart every few seconds.
 		if(this.worldObj.difficultySetting == 0 && this.health < 20 && this.ticksExisted % 20 << 2 == 0) {
 			this.heal(1);
 		}
 
-		InventoryPlayer var3 = this.inventory;
-
-		for(int var4 = 0; var4 < var3.mainInventory.length; ++var4) {
-			if(var3.mainInventory[var4] != null && var3.mainInventory[var4].animationsToGo > 0) {
-				--var3.mainInventory[var4].animationsToGo;
+		for(ItemStack stack : this.inventory.mainInventory) {
+			if(stack != null && stack.animationsToGo > 0) {
+				--stack.animationsToGo;
 			}
 		}
 
 		this.prevCameraYaw = this.cameraYaw;
 		super.onLivingUpdate();
-		float var1 = MathHelper.sqrt_double(this.motionX * this.motionX + this.motionZ * this.motionZ);
-		float var2 = (float)Math.atan(-this.motionY * (double)0.2F) * 15.0F;
-		if(var1 > 0.1F) {
-			var1 = 0.1F;
+		// Head bob: sway sideways with horizontal speed and bounce on landings.
+		float bob = MathHelper.sqrt_double(this.motionX * this.motionX + this.motionZ * this.motionZ);
+		float rise = (float)Math.atan(-this.motionY * (double)0.2F) * 15.0F;
+		if(bob > 0.1F) {
+			bob = 0.1F;
 		}
 
 		if(!this.onGround || this.health <= 0) {
-			var1 = 0.0F;
+			bob = 0.0F;
 		}
 
 		if(this.onGround || this.health <= 0) {
-			var2 = 0.0F;
+			rise = 0.0F;
 		}
 
-		this.cameraYaw += (var1 - this.cameraYaw) * 0.4F;
-		this.cameraPitch += (var2 - this.cameraPitch) * 0.8F;
+		this.cameraYaw += (bob - this.cameraYaw) * 0.4F;
+		this.cameraPitch += (rise - this.cameraPitch) * 0.8F;
 		if(this.health > 0) {
-			List<Entity> var5 = this.worldObj.getEntitiesWithinAABBExcludingEntity(this, this.boundingBox.expand(1.0D, 0.0D, 1.0D));
-			if(var5 != null) {
-				for(int var6 = 0; var6 < var5.size(); ++var6) {
-					Entity var7 = var5.get(var6);
-					var7.onCollideWithPlayer(this);
+			// Give every touching entity a chance to react to the player.
+			List<Entity> nearby = this.worldObj.getEntitiesWithinAABBExcludingEntity(this, this.boundingBox.expand(1.0D, 0.0D, 1.0D));
+			if(nearby != null) {
+				for(Entity entity : nearby) {
+					entity.onCollideWithPlayer(this);
 				}
 			}
 		}
 
 	}
 
-	public final void onDeath(Entity var1) {
+	/** Shrinks the body to a crumpled corpse, drops the inventory and kicks away from the killer. */
+	public final void onDeath(Entity killer) {
 		this.setSize(0.2F, 0.2F);
 		this.setPosition(this.posX, this.posY, this.posZ);
 		this.motionY = (double)0.1F;
@@ -99,7 +105,7 @@ public class EntityPlayer extends EntityLiving {
 		}
 
 		this.inventory.dropAllItems();
-		if(var1 != null) {
+		if(killer != null) {
 			this.motionX = (double)(-MathHelper.cos((this.attackedAtYaw + this.rotationYaw) * (float)Math.PI / 180.0F) * 0.1F);
 			this.motionZ = (double)(-MathHelper.sin((this.attackedAtYaw + this.rotationYaw) * (float)Math.PI / 180.0F) * 0.1F);
 		} else {
@@ -109,114 +115,118 @@ public class EntityPlayer extends EntityLiving {
 		this.yOffset = 0.1F;
 	}
 
-	public final void dropPlayerItem(ItemStack var1) {
-		this.dropPlayerItemWithRandomChoice(var1, false);
+	public final void dropPlayerItem(ItemStack item) {
+		this.dropPlayerItemWithRandomChoice(item, false);
 	}
 
-	public final void dropPlayerItemWithRandomChoice(ItemStack var1, boolean var2) {
-		if(var1 != null) {
-			EntityItem var4 = new EntityItem(this.worldObj, this.posX, this.posY - (double)0.3F, this.posZ, var1);
-			var4.delayBeforeCanPickup = 40;
-			float var3;
-			float var5;
-			if(var2) {
-				var3 = this.rand.nextFloat() * 0.5F;
-				var5 = this.rand.nextFloat() * (float)Math.PI * 2.0F;
-				var4.motionX = (double)(-MathHelper.sin(var5) * var3);
-				var4.motionZ = (double)(MathHelper.cos(var5) * var3);
-				var4.motionY = (double)0.2F;
+	/**
+	 * Drops an item in front of the player (largely matching the camera aim),
+	 * or scatters it randomly when {@code scatter} is set (e.g. from Notch's
+	 * apple on death).
+	 */
+	public final void dropPlayerItemWithRandomChoice(ItemStack item, boolean scatter) {
+		if(item != null) {
+			EntityItem entityItem = new EntityItem(this.worldObj, this.posX, this.posY - (double)0.3F, this.posZ, item);
+			entityItem.delayBeforeCanPickup = 40;
+			float speed;
+			float angle;
+			if(scatter) {
+				speed = this.rand.nextFloat() * 0.5F;
+				angle = this.rand.nextFloat() * (float)Math.PI * 2.0F;
+				entityItem.motionX = (double)(-MathHelper.sin(angle) * speed);
+				entityItem.motionZ = (double)(MathHelper.cos(angle) * speed);
+				entityItem.motionY = (double)0.2F;
 			} else {
-				var4.motionX = (double)(-MathHelper.sin(this.rotationYaw / 180.0F * (float)Math.PI) * MathHelper.cos(this.rotationPitch / 180.0F * (float)Math.PI) * 0.3F);
-				var4.motionZ = (double)(MathHelper.cos(this.rotationYaw / 180.0F * (float)Math.PI) * MathHelper.cos(this.rotationPitch / 180.0F * (float)Math.PI) * 0.3F);
-				var4.motionY = (double)(-MathHelper.sin(this.rotationPitch / 180.0F * (float)Math.PI) * 0.3F + 0.1F);
-				var3 = this.rand.nextFloat() * (float)Math.PI * 2.0F;
-				var5 = 0.02F * this.rand.nextFloat();
-				var4.motionX += Math.cos((double)var3) * (double)var5;
-				var4.motionY += (double)((this.rand.nextFloat() - this.rand.nextFloat()) * 0.1F);
-				var4.motionZ += Math.sin((double)var3) * (double)var5;
+				entityItem.motionX = (double)(-MathHelper.sin(this.rotationYaw / 180.0F * (float)Math.PI) * MathHelper.cos(this.rotationPitch / 180.0F * (float)Math.PI) * 0.3F);
+				entityItem.motionZ = (double)(MathHelper.cos(this.rotationYaw / 180.0F * (float)Math.PI) * MathHelper.cos(this.rotationPitch / 180.0F * (float)Math.PI) * 0.3F);
+				entityItem.motionY = (double)(-MathHelper.sin(this.rotationPitch / 180.0F * (float)Math.PI) * 0.3F + 0.1F);
+				speed = this.rand.nextFloat() * (float)Math.PI * 2.0F;
+				angle = 0.02F * this.rand.nextFloat();
+				entityItem.motionX += Math.cos((double)speed) * (double)angle;
+				entityItem.motionY += (double)((this.rand.nextFloat() - this.rand.nextFloat()) * 0.1F);
+				entityItem.motionZ += Math.sin((double)speed) * (double)angle;
 			}
 
-			this.worldObj.spawnEntityInWorld(var4);
+			this.worldObj.spawnEntityInWorld(entityItem);
 		}
 	}
 
-	public final boolean canHarvestBlock(Block var1) {
-		Block var2 = var1;
-		InventoryPlayer var3 = this.inventory;
-		if(var2.blockMaterial != Material.rock && var2.blockMaterial != Material.iron) {
+	/** True when the currently selected item can break the given block. */
+	public final boolean canHarvestBlock(Block block) {
+		if(block.blockMaterial != Material.rock && block.blockMaterial != Material.iron) {
 			return true;
 		} else {
-			ItemStack var4 = var3.getStackInSlot(var3.currentItem);
-			return var4 != null ? Item.itemsList[var4.itemID].canHarvestBlock(var2) : false;
+			ItemStack stack = this.inventory.getStackInSlot(this.inventory.currentItem);
+			return stack != null ? Item.itemsList[stack.itemID].canHarvestBlock(block) : false;
 		}
 	}
 
-	public void readEntityFromNBT(NBTTagCompound var1) {
-		super.readEntityFromNBT(var1);
-	}
-
-	public void writeEntityToNBT(NBTTagCompound var1) {
-		super.writeEntityToNBT(var1);
-	}
-
-	public void displayChestGUI(IInventory var1) {
+	public void displayChestGUI(IInventory inventory) {
 	}
 
 	public void displayWorkbenchGUI() {
 	}
 
-	public void onItemPickup(Entity var1) {
+	public void onItemPickup(Entity item) {
 	}
 
 	protected final float getEyeHeight() {
 		return 0.12F;
 	}
 
-	public final boolean attackEntityFrom(Entity var1, int var2) {
+	/**
+	 * Damage for the player: scaled by the difficulty, softened by armour on a
+	 * 25-point hopper (with the odd remainder carried over), and nullified
+	 * while the red hearts flash is still up. Returns true when the blow landed.
+	 */
+	public final boolean attackEntityFrom(Entity attacker, int damage) {
 		this.entityAge = 0;
 		if(this.health <= 0) {
 			return false;
 		} else if((float)this.heartsLife > (float)this.heartsHalvesLife / 2.0F) {
+			// Still inside the post-hit grace window: the blow is ignored entirely.
 			return false;
 		} else {
-			if(var1 instanceof EntityMonster || var1 instanceof EntityArrow) {
+			if(attacker instanceof EntityMonster || attacker instanceof EntityArrow) {
+				// Hostile damage scales with the difficulty setting.
 				if(this.worldObj.difficultySetting == 0) {
-					var2 = 0;
+					damage = 0;
 				}
 
 				if(this.worldObj.difficultySetting == 1) {
-					var2 = var2 / 3 + 1;
+					damage = damage / 3 + 1;
 				}
 
 				if(this.worldObj.difficultySetting == 3) {
-					var2 = var2 * 3 / 2;
+					damage = damage * 3 / 2;
 				}
 			}
 
-			int var3 = 25 - this.inventory.getPlayerArmorValue();
-			var3 = var2 * var3 + this.damageRemainder;
-			int var4 = var2;
-			InventoryPlayer var6 = this.inventory;
+			// Armour absorbs a fraction: every protected point shaves one point
+			// from a 25-scale hopper, and whatever did not divide evenly is kept.
+			int hopper = 25 - this.inventory.getPlayerArmorValue();
+			hopper = damage * hopper + this.damageRemainder;
 
-			for(int var5 = 0; var5 < var6.armorInventory.length; ++var5) {
-				if(var6.armorInventory[var5] != null && var6.armorInventory[var5].getItem() instanceof ItemArmor) {
-					var6.armorInventory[var5].damageItem(var4);
-					if(var6.armorInventory[var5].stackSize == 0) {
-						var6.armorInventory[var5] = null;
+			for(int slot = 0; slot < this.inventory.armorInventory.length; ++slot) {
+				ItemStack armorStack = this.inventory.armorInventory[slot];
+				if(armorStack != null && armorStack.getItem() instanceof ItemArmor) {
+					armorStack.damageItem(damage);
+					if(armorStack.stackSize == 0) {
+						this.inventory.armorInventory[slot] = null;
 					}
 				}
 			}
 
-			var2 = var3 / 25;
-			this.damageRemainder = var3 % 25;
-			if(var2 == 0) {
+			damage = hopper / 25;
+			this.damageRemainder = hopper % 25;
+			if(damage == 0) {
 				return false;
 			} else {
-				return super.attackEntityFrom(var1, var2);
+				return super.attackEntityFrom(attacker, damage);
 			}
 		}
 	}
 
-	public void displayFurnaceGUI(TileEntityFurnace var1) {
+	public void displayFurnaceGUI(TileEntityFurnace tileEntityFurnace) {
 	}
 }

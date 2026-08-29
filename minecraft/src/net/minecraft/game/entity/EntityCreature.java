@@ -5,19 +5,34 @@ import net.minecraft.game.world.World;
 import net.minecraft.game.world.path.PathEntity;
 import util.MathHelper;
 
+/**
+ * A creature that can chase a target along a precomputed path or, left to its
+ * own devices, wander toward the spot with the best "block weight". This is
+ * the base of both the passive animals and the hostile monsters.
+ */
 public class EntityCreature extends EntityLiving {
+	/** The current path toward the target; (re)computed whenever the target or goal changes. */
 	private PathEntity pathToEntity;
+	/** The entity this creature is actively trying to reach. */
 	protected Entity playerToAttack;
-	protected boolean hasAttacked = false;
+	/** Set when {@link #attackEntity} actually dealt a blow; halts all movement for the rest of the tick. */
+	protected boolean hasAttacked;
 
-	public EntityCreature(World var1) {
-		super(var1);
+	public EntityCreature(World world) {
+		super(world);
 	}
 
-	protected final boolean canEntityBeSeen(Entity var1) {
-		return this.worldObj.rayTraceBlocks(new Vec3D(this.posX, this.posY + (double)this.getEyeHeight(), this.posZ), new Vec3D(var1.posX, var1.posY + (double)var1.getEyeHeight(), var1.posZ)) == null;
+	/** True when a straight ray from this creature's eye to the target's eye passes through no block. */
+	protected final boolean canEntityBeSeen(Entity target) {
+		return this.worldObj.rayTraceBlocks(new Vec3D(this.posX, this.posY + (double)this.getEyeHeight(), this.posZ), new Vec3D(target.posX, target.posY + (double)target.getEyeHeight(), target.posZ)) == null;
 	}
 
+	/**
+	 * Steers the creature for one tick: pick up or drop the current target,
+	 * attack it when it comes within reach, otherwise follow the path — or,
+	 * with neither target nor path, fall through to the base wander behaviour.
+	 */
+	@Override
 	protected void updatePlayerActionState() {
 		this.hasAttacked = false;
 		if(this.playerToAttack == null) {
@@ -28,13 +43,13 @@ public class EntityCreature extends EntityLiving {
 		} else if(!this.playerToAttack.isEntityAlive()) {
 			this.playerToAttack = null;
 		} else {
-			Entity var5 = this.playerToAttack;
-			float var13 = (float)(var5.posX - super.posX);
-			float var14 = (float)(var5.posY - super.posY);
-			float var15 = (float)(var5.posZ - super.posZ);
-			float var1 = MathHelper.sqrt_float(var13 * var13 + var14 * var14 + var15 * var15);
+			Entity target = this.playerToAttack;
+			float deltaX = (float)(target.posX - this.posX);
+			float deltaY = (float)(target.posY - this.posY);
+			float deltaZ = (float)(target.posZ - this.posZ);
+			float targetDistance = MathHelper.sqrt_float(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
 			if(this.canEntityBeSeen(this.playerToAttack)) {
-				this.attackEntity(this.playerToAttack, var1);
+				this.attackEntity(this.playerToAttack, targetDistance);
 			}
 		}
 
@@ -43,74 +58,76 @@ public class EntityCreature extends EntityLiving {
 			this.moveForward = 0.0F;
 			this.isJumping = false;
 		} else {
-			float var4;
 			if(this.playerToAttack == null || this.pathToEntity != null && this.rand.nextInt(20) != 0) {
+				// Idling (or already ticking a path): occasionally pick a fresh
+				// wander goal — sample 200 random nearby spots, keep the best.
 				if(this.pathToEntity == null || this.rand.nextInt(100) == 0) {
-					int var24 = -1;
-					int var2 = -1;
-					int var3 = -1;
-					var4 = -99999.0F;
+					float bestScore = -99999.0F;
+					int bestX = -1;
+					int bestY = -1;
+					int bestZ = -1;
 
-					for(int var28 = 0; var28 < 200; ++var28) {
-						int var6 = MathHelper.floor_double(this.posX + (double)this.rand.nextInt(21) - 10.0D);
-						int var7 = MathHelper.floor_double(this.posY + (double)this.rand.nextInt(9) - 4.0D);
-						int var8 = MathHelper.floor_double(this.posZ + (double)this.rand.nextInt(21) - 10.0D);
-						float var9 = this.getBlockPathWeight(var6, var7, var8);
-						if(var9 > var4) {
-							var4 = var9;
-							var24 = var6;
-							var2 = var7;
-							var3 = var8;
+					for(int sample = 0; sample < 200; ++sample) {
+						int sampleX = MathHelper.floor_double(this.posX + (double)this.rand.nextInt(21) - 10.0D);
+						int sampleY = MathHelper.floor_double(this.posY + (double)this.rand.nextInt(9) - 4.0D);
+						int sampleZ = MathHelper.floor_double(this.posZ + (double)this.rand.nextInt(21) - 10.0D);
+						float score = this.getBlockPathWeight(sampleX, sampleY, sampleZ);
+						if(score > bestScore) {
+							bestScore = score;
+							bestX = sampleX;
+							bestY = sampleY;
+							bestZ = sampleZ;
 						}
 					}
 
-					if(var24 > 0) {
-						this.pathToEntity = this.worldObj.pathFinder.createEntityPathToXYZ(this, var24, var2, var3, 16.0F);
+					if(bestX > 0) {
+						this.pathToEntity = this.worldObj.pathFinder.createEntityPathToXYZ(this, bestX, bestY, bestZ, 16.0F);
 					}
 				}
 			} else {
+				// A live target without a valid path: trace a fresh one to it.
 				this.pathToEntity = this.worldObj.pathFinder.createEntityPathTo(this, this.playerToAttack, 16.0F);
 			}
 
-			boolean var25 = this.handleWaterMovement();
-			boolean var26 = this.handleLavaMovement();
+			boolean inWater = this.handleWaterMovement();
+			boolean inLava = this.handleLavaMovement();
 			if(this.pathToEntity != null && this.rand.nextInt(100) != 0) {
-				Vec3D var27 = this.pathToEntity.getPosition(this);
-				var4 = this.width * 2.0F;
+				Vec3D pathNode = this.pathToEntity.getPosition(this);
+				float reachDistance = this.width * 2.0F;
 
-				while(var27 != null) {
-					double var16 = this.posZ;
-					double var32 = this.posY;
-					double var12 = this.posX;
-					double var18 = var12 - var27.xCoord;
-					double var20 = var32 - var27.yCoord;
-					double var22 = var16 - var27.zCoord;
-					if(var18 * var18 + var20 * var20 + var22 * var22 >= (double)(var4 * var4) || var27.yCoord > this.posY) {
+				// Walk along the path: skip straight past any node we are already
+				// close enough to (unless it sits above us and we must climb).
+				while(pathNode != null) {
+					double nodeX = this.posX - pathNode.xCoord;
+					double nodeY = this.posY - pathNode.yCoord;
+					double nodeZ = this.posZ - pathNode.zCoord;
+					if(nodeX * nodeX + nodeY * nodeY + nodeZ * nodeZ >= (double)(reachDistance * reachDistance) || pathNode.yCoord > this.posY) {
 						break;
 					}
 
 					this.pathToEntity.incrementPathIndex();
 					if(this.pathToEntity.isFinished()) {
-						var27 = null;
+						pathNode = null;
 						this.pathToEntity = null;
 					} else {
-						var27 = this.pathToEntity.getPosition(this);
+						pathNode = this.pathToEntity.getPosition(this);
 					}
 				}
 
 				this.isJumping = false;
-				if(var27 != null) {
-					double var29 = var27.xCoord - this.posX;
-					double var30 = var27.zCoord - this.posZ;
-					double var31 = var27.yCoord - this.posY;
-					this.rotationYaw = (float)(Math.atan2(var30, var29) * 180.0D / (double)((float)Math.PI)) - 90.0F;
+				if(pathNode != null) {
+					double deltaX = pathNode.xCoord - this.posX;
+					double deltaZ = pathNode.zCoord - this.posZ;
+					double deltaY = pathNode.yCoord - this.posY;
+					this.rotationYaw = (float)(Math.atan2(deltaZ, deltaX) * 180.0D / (double)((float)Math.PI)) - 90.0F;
 					this.moveForward = this.moveSpeed;
-					if(var31 > 0.0D) {
+					if(deltaY > 0.0D) {
 						this.isJumping = true;
 					}
 				}
 
-				if(this.rand.nextFloat() < 0.8F && (var25 || var26)) {
+				// Flailing in water: creatures hop restlessly instead of sinking.
+				if(this.rand.nextFloat() < 0.8F && (inWater || inLava)) {
 					this.isJumping = true;
 				}
 
@@ -121,10 +138,18 @@ public class EntityCreature extends EntityLiving {
 		}
 	}
 
-	protected void attackEntity(Entity var1, float var2) {
+	/**
+	 * Gives the subclass the chance to land a hit when the target is within
+	 * reach; {@code distance} is the centre-to-centre distance to the target.
+	 */
+	protected void attackEntity(Entity target, float distance) {
 	}
 
-	protected float getBlockPathWeight(int var1, int var2, int var3) {
+	/**
+	 * How attractive a block is as a walk/drop goal. Creatures prefer higher
+	 * weights while wandering and require a non-negative one to spawn here.
+	 */
+	protected float getBlockPathWeight(int x, int y, int z) {
 		return 0.0F;
 	}
 
@@ -132,7 +157,8 @@ public class EntityCreature extends EntityLiving {
 		return null;
 	}
 
-	public boolean getCanSpawnHere(float var1, float var2, float var3) {
-		return super.getCanSpawnHere(var1, var2, var3) && this.getBlockPathWeight((int)var1, (int)var2, (int)var3) >= 0.0F;
+	@Override
+	public boolean getCanSpawnHere(float x, float y, float z) {
+		return super.getCanSpawnHere(x, y, z) && this.getBlockPathWeight((int)x, (int)y, (int)z) >= 0.0F;
 	}
 }

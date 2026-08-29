@@ -8,6 +8,13 @@ import net.minecraft.game.world.block.BlockFlower;
 import net.minecraft.game.world.block.BlockSand;
 import util.MathHelper;
 
+/**
+ * A block that fell off its support (sand or gravel), or is still in free fall
+ * after the world generation placed it mid-air: it obeys gravity until it hits
+ * solid ground and then is replaced by the actual block again. Note that the
+ * "FallingSand" name is shared with the block-entity mechanic introduced much
+ * later in the game's history; here it is a plain entity.
+ */
 public class EntityFallingSand extends Entity {
 	public int blockID;
 	public int fallTime = 0;

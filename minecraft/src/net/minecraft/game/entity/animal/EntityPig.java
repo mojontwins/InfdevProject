@@ -1,22 +1,14 @@
 package net.minecraft.game.entity.animal;
 
-import com.mojang.nbt.NBTTagCompound;
 import net.minecraft.game.item.Item;
 import net.minecraft.game.world.World;
 
+/** The friendly, oinking food animal. */
 public class EntityPig extends EntityAnimal {
-	public EntityPig(World var1) {
-		super(var1);
+	public EntityPig(World world) {
+		super(world);
 		this.texture = "/mob/pig.png";
 		this.setSize(0.9F, 0.9F);
-	}
-
-	public final void writeEntityToNBT(NBTTagCompound var1) {
-		super.writeEntityToNBT(var1);
-	}
-
-	public final void readEntityFromNBT(NBTTagCompound var1) {
-		super.readEntityFromNBT(var1);
 	}
 
 	protected final String getLivingSound() {

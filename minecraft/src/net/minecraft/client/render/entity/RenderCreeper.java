@@ -13,7 +13,7 @@ public final class RenderCreeper extends RenderLiving {
 
 	protected final void preRenderCallback(EntityLiving entityLiving, float partialTick) {
 		EntityCreeper creeper = (EntityCreeper)entityLiving;
-		float fuseFlash = creeper.c(partialTick);
+		float fuseFlash = creeper.getFuseProgress(partialTick);
 		float scale = 1.0F + MathHelper.sin(fuseFlash * 100.0F) * fuseFlash * 0.01F;
 		if(fuseFlash < 0.0F) {
 			fuseFlash = 0.0F;
@@ -32,7 +32,7 @@ public final class RenderCreeper extends RenderLiving {
 
 	protected final int getColorMultiplier(EntityLiving entityLiving, float brightness, float partialTick) {
 		EntityCreeper creeper = (EntityCreeper)entityLiving;
-		float fuseFlash = creeper.c(partialTick);
+		float fuseFlash = creeper.getFuseProgress(partialTick);
 		if((int)(fuseFlash * 10.0F) % 2 == 0) {
 			return 0;
 		} else {

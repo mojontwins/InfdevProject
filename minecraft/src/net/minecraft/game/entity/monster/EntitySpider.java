@@ -1,24 +1,28 @@
 package net.minecraft.game.entity.monster;
 
-import com.mojang.nbt.NBTTagCompound;
 import net.minecraft.game.entity.Entity;
 import net.minecraft.game.item.Item;
 import net.minecraft.game.world.World;
 import util.MathHelper;
 
+/**
+ * The swift night hunter: only stalks the player in the dark, and backs off
+ * when it comes back out into the light.
+ */
 public class EntitySpider extends EntityMonster {
-	public EntitySpider(World var1) {
-		super(var1);
+	public EntitySpider(World world) {
+		super(world);
 		this.texture = "/mob/spider.png";
 		this.setSize(1.4F, 0.9F);
 		this.moveSpeed = 0.8F;
 	}
 
+	/** Spiders only hunt while it is dark enough. */
 	protected final Entity findPlayerToAttack() {
-		float var1 = this.getEntityBrightness(1.0F);
-		if(var1 < 0.5F) {
-			double var2 = this.worldObj.playerEntity.getDistanceSqToEntity(this);
-			if(var2 < 256.0D) {
+		float brightness = this.getEntityBrightness(1.0F);
+		if(brightness < 0.5F) {
+			double distanceSq = this.worldObj.playerEntity.getDistanceSqToEntity(this);
+			if(distanceSq < 256.0D) {
 				return this.worldObj.playerEntity;
 			}
 		}
@@ -26,34 +30,34 @@ public class EntitySpider extends EntityMonster {
 		return null;
 	}
 
-	protected final void attackEntity(Entity var1, float var2) {
-		float var3 = this.getEntityBrightness(1.0F);
-		if(var3 > 0.5F && this.rand.nextInt(100) == 0) {
+	/**
+	 * Bright light makes an attacking spider give up on its target entirely;
+	 * in the dark, a nearby spider occasionally pounces, then falls back to
+	 * the plain bite.
+	 */
+	protected final void attackEntity(Entity target, float distance) {
+		float brightness = this.getEntityBrightness(1.0F);
+		if(brightness > 0.5F && this.rand.nextInt(100) == 0) {
 			this.playerToAttack = null;
 		} else {
-			if(var2 > 2.0F && var2 < 6.0F && this.rand.nextInt(10) == 0) {
+			// The pounce: within 2-6 m there is a 1-in-10 chance of a leap,
+			// but only from the ground — an airborne roll at that range simply
+			// does nothing at all (a faithful quirk of the original).
+			if(distance > 2.0F && distance < 6.0F && this.rand.nextInt(10) == 0) {
 				if(this.onGround) {
-					double var4 = var1.posX - this.posX;
-					double var6 = var1.posZ - this.posZ;
-					float var8 = MathHelper.sqrt_double(var4 * var4 + var6 * var6);
-					this.motionX = var4 / (double)var8 * 0.5D * (double)0.8F + this.motionX * (double)0.2F;
-					this.motionZ = var6 / (double)var8 * 0.5D * (double)0.8F + this.motionZ * (double)0.2F;
+					double deltaX = target.posX - this.posX;
+					double deltaZ = target.posZ - this.posZ;
+					float attackRange = MathHelper.sqrt_double(deltaX * deltaX + deltaZ * deltaZ);
+					this.motionX = deltaX / (double)attackRange * 0.5D * (double)0.8F + this.motionX * (double)0.2F;
+					this.motionZ = deltaZ / (double)attackRange * 0.5D * (double)0.8F + this.motionZ * (double)0.2F;
 					this.motionY = (double)0.4F;
 					return;
 				}
 			} else {
-				super.attackEntity(var1, var2);
+				super.attackEntity(target, distance);
 			}
 
 		}
-	}
-
-	public final void writeEntityToNBT(NBTTagCompound var1) {
-		super.writeEntityToNBT(var1);
-	}
-
-	public final void readEntityFromNBT(NBTTagCompound var1) {
-		super.readEntityFromNBT(var1);
 	}
 
 	protected final int getDroppedItem() {

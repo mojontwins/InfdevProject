@@ -2,24 +2,21 @@ package net.minecraft.game.entity.monster;
 
 import net.minecraft.game.item.Item;
 import net.minecraft.game.world.World;
-import util.MathHelper;
 
+/**
+ * The shambling undead: slow, tough and prone to burning in daylight.
+ * Drops feathers, oddly enough.
+ */
 public class EntityZombie extends EntityMonster {
-	public EntityZombie(World var1) {
-		super(var1);
+	public EntityZombie(World world) {
+		super(world);
 		this.texture = "/mob/zombie.png";
 		this.moveSpeed = 0.5F;
 		this.attackStrength = 5;
 	}
 
 	public final void onLivingUpdate() {
-		if(this.worldObj.isDaytime()) {
-			float var1 = this.getEntityBrightness(1.0F);
-			if(var1 > 0.5F && this.worldObj.canBlockSeeTheSky(MathHelper.floor_double(this.posX), MathHelper.floor_double(this.posY), MathHelper.floor_double(this.posZ)) && this.rand.nextFloat() * 30.0F < (var1 - 0.4F) * 2.0F) {
-				this.fire = 300;
-			}
-		}
-
+		this.tryBurnInDaylight();
 		super.onLivingUpdate();
 	}
 

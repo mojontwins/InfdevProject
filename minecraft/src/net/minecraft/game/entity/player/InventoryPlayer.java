@@ -1,187 +1,174 @@
 package net.minecraft.game.entity.player;
 
+import java.util.stream.IntStream;
 import net.minecraft.game.IInventory;
 import net.minecraft.game.item.ItemArmor;
 import net.minecraft.game.item.ItemStack;
 
+/**
+ * The player's 36-slot main inventory plus the 4 armor slots (indexed 36..39)
+ * layered on top. Slots are plain arrays for the same reason the protoype game
+ * keeps them raw: the hotbar and the container screens read and write them
+ * directly every frame.
+ */
 public final class InventoryPlayer implements IInventory {
 	public ItemStack[] mainInventory = new ItemStack[36];
 	public ItemStack[] armorInventory = new ItemStack[4];
 	public int currentItem = 0;
 	private EntityPlayer player;
 
-	public InventoryPlayer(EntityPlayer var1) {
-		this.player = var1;
+	public InventoryPlayer(EntityPlayer player) {
+		this.player = player;
 	}
 
 	public final ItemStack getCurrentItem() {
 		return this.mainInventory[this.currentItem];
 	}
 
-	private int getInventorySlotContainItem(int var1) {
-		for(int var2 = 0; var2 < this.mainInventory.length; ++var2) {
-			if(this.mainInventory[var2] != null && this.mainInventory[var2].itemID == var1) {
-				return var2;
-			}
-		}
-
-		return -1;
+	/** First main-inventory slot holding the given item id, or -1. */
+	private int getInventorySlotContainItem(int itemID) {
+		return IntStream.range(0, this.mainInventory.length)
+				.filter(i -> this.mainInventory[i] != null && this.mainInventory[i].itemID == itemID)
+				.findFirst()
+				.orElse(-1);
 	}
 
+	/** First empty main-inventory slot, or -1. */
 	private int storeItemStack() {
-		for(int var1 = 0; var1 < this.mainInventory.length; ++var1) {
-			if(this.mainInventory[var1] == null) {
-				return var1;
-			}
-		}
-
-		return -1;
+		return IntStream.range(0, this.mainInventory.length)
+				.filter(i -> this.mainInventory[i] == null)
+				.findFirst()
+				.orElse(-1);
 	}
 
-	public final void getFirstEmptyStack(int var1) {
-		var1 = this.getInventorySlotContainItem(var1);
-		if(var1 >= 0 && var1 < 9) {
-			this.currentItem = var1;
+	/** Selects the hotbar slot (0..8) holding the given item, if any. */
+	public final void getFirstEmptyStack(int itemID) {
+		itemID = this.getInventorySlotContainItem(itemID);
+		if (itemID >= 0 && itemID < 9) {
+			this.currentItem = itemID;
 		}
 	}
 
-	public final boolean consumeInventoryItem(int var1) {
-		var1 = this.getInventorySlotContainItem(var1);
-		if(var1 < 0) {
+	public final boolean consumeInventoryItem(int itemID) {
+		itemID = this.getInventorySlotContainItem(itemID);
+		if (itemID < 0) {
 			return false;
 		} else {
-			if(--this.mainInventory[var1].stackSize <= 0) {
-				this.mainInventory[var1] = null;
+			if (--this.mainInventory[itemID].stackSize <= 0) {
+				this.mainInventory[itemID] = null;
 			}
 
 			return true;
 		}
 	}
 
-	public final boolean storePartialItemStack(ItemStack var1) {
-		if(var1.itemDamage == 0) {
-			int var4 = var1.stackSize;
-			int var3 = var1.itemID;
-			int var6 = var3;
-			InventoryPlayer var5 = this;
-			int var7 = 0;
+	/**
+	 * Tries to stash the given stack. It is first merged into an existing,
+	 * non-full stack of the same item; whatever does not fit goes into an empty
+	 * slot; and whatever still does not fit is left in the argument stack.
+	 */
+	public final boolean storePartialItemStack(ItemStack stack) {
+		if (stack.itemDamage == 0) {
+			int remaining = stack.stackSize;
+			int itemID = stack.itemID;
 
-			int var10001;
-			ItemStack var8;
-			while(true) {
-				if(var7 >= var5.mainInventory.length) {
-					var10001 = -1;
-					break;
-				}
-
-				if(var5.mainInventory[var7] != null && var5.mainInventory[var7].itemID == var6) {
-					var8 = var5.mainInventory[var7];
-					if(var5.mainInventory[var7].stackSize < var8.getItem().getItemStackLimit() && var5.mainInventory[var7].stackSize < 64) {
-						var10001 = var7;
-						break;
-					}
-				}
-
-				++var7;
+			int slot = IntStream.range(0, this.mainInventory.length)
+					.filter(i -> this.mainInventory[i] != null
+							&& this.mainInventory[i].itemID == itemID
+							&& this.mainInventory[i].stackSize < this.mainInventory[i].getItem().getItemStackLimit()
+							&& this.mainInventory[i].stackSize < 64)
+					.findFirst()
+					.orElse(-1);
+			if (slot < 0) {
+				slot = this.storeItemStack();
 			}
 
-			int var9 = var10001;
-			if(var9 < 0) {
-				var9 = this.storeItemStack();
-			}
-
-			if(var9 < 0) {
-				var10001 = var4;
-			} else {
-				if(this.mainInventory[var9] == null) {
-					this.mainInventory[var9] = new ItemStack(var3, 0);
+			if (slot >= 0) {
+				if (this.mainInventory[slot] == null) {
+					this.mainInventory[slot] = new ItemStack(itemID, 0);
 				}
 
-				var3 = var4;
-				var8 = this.mainInventory[var9];
-				if(var4 > var8.getItem().getItemStackLimit() - this.mainInventory[var9].stackSize) {
-					var8 = this.mainInventory[var9];
-					var3 = var8.getItem().getItemStackLimit() - this.mainInventory[var9].stackSize;
+				int added = remaining;
+				int slotLimit = this.mainInventory[slot].getItem().getItemStackLimit();
+				if (added > slotLimit - this.mainInventory[slot].stackSize) {
+					added = slotLimit - this.mainInventory[slot].stackSize;
 				}
 
-				if(var3 > 64 - this.mainInventory[var9].stackSize) {
-					var3 = 64 - this.mainInventory[var9].stackSize;
+				if (added > 64 - this.mainInventory[slot].stackSize) {
+					added = 64 - this.mainInventory[slot].stackSize;
 				}
 
-				if(var3 == 0) {
-					var10001 = var4;
-				} else {
-					var4 -= var3;
-					this.mainInventory[var9].stackSize += var3;
-					this.mainInventory[var9].animationsToGo = 5;
-					var10001 = var4;
+				if (added != 0) {
+					remaining -= added;
+					this.mainInventory[slot].stackSize += added;
+					this.mainInventory[slot].animationsToGo = 5;
 				}
 			}
 
-			var1.stackSize = var10001;
-			if(var1.stackSize == 0) {
+			stack.stackSize = remaining;
+			if (stack.stackSize == 0) {
 				return true;
 			}
 		}
 
-		int var2 = this.storeItemStack();
-		if(var2 >= 0) {
-			this.mainInventory[var2] = var1;
-			this.mainInventory[var2].animationsToGo = 5;
+		int emptySlot = this.storeItemStack();
+		if (emptySlot >= 0) {
+			this.mainInventory[emptySlot] = stack;
+			this.mainInventory[emptySlot].animationsToGo = 5;
 			return true;
 		} else {
 			return false;
 		}
 	}
 
-	public final ItemStack decrStackSize(int var1, int var2) {
-		ItemStack[] var3 = this.mainInventory;
-		if(var1 >= this.mainInventory.length) {
-			var3 = this.armorInventory;
-			var1 -= this.mainInventory.length;
+	public final ItemStack decrStackSize(int slot, int amount) {
+		ItemStack[] inventory = this.mainInventory;
+		if (slot >= this.mainInventory.length) {
+			inventory = this.armorInventory;
+			slot -= this.mainInventory.length;
 		}
 
-		if(var3[var1] != null) {
-			ItemStack var4;
-			if(var3[var1].stackSize <= var2) {
-				var4 = var3[var1];
-				var3[var1] = null;
-				return var4;
+		if (inventory[slot] != null) {
+			ItemStack taken;
+			if (inventory[slot].stackSize <= amount) {
+				taken = inventory[slot];
+				inventory[slot] = null;
+				return taken;
 			} else {
-				var4 = var3[var1].splitStack(var2);
-				if(var3[var1].stackSize == 0) {
-					var3[var1] = null;
+				taken = inventory[slot].splitStack(amount);
+				if (inventory[slot].stackSize == 0) {
+					inventory[slot] = null;
 				}
 
-				return var4;
+				return taken;
 			}
 		} else {
 			return null;
 		}
 	}
 
-	public final void setInventorySlotContents(int var1, ItemStack var2) {
-		ItemStack[] var3 = this.mainInventory;
-		if(var1 >= this.mainInventory.length) {
-			var3 = this.armorInventory;
-			var1 -= this.mainInventory.length;
+	public final void setInventorySlotContents(int slot, ItemStack stack) {
+		ItemStack[] inventory = this.mainInventory;
+		if (slot >= this.mainInventory.length) {
+			inventory = this.armorInventory;
+			slot -= this.mainInventory.length;
 		}
 
-		var3[var1] = var2;
+		inventory[slot] = stack;
 	}
 
 	public final int getInventorySize() {
 		return this.mainInventory.length + 4;
 	}
 
-	public final ItemStack getStackInSlot(int var1) {
-		ItemStack[] var2 = this.mainInventory;
-		if(var1 >= this.mainInventory.length) {
-			var2 = this.armorInventory;
-			var1 -= this.mainInventory.length;
+	public final ItemStack getStackInSlot(int slot) {
+		ItemStack[] inventory = this.mainInventory;
+		if (slot >= this.mainInventory.length) {
+			inventory = this.armorInventory;
+			slot -= this.mainInventory.length;
 		}
 
-		return var2[var1];
+		return inventory[slot];
 	}
 
 	public final String getInvName() {
@@ -193,45 +180,42 @@ public final class InventoryPlayer implements IInventory {
 	}
 
 	public final int getPlayerArmorValue() {
-		int var1 = 0;
-		int var2 = 0;
-		int var3 = 0;
+		int damageReduceTotal = 0;
+		int remainingDurability = 0;
+		int totalDurability = 0;
 
-		for(int var4 = 0; var4 < this.armorInventory.length; ++var4) {
-			if(this.armorInventory[var4] != null && this.armorInventory[var4].getItem() instanceof ItemArmor) {
-				int var5 = this.armorInventory[var4].getMaxDamage();
-				int var6 = this.armorInventory[var4].itemDamage;
-				var6 = var5 - var6;
-				var2 += var6;
-				var3 += var5;
-				var5 = ((ItemArmor)this.armorInventory[var4].getItem()).damageReduceAmount;
-				var1 += var5;
+		for (int i = 0; i < this.armorInventory.length; ++i) {
+			ItemStack armor = this.armorInventory[i];
+			if (armor != null && armor.getItem() instanceof ItemArmor) {
+				int maxDamage = armor.getMaxDamage();
+				remainingDurability += maxDamage - armor.itemDamage;
+				totalDurability += maxDamage;
+				damageReduceTotal += ((ItemArmor) armor.getItem()).damageReduceAmount;
 			}
 		}
 
-		if(var3 == 0) {
+		if (totalDurability == 0) {
 			return 0;
 		} else {
-			return (var1 - 1) * var2 / var3 + 1;
+			return (damageReduceTotal - 1) * remainingDurability / totalDurability + 1;
 		}
 	}
 
 	public final void dropAllItems() {
-		int var1;
-		for(var1 = 0; var1 < this.mainInventory.length; ++var1) {
-			if(this.mainInventory[var1] != null) {
-				this.player.dropPlayerItemWithRandomChoice(this.mainInventory[var1], true);
-				this.mainInventory[var1] = null;
+		int slot;
+		for (slot = 0; slot < this.mainInventory.length; ++slot) {
+			if (this.mainInventory[slot] != null) {
+				this.player.dropPlayerItemWithRandomChoice(this.mainInventory[slot], true);
+				this.mainInventory[slot] = null;
 			}
 		}
 
-		for(var1 = 0; var1 < this.armorInventory.length; ++var1) {
-			if(this.armorInventory[var1] != null) {
-				this.player.dropPlayerItemWithRandomChoice(this.armorInventory[var1], true);
-				this.armorInventory[var1] = null;
+		for (slot = 0; slot < this.armorInventory.length; ++slot) {
+			if (this.armorInventory[slot] != null) {
+				this.player.dropPlayerItemWithRandomChoice(this.armorInventory[slot], true);
+				this.armorInventory[slot] = null;
 			}
 		}
-
 	}
 
 	public final void onInventoryChanged() {
