@@ -47,21 +47,7 @@ public final class GuiCrafting extends GuiContainer {
 	}
 
 	public final void guiCraftingItemsCheck() {
-		int[] var1 = new int[9];
-
-		for(int var2 = 0; var2 < 3; ++var2) {
-			for(int var3 = 0; var3 < 3; ++var3) {
-				int var4 = var2 + var3 * 3;
-				ItemStack var5 = this.inventoryCrafting.getStackInSlot(var4);
-				if(var5 == null) {
-					var1[var4] = -1;
-				} else {
-					var1[var4] = var5.itemID;
-				}
-			}
-		}
-
-		this.iInventory.setInventorySlotContents(0, CraftingManager.getInstance().findMatchingRecipe(var1));
+		this.iInventory.setInventorySlotContents(0, CraftingManager.getInstance().findMatchingRecipe(this.inventoryCrafting));
 	}
 
 	protected final void drawGuiContainerForegroundLayer() {

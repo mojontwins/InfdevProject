@@ -5,6 +5,7 @@ import com.mojang.nbt.NBTTagList;
 import net.minecraft.game.IInventory;
 import net.minecraft.game.item.Item;
 import net.minecraft.game.item.ItemStack;
+import net.minecraft.game.item.recipe.FurnaceRecipes;
 import net.minecraft.game.world.block.Block;
 import net.minecraft.game.world.material.Material;
 
@@ -135,10 +136,10 @@ public class TileEntityFurnace extends TileEntity implements IInventory {
 			if(this.furnaceCookTime == 200) {
 				this.furnaceCookTime = 0;
 				if(this.canSmelt()) {
-					int smeltedItemID = smeltItem(this.furnaceItemStacks[0].getItem().shiftedIndex);
+					ItemStack smeltedResult = FurnaceRecipes.smelting().getSmeltingResult(this.furnaceItemStacks[0]);
 					if(this.furnaceItemStacks[2] == null) {
-						this.furnaceItemStacks[2] = new ItemStack(smeltedItemID, 1);
-					} else if(this.furnaceItemStacks[2].itemID == smeltedItemID) {
+						this.furnaceItemStacks[2] = new ItemStack(smeltedResult.itemID, 1, smeltedResult.itemDamage);
+					} else if(this.furnaceItemStacks[2].itemID == smeltedResult.itemID) {
 						++this.furnaceItemStacks[2].stackSize;
 					}
 
@@ -172,12 +173,12 @@ public class TileEntityFurnace extends TileEntity implements IInventory {
 		if(this.furnaceItemStacks[0] == null) {
 			return false;
 		} else {
-			int smeltedItemID = smeltItem(this.furnaceItemStacks[0].getItem().shiftedIndex);
-			if(smeltedItemID < 0) {
+			ItemStack smeltedResult = FurnaceRecipes.smelting().getSmeltingResult(this.furnaceItemStacks[0]);
+			if(smeltedResult == null) {
 				return false;
 			} else if(this.furnaceItemStacks[2] == null) {
 				return true;
-			} else if(this.furnaceItemStacks[2].itemID != smeltedItemID) {
+			} else if(this.furnaceItemStacks[2].itemID != smeltedResult.itemID) {
 				return false;
 			} else {
 				if(this.furnaceItemStacks[2].stackSize < 64) {
@@ -186,13 +187,9 @@ public class TileEntityFurnace extends TileEntity implements IInventory {
 						return true;
 					}
 				}
-				return this.furnaceItemStacks[2].stackSize < Item.itemsList[smeltedItemID].getItemStackLimit();
+				return this.furnaceItemStacks[2].stackSize < Item.itemsList[smeltedResult.itemID].getItemStackLimit();
 			}
 		}
-	}
-
-	private static int smeltItem(int itemID) {
-		return itemID == Block.oreIron.blockID ? Item.ingotIron.shiftedIndex : (itemID == Block.oreGold.blockID ? Item.ingotGold.shiftedIndex : (itemID == Block.oreDiamond.blockID ? Item.diamod.shiftedIndex : (itemID == Block.sand.blockID ? Block.glass.blockID : (itemID == Item.porkRaw.shiftedIndex ? Item.porkCooked.shiftedIndex : (itemID == Block.cobblestone.blockID ? Block.stone.blockID : -1)))));
 	}
 
 	private static int getItemBurnTime(ItemStack itemStack) {

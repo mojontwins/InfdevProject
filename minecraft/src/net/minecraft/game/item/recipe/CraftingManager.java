@@ -5,22 +5,26 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import net.minecraft.client.gui.container.InventoryCrafting;
 import net.minecraft.game.item.Item;
 import net.minecraft.game.item.ItemStack;
 import net.minecraft.game.world.block.Block;
 
 /**
- * The singleton catalogue of every shaped recipe the game knows. A recipe is just a
- * pattern of item ids; the 3×3 crafting matrix of the crafting table
- * ({@link net.minecraft.client.gui.container.GuiCrafting}) as well as the small 2×2
- * one on the survival screen are both matched against this catalogue via
- * {@link #findMatchingRecipe(int[])}.
+ * The singleton catalogue of every crafting recipe the game knows. A recipe is an
+ * {@link IRecipe} — typically a {@link ShapedRecipe} pattern of item stacks, but
+ * potentially also a {@link ShapelessRecipe} bag of ingredients — and the 3×3
+ * crafting matrix of the crafting table
+ * ({@link net.minecraft.client.gui.container.GuiCrafting}) as well as the small
+ * 2×2 one on the survival screen are both matched against this catalogue via
+ * {@link #findMatchingRecipe(InventoryCrafting)}. Ingredient stacks match by item
+ * id and — unless their damage is the {@code -1} wildcard — by damage.
  */
 public final class CraftingManager {
 
 	private static final CraftingManager instance = new CraftingManager();
 
-	private final List<CraftingRecipe> recipes = new ArrayList<>();
+	private final List<IRecipe> recipes = new ArrayList<>();
 
 	public static final CraftingManager getInstance() {
 		return instance;
@@ -29,8 +33,8 @@ public final class CraftingManager {
 	/**
 	 * Builds the whole recipe table, registering the recipes in their original
 	 * order and then sorting the list biggest-pattern-first. The sort matters:
-	 * {@link #findMatchingRecipe(int[])} returns the first match, so a large shape
-	 * must win over a small one that happens to also fit.
+	 * {@link #findMatchingRecipe(InventoryCrafting)} returns the first match, so a
+	 * large shape must win over a small one that happens to also fit.
 	 */
 	private CraftingManager() {
 		new RecipesTools().addRecipe(this);
@@ -60,7 +64,7 @@ public final class CraftingManager {
 		this.addRecipe(new ItemStack(Item.painting, 1), "###", "#X#", "###", '#', Item.stick, 'X', Block.clothGray);
 		this.addRecipe(new ItemStack(Item.appleGold, 1), "###", "#X#", "###", '#', Block.blockGold, 'X', Item.apple);
 
-		this.recipes.sort(Comparator.comparingInt(CraftingRecipe::getRecipeArea).reversed());
+		this.recipes.sort(Comparator.comparingInt(IRecipe::getRecipeSize).reversed());
 		System.out.println(this.recipes.size() + " recipes");
 	}
 
@@ -71,11 +75,12 @@ public final class CraftingManager {
 	 * or a run of consecutive {@code String} rows (one character per cell, any
 	 * character serves as a symbol);</li>
 	 * <li><b>one {@code Character} + ingredient pair per symbol</b>, where an
-	 * ingredient may be an {@link Item} or a {@link Block}. A symbol without a
-	 * matching pair simply means "empty cell".</li>
+	 * ingredient may be an {@link Item}, a {@link Block} or an {@link ItemStack}. A
+	 * symbol without a matching pair simply means "empty cell".</li>
 	 * </ol>
 	 * Every row must have the same length; the shape's bounding box becomes the
-	 * recipe's width and height.
+	 * recipe's width and height. Block ingredients turn into "any damage"
+	 * ({@code -1}) inputs.
 	 */
 	final void addRecipe(ItemStack recipeOutput, Object... parts) {
 		int width = 0;
@@ -100,46 +105,76 @@ public final class CraftingManager {
 			}
 		}
 
-		Map<Character, Integer> symbolToItemId = new HashMap<>();
+		Map<Character, ItemStack> symbolToIngredient = new HashMap<>();
 		for (; cursor < parts.length; cursor += 2) {
 			Character symbol = (Character) parts[cursor];
-			symbolToItemId.put(symbol, ingredientId(parts[cursor + 1]));
+			symbolToIngredient.put(symbol, ingredientStack(parts[cursor + 1]));
 		}
 
 		int cellCount = width * height;
-		int[] ingredientGrid = new int[cellCount];
+		ItemStack[] ingredientGrid = new ItemStack[cellCount];
 		for (int cell = 0; cell < cellCount; ++cell) {
 			char symbol = shapeFlat.charAt(cell);
-			ingredientGrid[cell] = symbolToItemId.containsKey(symbol) ? symbolToItemId.get(symbol) : -1;
+			ingredientGrid[cell] = symbolToIngredient.containsKey(symbol) ? symbolToIngredient.get(symbol).copy() : null;
 		}
 
-		this.recipes.add(new CraftingRecipe(width, height, ingredientGrid, recipeOutput));
+		this.recipes.add(new ShapedRecipe(width, height, ingredientGrid, recipeOutput));
 	}
 
 	/**
-	 * The grid id of one ingredient: items use their shifted index, blocks their
-	 * block id, anything else maps to id 0.
+	 * Registers one shapeless recipe from an unordered list of ingredients —
+	 * currently unused by this version, whose recipes are all shaped, but part of
+	 * the recipe framework.
 	 */
-	private static int ingredientId(Object ingredient) {
+	final void addShapelessRecipe(ItemStack recipeOutput, Object... ingredients) {
+		List<ItemStack> ingredientList = new ArrayList<>();
+		for (Object ingredient : ingredients) {
+			if (ingredient instanceof ItemStack) {
+				ingredientList.add(((ItemStack) ingredient).copy());
+			} else if (ingredient instanceof Item) {
+				ingredientList.add(new ItemStack((Item) ingredient));
+			} else if (ingredient instanceof Block) {
+				ingredientList.add(new ItemStack((Block) ingredient));
+			} else {
+				throw new IllegalArgumentException("Invalid shapeless recipe ingredient: " + ingredient);
+			}
+		}
+		this.recipes.add(new ShapelessRecipe(recipeOutput, ingredientList));
+	}
+
+	/**
+	 * The ingredient stack for one symbol: items carry no damage, blocks are
+	 * wildcards ({@code -1}, "any damage") and an {@link ItemStack} is used as
+	 * given. Anything else is a programmer error.
+	 */
+	private static ItemStack ingredientStack(Object ingredient) {
 		if (ingredient instanceof Item) {
-			return ((Item) ingredient).shiftedIndex;
+			return new ItemStack((Item) ingredient);
 		}
 		if (ingredient instanceof Block) {
-			return ((Block) ingredient).blockID;
+			return new ItemStack(((Block) ingredient).blockID, 1, -1);
 		}
-		return 0;
+		if (ingredient instanceof ItemStack) {
+			return (ItemStack) ingredient;
+		}
+		throw new IllegalArgumentException("Invalid shaped recipe ingredient: " + ingredient);
 	}
 
 	/**
-	 * The result of the first recipe matching the given 3×3 crafting matrix, or
+	 * The result of the first recipe matching the given craft matrix, or
 	 * {@code null} when nothing matches. Sorting biggest-pattern-first makes sure
 	 * an overlapping small recipe never shadows a larger one.
 	 */
-	public final ItemStack findMatchingRecipe(int[] craftingMatrix) {
+	public final ItemStack findMatchingRecipe(InventoryCrafting inventoryCrafting) {
 		return this.recipes.stream()
-			.filter(recipe -> recipe.matchRecipe(craftingMatrix))
-			.map(CraftingRecipe::createResult)
+			.filter(recipe -> recipe.matches(inventoryCrafting))
+			.map(recipe -> recipe.getCraftingResult(inventoryCrafting))
 			.findFirst()
 			.orElse(null);
+	}
+
+	/** The whole recipe catalogue, biggest pattern first. */
+	public final List<IRecipe> getRecipeList() {
+		return this.recipes;
 	}
 }

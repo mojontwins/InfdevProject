@@ -59,6 +59,11 @@ public final class ItemStack {
 		return new ItemStack(this.itemID, amount, this.itemDamage);
 	}
 
+	/** An independent copy of this stack — id, quantity and damage — with no shared state. */
+	public final ItemStack copy() {
+		return new ItemStack(this.itemID, this.stackSize, this.itemDamage);
+	}
+
 	public final Item getItem() {
 		return Item.itemsList[this.itemID];
 	}
