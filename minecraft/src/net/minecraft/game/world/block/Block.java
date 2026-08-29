@@ -245,7 +245,17 @@ public class Block {
 		return this.blockID;
 	}
 
+	/** Digging strength without knowing the block's state; treats metadata as "any". */
 	public final float blockStrength(EntityPlayer player) {
+		return this.blockStrength(player, -1);
+	}
+
+	/**
+	 * How much digging progress one swing makes, given the held tool and the
+	 * exact block state being mined (used by the tool speed tables that match
+	 * specific metadata).
+	 */
+	public final float blockStrength(EntityPlayer player, int metadata) {
 		if(this.blockHardness < 0.0F) {
 			return 0.0F;
 		} else if(!player.canHarvestBlock(this)) {
@@ -255,7 +265,7 @@ public class Block {
 			float strength = 1.0F;
 			if(inventory.mainInventory[inventory.currentItem] != null) {
 				ItemStack currentItemStack = inventory.mainInventory[inventory.currentItem];
-				strength = 1.0F * currentItemStack.getItem().getStrVsBlock(this);
+				strength = currentItemStack.getItem().getStrVsBlock(this, metadata);
 			}
 
 			float effectiveStrength = strength;

@@ -3,35 +3,40 @@ package net.minecraft.game.item;
 import net.minecraft.game.entity.EntityPainting;
 import net.minecraft.game.world.World;
 
+/**
+ * The painting item: on use it builds an {@link EntityPainting} on the clicked
+ * wall face (only horizontal sides are walls for this purpose), and only spends
+ * the item if the painting actually fits and hangs.
+ */
 public final class ItemPainting extends Item {
-	public ItemPainting(int var1) {
-		super(65);
+	public ItemPainting(int itemID) {
+		super(itemID);
 		this.maxDamage = 64;
 	}
 
-	public final boolean onItemUse(ItemStack var1, World var2, int var3, int var4, int var5, int var6) {
-		if(var6 == 0) {
-			return false;
-		} else if(var6 == 1) {
+	@Override
+	public final boolean onItemUse(ItemStack stack, World world, int x, int y, int z, int side) {
+		if (side == 0 || side == 1) {
 			return false;
 		} else {
-			byte var7 = 0;
-			if(var6 == 4) {
-				var7 = 1;
+			// Convert the clicked block face into the painting's facing direction
+			// (0 = -Z, 1 = -X, 2 = +Z, 3 = +X); side 2 (-Z) is the natural default.
+			int direction = 0;
+			switch (side) {
+				case 4:
+					direction = 1;
+					break;
+				case 3:
+					direction = 2;
+					break;
+				case 5:
+					direction = 3;
 			}
 
-			if(var6 == 3) {
-				var7 = 2;
-			}
-
-			if(var6 == 5) {
-				var7 = 3;
-			}
-
-			EntityPainting var8 = new EntityPainting(var2, var3, var4, var5, var7);
-			if(var8.onValidSurface()) {
-				var2.spawnEntityInWorld(var8);
-				--var1.stackSize;
+			EntityPainting painting = new EntityPainting(world, x, y, z, direction);
+			if (painting.onValidSurface()) {
+				world.spawnEntityInWorld(painting);
+				--stack.stackSize;
 			}
 
 			return true;

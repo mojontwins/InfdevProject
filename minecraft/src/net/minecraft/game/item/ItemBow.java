@@ -4,18 +4,23 @@ import net.minecraft.game.entity.player.EntityPlayer;
 import net.minecraft.game.entity.projectile.EntityArrow;
 import net.minecraft.game.world.World;
 
+/**
+ * The bow: fires an arrow (spawned with a bit of downhill pitch) whenever the
+ * player has an arrow in the inventory, which the shot consumes.
+ */
 public final class ItemBow extends Item {
-	public ItemBow(int var1) {
-		super(5);
+	public ItemBow(int itemID) {
+		super(itemID);
 		this.maxStackSize = 1;
 	}
 
-	public final ItemStack onItemRightClick(ItemStack var1, World var2, EntityPlayer var3) {
-		if(var3.inventory.consumeInventoryItem(Item.arrow.shiftedIndex)) {
-			var2.playSoundAtEntity(var3, "random.bow", 1.0F, 1.0F / (itemRand.nextFloat() * 0.4F + 0.8F));
-			var2.spawnEntityInWorld(new EntityArrow(var2, var3));
+	@Override
+	public final ItemStack onItemRightClick(ItemStack stack, World world, EntityPlayer player) {
+		if (player.inventory.consumeInventoryItem(Item.arrow.shiftedIndex)) {
+			world.playSoundAtEntity(player, "random.bow", 1.0F, 1.0F / (itemRand.nextFloat() * 0.4F + 0.8F));
+			world.spawnEntityInWorld(new EntityArrow(world, player));
 		}
 
-		return var1;
+		return stack;
 	}
 }
