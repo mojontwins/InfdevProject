@@ -36,9 +36,15 @@ public final class WorldGenMinable extends WorldGenerator {
 			double radius = (double) (MathHelper.sin((float) step / 16.0F * (float) Math.PI) + 1.0F) * random.nextDouble() + 1.0D;
 			double radiusHalf = radius / 2.0D;
 
-			for(int vx = (int) (centreX - radiusHalf); vx <= (int) (centreX + radiusHalf); ++vx) {
-				for(int vy = (int) (centreY - radiusHalf); vy <= (int) (centreY + radiusHalf); ++vy) {
-					for(int vz = (int) (centreZ - radiusHalf); vz <= (int) (centreZ + radiusHalf); ++vz) {
+			// The loop bounds must floor (not truncate toward zero): the original
+			// code used `(int)`, which shrinks the vein when a negative center is
+			// involved — `(int)(-12.2)` is -12 while `(int)(+12.2)` is 12, so a
+			// negative-center vein reaches one cell fewer and generates less ore
+			// in the negative-x / negative-z quadrants. Floors both bounds make a
+			// vein at (-c) mirror the vein at (+c) exactly.
+			for(int vx = (int) Math.floor(centreX - radiusHalf); vx <= (int) Math.floor(centreX + radiusHalf); ++vx) {
+				for(int vy = (int) Math.floor(centreY - radiusHalf); vy <= (int) Math.floor(centreY + radiusHalf); ++vy) {
+					for(int vz = (int) Math.floor(centreZ - radiusHalf); vz <= (int) Math.floor(centreZ + radiusHalf); ++vz) {
 						double dx = ((double) vx + 0.5D - centreX) / radiusHalf;
 						double dy = ((double) vy + 0.5D - centreY) / radiusHalf;
 						double dz = ((double) vz + 0.5D - centreZ) / radiusHalf;
