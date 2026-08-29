@@ -4,16 +4,27 @@ import net.minecraft.game.item.Item;
 import net.minecraft.game.item.ItemStack;
 import net.minecraft.game.world.block.Block;
 
+/**
+ * Shaped recipes converting between the three metal blocks and their ingots: a
+ * block is smelted from a 3×3 square of its ingots, and a block melts back down
+ * into nine ingots. Both conversions exist for gold, steel (iron) and diamond.
+ */
 public final class RecipesIngots {
-	private Object[][] recipeItems = new Object[][]{{Block.blockGold, Item.ingotGold}, {Block.blockSteel, Item.ingotIron}, {Block.blockDiamond, Item.diamod}};
 
-	public final void addRecipe(CraftingManager var1) {
-		for(int var2 = 0; var2 < this.recipeItems.length; ++var2) {
-			Block var3 = (Block)this.recipeItems[var2][0];
-			Item var4 = (Item)this.recipeItems[var2][1];
-			var1.addRecipe(new ItemStack(var3), new Object[]{"###", "###", "###", Character.valueOf('#'), var4});
-			var1.addRecipe(new ItemStack(var4, 9), new Object[]{"#", Character.valueOf('#'), var3});
+	/** The compression blocks, one per material tier. */
+	private static final Block[] INGOT_BLOCKS = {
+		Block.blockGold, Block.blockSteel, Block.blockDiamond
+	};
+
+	/** The matching ingot items. */
+	private static final Item[] INGOT_ITEMS = {
+		Item.ingotGold, Item.ingotIron, Item.diamod
+	};
+
+	public final void addRecipe(CraftingManager manager) {
+		for (int material = 0; material < INGOT_BLOCKS.length; ++material) {
+			manager.addRecipe(new ItemStack(INGOT_BLOCKS[material]), "###", "###", "###", '#', INGOT_ITEMS[material]);
+			manager.addRecipe(new ItemStack(INGOT_ITEMS[material], 9), "#", '#', INGOT_BLOCKS[material]);
 		}
-
 	}
 }

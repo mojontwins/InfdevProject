@@ -2,7 +2,22 @@ package net.minecraft.game.physics;
 
 import net.minecraft.game.entity.Entity;
 
+/**
+ * The result of a game-sight ray cast: either the block face that was pierced or the
+ * entity that was hit. {@link AxisAlignedBB#calculateIntercept} and
+ * {@link net.minecraft.game.world.block.Block#rayTrace} fill the block form, while
+ * arrow collision fills the entity form; the client consumes it for the highlighted
+ * block and for click targeting. The side codes are the standard block faces,
+ * 0 = −Y, 1 = +Y, 2 = −Z, 3 = +Z, 4 = −X, 5 = +X.
+ */
 public final class MovingObjectPosition {
+
+	/** Ray hit a block: {@link #blockX}, {@link #blockY}, {@link #blockZ} and {@link #sideHit} are set. */
+	public static final int HIT_BLOCK = 0;
+
+	/** Ray hit an entity: {@link #entityHit} is set. */
+	public static final int HIT_ENTITY = 1;
+
 	public int typeOfHit;
 	public int blockX;
 	public int blockY;
@@ -11,18 +26,20 @@ public final class MovingObjectPosition {
 	public Vec3D hitVec;
 	public Entity entityHit;
 
-	public MovingObjectPosition(int var1, int var2, int var3, int var4, Vec3D var5) {
-		this.typeOfHit = 0;
-		this.blockX = var1;
-		this.blockY = var2;
-		this.blockZ = var3;
-		this.sideHit = var4;
-		this.hitVec = new Vec3D(var5.xCoord, var5.yCoord, var5.zCoord);
+	/** The block form: the coordinates of the struck block, the face that was pierced and the exact hit point. */
+	public MovingObjectPosition(int blockX, int blockY, int blockZ, int sideHit, Vec3D hitVector) {
+		this.typeOfHit = HIT_BLOCK;
+		this.blockX = blockX;
+		this.blockY = blockY;
+		this.blockZ = blockZ;
+		this.sideHit = sideHit;
+		this.hitVec = new Vec3D(hitVector.xCoord, hitVector.yCoord, hitVector.zCoord);
 	}
 
-	public MovingObjectPosition(Entity var1) {
-		this.typeOfHit = 1;
-		this.entityHit = var1;
-		this.hitVec = new Vec3D(var1.posX, var1.posY, var1.posZ);
+	/** The entity form: the struck entity gives up its position as the hit point. */
+	public MovingObjectPosition(Entity hitEntity) {
+		this.typeOfHit = HIT_ENTITY;
+		this.entityHit = hitEntity;
+		this.hitVec = new Vec3D(hitEntity.posX, hitEntity.posY, hitEntity.posZ);
 	}
 }

@@ -1,6 +1,15 @@
 package net.minecraft.game.physics;
 
+/**
+ * An axis-aligned bounding box, defined by its min and max corner. These are the
+ * collision volumes of the game: every block keeps one
+ * ({@link net.minecraft.game.world.block.Block#getCollisionBoundingBoxFromPool}) and
+ * so does every entity ({@link net.minecraft.game.entity.Entity#boundingBox}). The
+ * offset calculations in this class implement the sliding collision resolution used
+ * by {@code Entity.moveEntity}.
+ */
 public final class AxisAlignedBB {
+
 	public double minX;
 	public double minY;
 	public double minZ;
@@ -8,262 +17,212 @@ public final class AxisAlignedBB {
 	public double maxY;
 	public double maxZ;
 
-	public AxisAlignedBB(double var1, double var3, double var5, double var7, double var9, double var11) {
-		this.minX = var1;
-		this.minY = var3;
-		this.minZ = var5;
-		this.maxX = var7;
-		this.maxY = var9;
-		this.maxZ = var11;
+	public AxisAlignedBB(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
+		this.minX = minX;
+		this.minY = minY;
+		this.minZ = minZ;
+		this.maxX = maxX;
+		this.maxY = maxY;
+		this.maxZ = maxZ;
 	}
 
-	public final AxisAlignedBB addCoord(double var1, double var3, double var5) {
-		double var7 = this.minX;
-		double var9 = this.minY;
-		double var11 = this.minZ;
-		double var13 = this.maxX;
-		double var15 = this.maxY;
-		double var17 = this.maxZ;
-		if(var1 < 0.0D) {
-			var7 += var1;
+	/**
+	 * The swept volume of this box while moving by (x, y, z): each face extends,
+	 * but only into the direction of travel (negative travel grows the min side,
+	 * positive travel the max side). Used to move a box's collision test through
+	 * one frame of motion.
+	 */
+	public final AxisAlignedBB addCoord(double travelX, double travelY, double travelZ) {
+		double newMinX = this.minX;
+		double newMinY = this.minY;
+		double newMinZ = this.minZ;
+		double newMaxX = this.maxX;
+		double newMaxY = this.maxY;
+		double newMaxZ = this.maxZ;
+		if (travelX < 0.0D) {
+			newMinX += travelX;
 		}
-
-		if(var1 > 0.0D) {
-			var13 += var1;
+		if (travelX > 0.0D) {
+			newMaxX += travelX;
 		}
-
-		if(var3 < 0.0D) {
-			var9 += var3;
+		if (travelY < 0.0D) {
+			newMinY += travelY;
 		}
-
-		if(var3 > 0.0D) {
-			var15 += var3;
+		if (travelY > 0.0D) {
+			newMaxY += travelY;
 		}
-
-		if(var5 < 0.0D) {
-			var11 += var5;
+		if (travelZ < 0.0D) {
+			newMinZ += travelZ;
 		}
-
-		if(var5 > 0.0D) {
-			var17 += var5;
+		if (travelZ > 0.0D) {
+			newMaxZ += travelZ;
 		}
-
-		return new AxisAlignedBB(var7, var9, var11, var13, var15, var17);
+		return new AxisAlignedBB(newMinX, newMinY, newMinZ, newMaxX, newMaxY, newMaxZ);
 	}
 
-	public final AxisAlignedBB expand(double var1, double var3, double var5) {
-		if(this.minY > this.maxY) {
+	/**
+	 * This box inflated by the given offsets on both sides of each axis. The guard
+	 * against Y-inverted boxes is a long-standing part of the original code (and its
+	 * famous exception message is kept verbatim).
+	 */
+	public final AxisAlignedBB expand(double offsetX, double offsetY, double offsetZ) {
+		if (this.minY > this.maxY) {
 			throw new IllegalArgumentException("NOOOOOO!");
-		} else {
-			double var7 = this.minX - var1;
-			double var9 = this.minY - var3;
-			double var11 = this.minZ - var5;
-			double var13 = this.maxX + var1;
-			double var15 = this.maxY + var3;
-			double var17 = this.maxZ + var5;
-			return new AxisAlignedBB(var7, var9, var11, var13, var15, var17);
 		}
+		return new AxisAlignedBB(
+			this.minX - offsetX, this.minY - offsetY, this.minZ - offsetZ,
+			this.maxX + offsetX, this.maxY + offsetY, this.maxZ + offsetZ
+		);
 	}
 
-	public final AxisAlignedBB offsetCopy(double var1, double var3, double var5) {
-		return new AxisAlignedBB(this.minX + var1, this.minY + var3, this.minZ + var5, this.maxX + var1, this.maxY + var3, this.maxZ + var5);
+	/** A copy of this box translated by the given offsets. */
+	public final AxisAlignedBB offsetCopy(double offsetX, double offsetY, double offsetZ) {
+		return new AxisAlignedBB(
+			this.minX + offsetX, this.minY + offsetY, this.minZ + offsetZ,
+			this.maxX + offsetX, this.maxY + offsetY, this.maxZ + offsetZ
+		);
 	}
 
-	public final double calculateXOffset(AxisAlignedBB var1, double var2) {
-		if(var1.maxY > this.minY && var1.minY < this.maxY) {
-			if(var1.maxZ > this.minZ && var1.minZ < this.maxZ) {
-				double var4;
-				if(var2 > 0.0D && var1.maxX <= this.minX) {
-					var4 = this.minX - var1.maxX;
-					if(var4 < var2) {
-						var2 = var4;
-					}
+	/**
+	 * The largest X step {@code movingBox} may take before it touches this box
+	 * (the collider): the requested {@code stepX}, clamped to the gap between the
+	 * two boxes when they already overlap in Y and Z and the step would push the
+	 * mover into this one. When there is no overlap on one of the other axes, or
+	 * the step moves away, it is returned unchanged.
+	 */
+	public final double calculateXOffset(AxisAlignedBB movingBox, double stepX) {
+		if (movingBox.maxY > this.minY && movingBox.minY < this.maxY && movingBox.maxZ > this.minZ && movingBox.minZ < this.maxZ) {
+			double maxStep;
+			if (stepX > 0.0D && movingBox.maxX <= this.minX) {
+				maxStep = this.minX - movingBox.maxX;
+				if (maxStep < stepX) {
+					stepX = maxStep;
 				}
-
-				if(var2 < 0.0D && var1.minX >= this.maxX) {
-					var4 = this.maxX - var1.minX;
-					if(var4 > var2) {
-						var2 = var4;
-					}
-				}
-
-				return var2;
-			} else {
-				return var2;
 			}
-		} else {
-			return var2;
-		}
-	}
-
-	public final double calculateYOffset(AxisAlignedBB var1, double var2) {
-		if(var1.maxX > this.minX && var1.minX < this.maxX) {
-			if(var1.maxZ > this.minZ && var1.minZ < this.maxZ) {
-				double var4;
-				if(var2 > 0.0D && var1.maxY <= this.minY) {
-					var4 = this.minY - var1.maxY;
-					if(var4 < var2) {
-						var2 = var4;
-					}
+			if (stepX < 0.0D && movingBox.minX >= this.maxX) {
+				maxStep = this.maxX - movingBox.minX;
+				if (maxStep > stepX) {
+					stepX = maxStep;
 				}
-
-				if(var2 < 0.0D && var1.minY >= this.maxY) {
-					var4 = this.maxY - var1.minY;
-					if(var4 > var2) {
-						var2 = var4;
-					}
-				}
-
-				return var2;
-			} else {
-				return var2;
 			}
-		} else {
-			return var2;
 		}
+		return stepX;
 	}
 
-	public final double calculateZOffset(AxisAlignedBB var1, double var2) {
-		if(var1.maxX > this.minX && var1.minX < this.maxX) {
-			if(var1.maxY > this.minY && var1.minY < this.maxY) {
-				double var4;
-				if(var2 > 0.0D && var1.maxZ <= this.minZ) {
-					var4 = this.minZ - var1.maxZ;
-					if(var4 < var2) {
-						var2 = var4;
-					}
+	/** The largest Y step, see {@link #calculateXOffset}. */
+	public final double calculateYOffset(AxisAlignedBB movingBox, double stepY) {
+		if (movingBox.maxX > this.minX && movingBox.minX < this.maxX && movingBox.maxZ > this.minZ && movingBox.minZ < this.maxZ) {
+			double maxStep;
+			if (stepY > 0.0D && movingBox.maxY <= this.minY) {
+				maxStep = this.minY - movingBox.maxY;
+				if (maxStep < stepY) {
+					stepY = maxStep;
 				}
-
-				if(var2 < 0.0D && var1.minZ >= this.maxZ) {
-					var4 = this.maxZ - var1.minZ;
-					if(var4 > var2) {
-						var2 = var4;
-					}
-				}
-
-				return var2;
-			} else {
-				return var2;
 			}
-		} else {
-			return var2;
+			if (stepY < 0.0D && movingBox.minY >= this.maxY) {
+				maxStep = this.maxY - movingBox.minY;
+				if (maxStep > stepY) {
+					stepY = maxStep;
+				}
+			}
 		}
+		return stepY;
 	}
 
-	public final boolean intersectsWith(AxisAlignedBB var1) {
-		return var1.maxX > this.minX && var1.minX < this.maxX ? (var1.maxY > this.minY && var1.minY < this.maxY ? var1.maxZ > this.minZ && var1.minZ < this.maxZ : false) : false;
+	/** The largest Z step, see {@link #calculateXOffset}. */
+	public final double calculateZOffset(AxisAlignedBB movingBox, double stepZ) {
+		if (movingBox.maxX > this.minX && movingBox.minX < this.maxX && movingBox.maxY > this.minY && movingBox.minY < this.maxY) {
+			double maxStep;
+			if (stepZ > 0.0D && movingBox.maxZ <= this.minZ) {
+				maxStep = this.minZ - movingBox.maxZ;
+				if (maxStep < stepZ) {
+					stepZ = maxStep;
+				}
+			}
+			if (stepZ < 0.0D && movingBox.minZ >= this.maxZ) {
+				maxStep = this.maxZ - movingBox.minZ;
+				if (maxStep > stepZ) {
+					stepZ = maxStep;
+				}
+			}
+		}
+		return stepZ;
 	}
 
-	public final void offset(double var1, double var3, double var5) {
-		this.minX += var1;
-		this.minY += var3;
-		this.minZ += var5;
-		this.maxX += var1;
-		this.maxY += var3;
-		this.maxZ += var5;
+	/** Whether the two boxes overlap in all three axes (boundaries not included). */
+	public final boolean intersectsWith(AxisAlignedBB otherBox) {
+		return otherBox.maxX > this.minX && otherBox.minX < this.maxX
+			&& otherBox.maxY > this.minY && otherBox.minY < this.maxY
+			&& otherBox.maxZ > this.minZ && otherBox.minZ < this.maxZ;
 	}
 
+	/** Translates this box in place by the given offsets. */
+	public final void offset(double offsetX, double offsetY, double offsetZ) {
+		this.minX += offsetX;
+		this.minY += offsetY;
+		this.minZ += offsetZ;
+		this.maxX += offsetX;
+		this.maxY += offsetY;
+		this.maxZ += offsetZ;
+	}
+
+	/** A fresh copy of this box. */
 	public final AxisAlignedBB copy() {
 		return new AxisAlignedBB(this.minX, this.minY, this.minZ, this.maxX, this.maxY, this.maxZ);
 	}
 
-	public final MovingObjectPosition calculateIntercept(Vec3D var1, Vec3D var2) {
-		Vec3D var3 = var1.getIntermediateWithXValue(var2, this.minX);
-		Vec3D var4 = var1.getIntermediateWithXValue(var2, this.maxX);
-		Vec3D var5 = var1.getIntermediateWithYValue(var2, this.minY);
-		Vec3D var6 = var1.getIntermediateWithYValue(var2, this.maxY);
-		Vec3D var7 = var1.getIntermediateWithZValue(var2, this.minZ);
-		var2 = var1.getIntermediateWithZValue(var2, this.maxZ);
-		if(!this.isVecInYZ(var3)) {
-			var3 = null;
-		}
+	/**
+	 * The point at which the ray from {@code startVector} to {@code endVector} first
+	 * pierces this box, wrapped as a {@link MovingObjectPosition} whose side code
+	 * identifies the pierced face (0 = −Y, 1 = +Y, 2 = −Z, 3 = +Z, 4 = −X, 5 = +X),
+	 * or {@code null} when the ray misses the box. Each face plane is intersected
+	 * first, then the hit point must actually sit on the face — the nearest such
+	 * point wins, with earlier planes breaking ties (the order the original used).
+	 */
+	public final MovingObjectPosition calculateIntercept(Vec3D startVector, Vec3D endVector) {
+		Vec3D[] planePoints = {
+			startVector.getIntermediateWithXValue(endVector, this.minX),
+			startVector.getIntermediateWithXValue(endVector, this.maxX),
+			startVector.getIntermediateWithYValue(endVector, this.minY),
+			startVector.getIntermediateWithYValue(endVector, this.maxY),
+			startVector.getIntermediateWithZValue(endVector, this.minZ),
+			startVector.getIntermediateWithZValue(endVector, this.maxZ)
+		};
+		int[] sideHits = {4, 5, 0, 1, 2, 3};
 
-		if(!this.isVecInYZ(var4)) {
-			var4 = null;
+		Vec3D closestPoint = null;
+		int closestSide = -1;
+		for (int plane = 0; plane < planePoints.length; ++plane) {
+			Vec3D point = planePoints[plane];
+			if (this.isPointOnPlane(plane, point) && (closestPoint == null || startVector.squareDistanceTo(point) < startVector.squareDistanceTo(closestPoint))) {
+				closestPoint = point;
+				closestSide = sideHits[plane];
+			}
 		}
-
-		if(!this.isVecInXZ(var5)) {
-			var5 = null;
-		}
-
-		if(!this.isVecInXZ(var6)) {
-			var6 = null;
-		}
-
-		if(!this.isVecInXY(var7)) {
-			var7 = null;
-		}
-
-		if(!this.isVecInXY(var2)) {
-			var2 = null;
-		}
-
-		Vec3D var8 = null;
-		if(var3 != null) {
-			var8 = var3;
-		}
-
-		if(var4 != null && (var8 == null || var1.squareDistanceTo(var4) < var1.squareDistanceTo(var8))) {
-			var8 = var4;
-		}
-
-		if(var5 != null && (var8 == null || var1.squareDistanceTo(var5) < var1.squareDistanceTo(var8))) {
-			var8 = var5;
-		}
-
-		if(var6 != null && (var8 == null || var1.squareDistanceTo(var6) < var1.squareDistanceTo(var8))) {
-			var8 = var6;
-		}
-
-		if(var7 != null && (var8 == null || var1.squareDistanceTo(var7) < var1.squareDistanceTo(var8))) {
-			var8 = var7;
-		}
-
-		if(var2 != null && (var8 == null || var1.squareDistanceTo(var2) < var1.squareDistanceTo(var8))) {
-			var8 = var2;
-		}
-
-		if(var8 == null) {
+		if (closestPoint == null) {
 			return null;
-		} else {
-			byte var9 = -1;
-			if(var8 == var3) {
-				var9 = 4;
-			}
-
-			if(var8 == var4) {
-				var9 = 5;
-			}
-
-			if(var8 == var5) {
-				var9 = 0;
-			}
-
-			if(var8 == var6) {
-				var9 = 1;
-			}
-
-			if(var8 == var7) {
-				var9 = 2;
-			}
-
-			if(var8 == var2) {
-				var9 = 3;
-			}
-
-			return new MovingObjectPosition(0, 0, 0, var9, var8);
 		}
+		return new MovingObjectPosition(0, 0, 0, closestSide, closestPoint);
 	}
 
-	private boolean isVecInYZ(Vec3D var1) {
-		return var1 == null ? false : var1.yCoord >= this.minY && var1.yCoord <= this.maxY && var1.zCoord >= this.minZ && var1.zCoord <= this.maxZ;
-	}
-
-	private boolean isVecInXZ(Vec3D var1) {
-		return var1 == null ? false : var1.xCoord >= this.minX && var1.xCoord <= this.maxX && var1.zCoord >= this.minZ && var1.zCoord <= this.maxZ;
-	}
-
-	private boolean isVecInXY(Vec3D var1) {
-		return var1 == null ? false : var1.xCoord >= this.minX && var1.xCoord <= this.maxX && var1.yCoord >= this.minY && var1.yCoord <= this.maxY;
+	/**
+	 * Whether {@code point} lies on the {@code plane}-th face plane of this box, i.e.
+	 * within the box's bounds on the two axes the plane does not fix. A {@code null}
+	 * point (the segment never crossed that plane) is not on it.
+	 */
+	private boolean isPointOnPlane(int plane, Vec3D point) {
+		if (point == null) {
+			return false;
+		}
+		switch (plane) {
+			case 0:
+			case 1: // X− / X+ faces: only Y and Z are constrained.
+				return point.yCoord >= this.minY && point.yCoord <= this.maxY && point.zCoord >= this.minZ && point.zCoord <= this.maxZ;
+			case 2:
+			case 3: // Y− / Y+ faces: only X and Z are constrained.
+				return point.xCoord >= this.minX && point.xCoord <= this.maxX && point.zCoord >= this.minZ && point.zCoord <= this.maxZ;
+			default: // Z− / Z+ faces: only X and Y are constrained.
+				return point.xCoord >= this.minX && point.xCoord <= this.maxX && point.yCoord >= this.minY && point.yCoord <= this.maxY;
+		}
 	}
 }

@@ -2,81 +2,113 @@ package net.minecraft.game.physics;
 
 import util.MathHelper;
 
+/**
+ * An immutable 3D double-precision vector — the everyday math primitive of the
+ * physics package. Instances are short-lived: every method that behaves like a
+ * point transform returns a fresh vector, so the objects used for ray tracing
+ * and distance checks can be shared freely.
+ */
 public final class Vec3D {
+
 	public double xCoord;
 	public double yCoord;
 	public double zCoord;
 
-	public Vec3D(double var1, double var3, double var5) {
-		this.xCoord = var1;
-		this.yCoord = var3;
-		this.zCoord = var5;
+	public Vec3D(double xCoord, double yCoord, double zCoord) {
+		this.xCoord = xCoord;
+		this.yCoord = yCoord;
+		this.zCoord = zCoord;
 	}
 
-	public final Vec3D subtract(Vec3D var1) {
-		return new Vec3D(this.xCoord - var1.xCoord, this.yCoord - var1.yCoord, this.zCoord - var1.zCoord);
+	/** The vector pointing from {@code other} to this vector. */
+	public final Vec3D subtract(Vec3D other) {
+		return new Vec3D(this.xCoord - other.xCoord, this.yCoord - other.yCoord, this.zCoord - other.zCoord);
 	}
 
+	/** A unit vector pointing in the same direction as this one. */
 	public final Vec3D normalize() {
-		double var1 = (double)MathHelper.sqrt_double(this.xCoord * this.xCoord + this.yCoord * this.yCoord + this.zCoord * this.zCoord);
-		return new Vec3D(this.xCoord / var1, this.yCoord / var1, this.zCoord / var1);
+		double length = MathHelper.sqrt_double(this.xCoord * this.xCoord + this.yCoord * this.yCoord + this.zCoord * this.zCoord);
+		return new Vec3D(this.xCoord / length, this.yCoord / length, this.zCoord / length);
 	}
 
-	public final Vec3D addVector(double var1, double var3, double var5) {
-		return new Vec3D(this.xCoord + var1, this.yCoord + var3, this.zCoord + var5);
+	/** This vector translated by the given offsets. */
+	public final Vec3D addVector(double offsetX, double offsetY, double offsetZ) {
+		return new Vec3D(this.xCoord + offsetX, this.yCoord + offsetY, this.zCoord + offsetZ);
 	}
 
-	public final double distance(Vec3D var1) {
-		double var2 = var1.xCoord - this.xCoord;
-		double var4 = var1.yCoord - this.yCoord;
-		double var6 = var1.zCoord - this.zCoord;
-		return (double)MathHelper.sqrt_double(var2 * var2 + var4 * var4 + var6 * var6);
+	/** Euclidean distance to {@code other}. */
+	public final double distance(Vec3D other) {
+		double dx = other.xCoord - this.xCoord;
+		double dy = other.yCoord - this.yCoord;
+		double dz = other.zCoord - this.zCoord;
+		return MathHelper.sqrt_double(dx * dx + dy * dy + dz * dz);
 	}
 
-	public final double squareDistanceTo(Vec3D var1) {
-		double var2 = var1.xCoord - this.xCoord;
-		double var4 = var1.yCoord - this.yCoord;
-		double var6 = var1.zCoord - this.zCoord;
-		return var2 * var2 + var4 * var4 + var6 * var6;
+	/** Squared Euclidean distance to {@code other}; avoids the square root when only the ranking matters. */
+	public final double squareDistanceTo(Vec3D other) {
+		double dx = other.xCoord - this.xCoord;
+		double dy = other.yCoord - this.yCoord;
+		double dz = other.zCoord - this.zCoord;
+		return dx * dx + dy * dy + dz * dz;
 	}
 
-	public final Vec3D getIntermediateWithXValue(Vec3D var1, double var2) {
-		double var4 = var1.xCoord - this.xCoord;
-		double var6 = var1.yCoord - this.yCoord;
-		double var8 = var1.zCoord - this.zCoord;
-		if(var4 * var4 < (double)1.0E-7F) {
+	/**
+	 * The point along the segment from this vector to {@code end} that crosses the
+	 * given X plane, or {@code null} when the segment stays entirely on one side of
+	 * that plane (runs parallel to it or does not reach it). The three
+	 * {@code getIntermediateWith*} helpers share one implementation.
+	 */
+	public final Vec3D getIntermediateWithXValue(Vec3D end, double targetX) {
+		return this.getIntermediateOnAxis(end, targetX, Axis.X);
+	}
+
+	/** The point crossing {@code targetY}, see {@link #getIntermediateWithXValue}. */
+	public final Vec3D getIntermediateWithYValue(Vec3D end, double targetY) {
+		return this.getIntermediateOnAxis(end, targetY, Axis.Y);
+	}
+
+	/** The point crossing {@code targetZ}, see {@link #getIntermediateWithXValue}. */
+	public final Vec3D getIntermediateWithZValue(Vec3D end, double targetZ) {
+		return this.getIntermediateOnAxis(end, targetZ, Axis.Z);
+	}
+
+	/** Shared interpolation behind the three {@code getIntermediateWith*} helpers. */
+	private Vec3D getIntermediateOnAxis(Vec3D end, double targetValue, Axis axis) {
+		double dx = end.xCoord - this.xCoord;
+		double dy = end.yCoord - this.yCoord;
+		double dz = end.zCoord - this.zCoord;
+		double axisDelta = axis.component(end) - axis.component(this);
+		if (axisDelta * axisDelta < (double) 1.0E-7F) {
+			// The segment runs parallel to that axis' planes — it never crosses them.
 			return null;
-		} else {
-			double var10 = (var2 - this.xCoord) / var4;
-			return var10 >= 0.0D && var10 <= 1.0D ? new Vec3D(this.xCoord + var4 * var10, this.yCoord + var6 * var10, this.zCoord + var8 * var10) : null;
+		}
+		double progress = (targetValue - axis.component(this)) / axisDelta;
+		if (progress < 0.0D || progress > 1.0D) {
+			// The crossing lies outside the segment.
+			return null;
+		}
+		return new Vec3D(this.xCoord + dx * progress, this.yCoord + dy * progress, this.zCoord + dz * progress);
+	}
+
+	/** One of the three coordinate axes, used to parameterize the shared helper above. */
+	private enum Axis {
+		X, Y, Z;
+
+		/** The component of {@code vec} on this axis. */
+		double component(Vec3D vec) {
+			switch (this) {
+				case X:
+					return vec.xCoord;
+				case Y:
+					return vec.yCoord;
+				default:
+					return vec.zCoord;
+			}
 		}
 	}
 
-	public final Vec3D getIntermediateWithYValue(Vec3D var1, double var2) {
-		double var4 = var1.xCoord - this.xCoord;
-		double var6 = var1.yCoord - this.yCoord;
-		double var8 = var1.zCoord - this.zCoord;
-		if(var6 * var6 < (double)1.0E-7F) {
-			return null;
-		} else {
-			double var10 = (var2 - this.yCoord) / var6;
-			return var10 >= 0.0D && var10 <= 1.0D ? new Vec3D(this.xCoord + var4 * var10, this.yCoord + var6 * var10, this.zCoord + var8 * var10) : null;
-		}
-	}
-
-	public final Vec3D getIntermediateWithZValue(Vec3D var1, double var2) {
-		double var4 = var1.xCoord - this.xCoord;
-		double var6 = var1.yCoord - this.yCoord;
-		double var8 = var1.zCoord - this.zCoord;
-		if(var8 * var8 < (double)1.0E-7F) {
-			return null;
-		} else {
-			double var10 = (var2 - this.zCoord) / var8;
-			return var10 >= 0.0D && var10 <= 1.0D ? new Vec3D(this.xCoord + var4 * var10, this.yCoord + var6 * var10, this.zCoord + var8 * var10) : null;
-		}
-	}
-
-	public final String toString() {
+	@Override
+	public String toString() {
 		return "(" + this.xCoord + ", " + this.yCoord + ", " + this.zCoord + ")";
 	}
 }

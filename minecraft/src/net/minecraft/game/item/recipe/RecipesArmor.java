@@ -1,22 +1,41 @@
 package net.minecraft.game.item.recipe;
 
 import net.minecraft.game.item.Item;
-import net.minecraft.game.item.ItemStack;
 import net.minecraft.game.world.block.Block;
 
-public final class RecipesArmor {
-	private String[][] recipePatterns = new String[][]{{"XXX", "X X"}, {"X X", "XXX", "XXX"}, {"XXX", "X X", "X X"}, {"X X", "X X"}};
-	private Object[][] recipeItems = new Object[][]{{Block.clothGray, Block.fire, Item.ingotIron, Item.diamod, Item.ingotGold}, {Item.helmetLeather, Item.helmetChain, Item.helmetSteel, Item.helmetDiamond, Item.helmetGold}, {Item.plateLeather, Item.plateChain, Item.plateSteel, Item.plateDiamond, Item.plateGold}, {Item.legsLeather, Item.legsChain, Item.legsSteel, Item.legsDiamond, Item.legsGold}, {Item.bootsLeather, Item.bootsChain, Item.bootsSteel, Item.bootsDiamond, Item.bootsGold}};
+/**
+ * Shaped recipes for all four armour pieces, once per material tier. The shapes cover
+ * helmet, chest plate, leggings and boots; the results fill the armour slots of an
+ * entity's inventory ({@link net.minecraft.game.entity.EntityLiving}).
+ *
+ * <p>This pre-release version knows only five materials per slot — and it predates the
+ * modern "chainmail needs iron" recipe: chain armour is forged out of literal
+ * <em>fire</em> ({@link Block#fire}). A genuine Infdev quirk, preserved faithfully.
+ */
+public final class RecipesArmor extends RecipesTiered {
 
-	public final void addRecipe(CraftingManager var1) {
-		for(int var2 = 0; var2 < this.recipeItems[0].length; ++var2) {
-			Object var3 = this.recipeItems[0][var2];
+	/** The helmet, chest plate, leggings and boots shapes. */
+	private static final String[][] ARMOUR_PATTERNS = {
+		{"XXX", "X X"},
+		{"X X", "XXX", "XXX"},
+		{"XXX", "X X", "X X"},
+		{"X X", "X X"}
+	};
 
-			for(int var4 = 0; var4 < this.recipeItems.length - 1; ++var4) {
-				Item var5 = (Item)this.recipeItems[var4 + 1][var2];
-				var1.addRecipe(new ItemStack(var5), new Object[]{this.recipePatterns[var4], Character.valueOf('X'), var3});
-			}
-		}
+	/** The five armour materials: leather, chain (fire!), steel, diamond and gold. */
+	private static final Object[] ARMOUR_MATERIALS = {
+		Block.clothGray, Block.fire, Item.ingotIron, Item.diamod, Item.ingotGold
+	};
 
+	/** Output item per (armour piece, material) pair. */
+	private static final Item[][] ARMOUR_OUTPUTS = {
+		{Item.helmetLeather, Item.helmetChain, Item.helmetSteel, Item.helmetDiamond, Item.helmetGold},
+		{Item.plateLeather, Item.plateChain, Item.plateSteel, Item.plateDiamond, Item.plateGold},
+		{Item.legsLeather, Item.legsChain, Item.legsSteel, Item.legsDiamond, Item.legsGold},
+		{Item.bootsLeather, Item.bootsChain, Item.bootsSteel, Item.bootsDiamond, Item.bootsGold}
+	};
+
+	public RecipesArmor() {
+		super(ARMOUR_PATTERNS, ARMOUR_MATERIALS, ARMOUR_OUTPUTS);
 	}
 }

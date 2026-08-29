@@ -1,108 +1,145 @@
 package net.minecraft.game.item.recipe;
 
 import java.util.ArrayList;
-import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import net.minecraft.game.item.Item;
 import net.minecraft.game.item.ItemStack;
 import net.minecraft.game.world.block.Block;
 
+/**
+ * The singleton catalogue of every shaped recipe the game knows. A recipe is just a
+ * pattern of item ids; the 3×3 crafting matrix of the crafting table
+ * ({@link net.minecraft.client.gui.container.GuiCrafting}) as well as the small 2×2
+ * one on the survival screen are both matched against this catalogue via
+ * {@link #findMatchingRecipe(int[])}.
+ */
 public final class CraftingManager {
+
 	private static final CraftingManager instance = new CraftingManager();
-	private List<CraftingRecipe> recipes = new ArrayList<>();
+
+	private final List<CraftingRecipe> recipes = new ArrayList<>();
 
 	public static final CraftingManager getInstance() {
 		return instance;
 	}
 
+	/**
+	 * Builds the whole recipe table, registering the recipes in their original
+	 * order and then sorting the list biggest-pattern-first. The sort matters:
+	 * {@link #findMatchingRecipe(int[])} returns the first match, so a large shape
+	 * must win over a small one that happens to also fit.
+	 */
 	private CraftingManager() {
-		(new RecipesTools()).addRecipes(this);
-		(new RecipesWeapons()).addRecipe(this);
-		(new RecipesIngots()).addRecipe(this);
-		new RecipesFood();
-		this.addRecipe(new ItemStack(Item.bowlSoup), new Object[]{"Y", "X", "#", Character.valueOf('X'), Block.mushroomBrown, Character.valueOf('Y'), Block.mushroomRed, Character.valueOf('#'), Item.bowlEmpty});
-		this.addRecipe(new ItemStack(Item.bowlSoup), new Object[]{"Y", "X", "#", Character.valueOf('X'), Block.mushroomRed, Character.valueOf('Y'), Block.mushroomBrown, Character.valueOf('#'), Item.bowlEmpty});
-		new RecipesCrafting();
-		this.addRecipe(new ItemStack(Block.chest), new Object[]{"###", "# #", "###", Character.valueOf('#'), Block.planks});
-		this.addRecipe(new ItemStack(Block.stoneOvenIdle), new Object[]{"###", "# #", "###", Character.valueOf('#'), Block.cobblestone});
-		this.addRecipe(new ItemStack(Block.workbench), new Object[]{"##", "##", Character.valueOf('#'), Block.planks});
-		(new RecipesArmor()).addRecipe(this);
-		this.addRecipe(new ItemStack(Block.clothGray, 1), new Object[]{"###", "###", "###", Character.valueOf('#'), Item.silk});
-		this.addRecipe(new ItemStack(Block.tnt, 1), new Object[]{"X#X", "#X#", "X#X", Character.valueOf('X'), Item.gunpowder, Character.valueOf('#'), Block.sand});
-		this.addRecipe(new ItemStack(Block.stairSingle, 3), new Object[]{"###", Character.valueOf('#'), Block.cobblestone});
-		this.addRecipe(new ItemStack(Block.planks, 4), new Object[]{"#", Character.valueOf('#'), Block.wood});
-		this.addRecipe(new ItemStack(Item.stick, 4), new Object[]{"#", "#", Character.valueOf('#'), Block.planks});
-		this.addRecipe(new ItemStack(Block.torch, 4), new Object[]{"X", "#", Character.valueOf('X'), Item.coal, Character.valueOf('#'), Item.stick});
-		this.addRecipe(new ItemStack(Item.bowlEmpty, 4), new Object[]{"# #", " # ", Character.valueOf('#'), Block.planks});
-		this.addRecipe(new ItemStack(Item.flintAndSteel, 1), new Object[]{"A ", " B", Character.valueOf('A'), Item.ingotIron, Character.valueOf('B'), Item.flint});
-		this.addRecipe(new ItemStack(Item.bread, 1), new Object[]{"###", Character.valueOf('#'), Item.wheat});
-		this.addRecipe(new ItemStack(Item.painting, 1), new Object[]{"###", "#X#", "###", Character.valueOf('#'), Item.stick, Character.valueOf('X'), Block.clothGray});
-		this.addRecipe(new ItemStack(Item.appleGold, 1), new Object[]{"###", "#X#", "###", Character.valueOf('#'), Block.blockGold, Character.valueOf('X'), Item.apple});
-		Collections.sort(this.recipes, new RecipeSorter(this));
+		new RecipesTools().addRecipe(this);
+		new RecipesWeapons().addRecipe(this);
+		new RecipesIngots().addRecipe(this);
+
+		// Mushroom soup — the mushrooms may sit in either order.
+		this.addRecipe(new ItemStack(Item.bowlSoup), "Y", "X", "#", 'Y', Block.mushroomRed, 'X', Block.mushroomBrown, '#', Item.bowlEmpty);
+		this.addRecipe(new ItemStack(Item.bowlSoup), "Y", "X", "#", 'Y', Block.mushroomBrown, 'X', Block.mushroomRed, '#', Item.bowlEmpty);
+
+		// The storage and craft blocks.
+		this.addRecipe(new ItemStack(Block.chest), "###", "# #", "###", '#', Block.planks);
+		this.addRecipe(new ItemStack(Block.stoneOvenIdle), "###", "# #", "###", '#', Block.cobblestone);
+		this.addRecipe(new ItemStack(Block.workbench), "##", "##", '#', Block.planks);
+		new RecipesArmor().addRecipe(this);
+
+		// The rest, in their original registration order.
+		this.addRecipe(new ItemStack(Block.clothGray, 1), "###", "###", "###", '#', Item.silk);
+		this.addRecipe(new ItemStack(Block.tnt, 1), "X#X", "#X#", "X#X", 'X', Item.gunpowder, '#', Block.sand);
+		this.addRecipe(new ItemStack(Block.stairSingle, 3), "###", '#', Block.cobblestone);
+		this.addRecipe(new ItemStack(Block.planks, 4), "#", '#', Block.wood);
+		this.addRecipe(new ItemStack(Item.stick, 4), "#", "#", '#', Block.planks);
+		this.addRecipe(new ItemStack(Block.torch, 4), "X", "#", 'X', Item.coal, '#', Item.stick);
+		this.addRecipe(new ItemStack(Item.bowlEmpty, 4), "# #", " # ", '#', Block.planks);
+		this.addRecipe(new ItemStack(Item.flintAndSteel, 1), "A ", " B", 'A', Item.ingotIron, 'B', Item.flint);
+		this.addRecipe(new ItemStack(Item.bread, 1), "###", '#', Item.wheat);
+		this.addRecipe(new ItemStack(Item.painting, 1), "###", "#X#", "###", '#', Item.stick, 'X', Block.clothGray);
+		this.addRecipe(new ItemStack(Item.appleGold, 1), "###", "#X#", "###", '#', Block.blockGold, 'X', Item.apple);
+
+		this.recipes.sort(Comparator.comparingInt(CraftingRecipe::getRecipeArea).reversed());
 		System.out.println(this.recipes.size() + " recipes");
 	}
 
-	final void addRecipe(ItemStack var1, Object... var2) {
-		String var3 = "";
-		int var4 = 0;
-		int var5 = 0;
-		int var6 = 0;
-		if(var2[0] instanceof String[]) {
-			++var4;
-			String[] var11 = (String[])var2[0];
+	/**
+	 * Registers one shaped recipe. The varargs {@code parts} read in two sections:
+	 * <ol>
+	 * <li><b>the shape</b> — either a single {@code String[]} of equal-length rows,
+	 * or a run of consecutive {@code String} rows (one character per cell, any
+	 * character serves as a symbol);</li>
+	 * <li><b>one {@code Character} + ingredient pair per symbol</b>, where an
+	 * ingredient may be an {@link Item} or a {@link Block}. A symbol without a
+	 * matching pair simply means "empty cell".</li>
+	 * </ol>
+	 * Every row must have the same length; the shape's bounding box becomes the
+	 * recipe's width and height.
+	 */
+	final void addRecipe(ItemStack recipeOutput, Object... parts) {
+		int width = 0;
+		int height = 0;
+		String shapeFlat = "";
+		int cursor = 0;
 
-			for(int var8 = 0; var8 < var11.length; ++var8) {
-				String var9 = var11[var8];
-				++var6;
-				var5 = var9.length();
-				var3 = var3 + var9;
+		if (parts[0] instanceof String[]) {
+			String[] rows = (String[]) parts[0];
+			cursor = 1;
+			for (String row : rows) {
+				width = row.length();
+				++height;
+				shapeFlat += row;
 			}
 		} else {
-			while(var2[var4] instanceof String) {
-				String var7 = (String)var2[var4++];
-				++var6;
-				var5 = var7.length();
-				var3 = var3 + var7;
+			while (parts[cursor] instanceof String) {
+				String row = (String) parts[cursor++];
+				width = row.length();
+				++height;
+				shapeFlat += row;
 			}
 		}
 
-		HashMap<Character, Integer> var12;
-		int var15;
-		for(var12 = new HashMap<>(); var4 < var2.length; var4 += 2) {
-			Character var13 = (Character)var2[var4];
-			var15 = 0;
-			if(var2[var4 + 1] instanceof Item) {
-				var15 = ((Item)var2[var4 + 1]).shiftedIndex;
-			} else if(var2[var4 + 1] instanceof Block) {
-				var15 = ((Block)var2[var4 + 1]).blockID;
-			}
-
-			var12.put(var13, Integer.valueOf(var15));
+		Map<Character, Integer> symbolToItemId = new HashMap<>();
+		for (; cursor < parts.length; cursor += 2) {
+			Character symbol = (Character) parts[cursor];
+			symbolToItemId.put(symbol, ingredientId(parts[cursor + 1]));
 		}
 
-		int[] var14 = new int[var5 * var6];
-
-		for(var15 = 0; var15 < var5 * var6; ++var15) {
-			char var10 = var3.charAt(var15);
-			if(var12.containsKey(Character.valueOf(var10))) {
-				var14[var15] = var12.get(Character.valueOf(var10)).intValue();
-			} else {
-				var14[var15] = -1;
-			}
+		int cellCount = width * height;
+		int[] ingredientGrid = new int[cellCount];
+		for (int cell = 0; cell < cellCount; ++cell) {
+			char symbol = shapeFlat.charAt(cell);
+			ingredientGrid[cell] = symbolToItemId.containsKey(symbol) ? symbolToItemId.get(symbol) : -1;
 		}
 
-		this.recipes.add(new CraftingRecipe(var5, var6, var14, var1));
+		this.recipes.add(new CraftingRecipe(width, height, ingredientGrid, recipeOutput));
 	}
 
-	public final ItemStack findMatchingRecipe(int[] var1) {
-		for(int var2 = 0; var2 < this.recipes.size(); ++var2) {
-			CraftingRecipe var3 = this.recipes.get(var2);
-			if(var3.matchRecipe(var1)) {
-				return var3.createResult();
-			}
+	/**
+	 * The grid id of one ingredient: items use their shifted index, blocks their
+	 * block id, anything else maps to id 0.
+	 */
+	private static int ingredientId(Object ingredient) {
+		if (ingredient instanceof Item) {
+			return ((Item) ingredient).shiftedIndex;
 		}
+		if (ingredient instanceof Block) {
+			return ((Block) ingredient).blockID;
+		}
+		return 0;
+	}
 
-		return null;
+	/**
+	 * The result of the first recipe matching the given 3×3 crafting matrix, or
+	 * {@code null} when nothing matches. Sorting biggest-pattern-first makes sure
+	 * an overlapping small recipe never shadows a larger one.
+	 */
+	public final ItemStack findMatchingRecipe(int[] craftingMatrix) {
+		return this.recipes.stream()
+			.filter(recipe -> recipe.matchRecipe(craftingMatrix))
+			.map(CraftingRecipe::createResult)
+			.findFirst()
+			.orElse(null);
 	}
 }
