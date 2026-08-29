@@ -2,60 +2,91 @@ package net.minecraft.game.world.terrain.noise;
 
 import java.util.Random;
 
+/**
+ * Combines several {@link NoiseGeneratorPerlin} instances into a summation of
+ * octaves. Each octave is a single Perlin noise field sampled at a different
+ * frequency, so that both broad, low-frequency features and the finer,
+ * high-frequency detail contribute to the final value.
+ */
 public final class NoiseGeneratorOctaves extends NoiseGenerator {
 	private NoiseGeneratorPerlin[] generatorCollection;
 	private int octaves;
 
-	public NoiseGeneratorOctaves(Random var1, int var2) {
-		this.octaves = var2;
-		this.generatorCollection = new NoiseGeneratorPerlin[var2];
+	public NoiseGeneratorOctaves(Random random, int octaves) {
+		this.octaves = octaves;
+		this.generatorCollection = new NoiseGeneratorPerlin[octaves];
 
-		for(int var3 = 0; var3 < var2; ++var3) {
-			this.generatorCollection[var3] = new NoiseGeneratorPerlin(var1);
+		for(int i = 0; i < octaves; ++i) {
+			this.generatorCollection[i] = new NoiseGeneratorPerlin(random);
 		}
-
 	}
 
-	public final double noiseGenerator(double var1, double var3) {
-		double var5 = 0.0D;
-		double var7 = 1.0D;
+	/**
+	 * Returns the two-dimensional fractal noise at (x, y). With each higher
+	 * octave the sampling frequency is halved and the contribution weight kept
+	 * equal, giving an evenly weighted blend of features of every scale.
+	 */
+	public final double noiseGenerator(double x, double y) {
+		double value = 0.0D;
+		double frequency = 1.0D;
 
-		for(int var9 = 0; var9 < this.octaves; ++var9) {
-			var5 += this.generatorCollection[var9].generateNoise(var1 * var7, var3 * var7) / var7;
-			var7 /= 2.0D;
+		for(int octave = 0; octave < this.octaves; ++octave) {
+			value += this.generatorCollection[octave].generateNoise(x * frequency, y * frequency) / frequency;
+			frequency /= 2.0D;
 		}
 
-		return var5;
+		return value;
 	}
 
-	public final double generateNoiseOctaves(double var1, double var3, double var5) {
-		double var7 = 0.0D;
-		double var9 = 1.0D;
+	/**
+	 * Returns the three-dimensional fractal noise at (x, y, z), again blending
+	 * octaves of halving frequency with equal weight.
+	 */
+	public final double generateNoiseOctaves(double x, double y, double z) {
+		double value = 0.0D;
+		double frequency = 1.0D;
 
-		for(int var11 = 0; var11 < this.octaves; ++var11) {
-			var7 += this.generatorCollection[var11].generateNoiseD(var1 * var9, var3 * var9, var5 * var9) / var9;
-			var9 /= 2.0D;
+		for(int octave = 0; octave < this.octaves; ++octave) {
+			value += this.generatorCollection[octave].generateNoiseD(x * frequency, y * frequency, z * frequency) / frequency;
+			frequency /= 2.0D;
 		}
 
-		return var7;
+		return value;
 	}
 
-	public final double[] generateNoiseOctaves(double[] var1, int var2, int var3, int var4, int var5, int var6, int var7, double var8, double var10, double var12) {
-		if(var1 == null) {
-			var1 = new double[var5 * var6 * var7];
+	/**
+	 * Fills {@code values} with fractal noise sampled over a rectangular grid of
+	 * size (width x height x depth) starting at (startX, startY, startZ). Only a
+	 * fixed range of noise is ever requested: each octave's small grid is summed
+	 * into the same output array.
+	 *
+	 * @param values       output array; created if null, otherwise cleared first
+	 * @param startX       grid origin x (in noise space)
+	 * @param startY       grid origin y
+	 * @param startZ       grid origin z
+	 * @param width        grid size along x
+	 * @param height       grid size along y
+	 * @param depth        grid size along z
+	 * @param xScale       per-unit x frequency
+	 * @param yScale       per-unit y frequency
+	 * @param zScale       per-unit z frequency
+	 */
+	public final double[] generateNoiseOctaves(double[] values, int startX, int startY, int startZ, int width, int height, int depth, double xScale, double yScale, double zScale) {
+		if(values == null) {
+			values = new double[width * height * depth];
 		} else {
-			for(int var14 = 0; var14 < var1.length; ++var14) {
-				var1[var14] = 0.0D;
+			for(int i = 0; i < values.length; ++i) {
+				values[i] = 0.0D;
 			}
 		}
 
-		double var17 = 1.0D;
+		double frequency = 1.0D;
 
-		for(int var16 = 0; var16 < this.octaves; ++var16) {
-			this.generatorCollection[var16].populateNoiseArray(var1, var2, var3, var4, var5, var6, var7, var8 * var17, var10 * var17, var12 * var17, var17);
-			var17 /= 2.0D;
+		for(int octave = 0; octave < this.octaves; ++octave) {
+			this.generatorCollection[octave].populateNoiseArray(values, startX, startY, startZ, width, height, depth, xScale * frequency, yScale * frequency, zScale * frequency, frequency);
+			frequency /= 2.0D;
 		}
 
-		return var1;
+		return values;
 	}
 }

@@ -49,8 +49,14 @@ public final class Chunk {
 	private static final int CHUNK_SHIFT = 4;
 	/** Bits to shift X left to position a cell index within a 128-high 16-wide column. */
 	private static final int X_SHIFT = 11;
-	/** Bits to shift Z left within a 16-wide row. */
+	/** Bits to shift Z left within a 16-wide row of a chunk's block planes. */
 	private static final int Z_SHIFT = 7;
+	/**
+	 * Bits to shift Z left within the 16&times;16 height map. This must stay a 4-bit shift
+	 * (index = z &times; 16 + x); reusing {@link #Z_SHIFT} here overruns the 256-cell map and
+	 * throws during {@link #generateHeightMap}.
+	 */
+	private static final int HEIGHTMAP_Z_SHIFT = 4;
 	/** Bits to shift the tile-entity Y so its packed key is unique across the 128-high span. */
 	private static final int TILE_Y_SHIFT = 10;
 	/** Camera/cull flag — see the class doc for why it lives on the chunk as a static. */
@@ -95,7 +101,7 @@ public final class Chunk {
 
 	/** Height of the highest light-opaque block in the given column (x, z are chunk-local). */
 	public final int getHeightValue(int x, int z) {
-		return this.heightMap[z << Z_SHIFT | x] & 255;
+		return this.heightMap[z << HEIGHTMAP_Z_SHIFT | x] & 255;
 	}
 
 	/**
@@ -113,10 +119,10 @@ public final class Chunk {
 		int lowestHeight = SECTION_HEIGHT - 1;
 		for(int x = 0; x < SECTION_SIZE; ++x) {
 			for(int z = 0; z < SECTION_SIZE; ++z) {
-				this.heightMap[z << Z_SHIFT | x] = -128;
+				this.heightMap[z << HEIGHTMAP_Z_SHIFT | x] = -128;
 				this.relightBlock(x, SECTION_HEIGHT - 1, z);
-				if((this.heightMap[z << Z_SHIFT | x] & 255) < lowestHeight) {
-					lowestHeight = this.heightMap[z << Z_SHIFT | x] & 255;
+				if((this.heightMap[z << HEIGHTMAP_Z_SHIFT | x] & 255) < lowestHeight) {
+					lowestHeight = this.heightMap[z << HEIGHTMAP_Z_SHIFT | x] & 255;
 				}
 			}
 		}
@@ -175,7 +181,7 @@ public final class Chunk {
 	 * first non-zero-opacity block, matching how {@code setBlockID} seeds the column.
 	 */
 	private void relightBlock(int x, int y, int z) {
-		int oldHeight = this.heightMap[z << Z_SHIFT | x] & 255;
+		int oldHeight = this.heightMap[z << HEIGHTMAP_Z_SHIFT | x] & 255;
 		int newHeight = oldHeight;
 		if(y > newHeight) {
 			newHeight = y;
@@ -189,7 +195,7 @@ public final class Chunk {
 
 		if(newHeight != oldHeight) {
 			this.worldObj.markBlocksDirtyVertical(x, z, newHeight, oldHeight);
-			this.heightMap[z << Z_SHIFT | x] = (byte)newHeight;
+			this.heightMap[z << HEIGHTMAP_Z_SHIFT | x] = (byte)newHeight;
 			if(newHeight < this.lowestBlockHeight) {
 				this.lowestBlockHeight = newHeight;
 			} else {
@@ -197,8 +203,8 @@ public final class Chunk {
 				int lowestHeight = SECTION_HEIGHT - 1;
 				for(int scanZ = 0; scanZ < SECTION_SIZE; ++scanZ) {
 					for(int scanX = 0; scanX < SECTION_SIZE; ++scanX) {
-						if((this.heightMap[scanZ << Z_SHIFT | scanX] & 255) < lowestHeight) {
-							lowestHeight = this.heightMap[scanZ << Z_SHIFT | scanX] & 255;
+						if((this.heightMap[scanZ << HEIGHTMAP_Z_SHIFT | scanX] & 255) < lowestHeight) {
+							lowestHeight = this.heightMap[scanZ << HEIGHTMAP_Z_SHIFT | scanX] & 255;
 						}
 					}
 				}
@@ -256,7 +262,7 @@ public final class Chunk {
 	/** Sets a block id and updates height/skylight metadata accordingly; returns true if changed. */
 	public final boolean setBlockID(int x, int y, int z, int blockID) {
 		byte blockByte = (byte)blockID;
-		int height = this.heightMap[z << Z_SHIFT | x] & 255;
+		int height = this.heightMap[z << HEIGHTMAP_Z_SHIFT | x] & 255;
 		int currentBlockID = this.blocks[x << X_SHIFT | z << Z_SHIFT | y] & 255;
 		if(currentBlockID == blockID) {
 			return false;
@@ -467,7 +473,7 @@ public final class Chunk {
 
 	/** Whether a cell sits at or above the column's opaque surface (i.e. opens to the sky). */
 	public final boolean canBlockSeeTheSky(int x, int y, int z) {
-		return y >= (this.heightMap[z << Z_SHIFT | x] & 255);
+		return y >= (this.heightMap[z << HEIGHTMAP_Z_SHIFT | x] & 255);
 	}
 
 	/**

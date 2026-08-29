@@ -2,10 +2,23 @@ package net.minecraft.game.world.terrain.generate;
 
 import java.util.Random;
 import net.minecraft.game.world.World;
+import net.minecraft.game.world.block.Block;
 import util.MathHelper;
 
+/**
+ * Places a large, branching tree: a central trunk, a set of outward-splayed
+ * branch trunks, and a rounded crown of leaves on top. The whole shape is
+ * generated procedurally from a small handful of parameters, using the noise
+ * approach that Minecraft originally used before the leaf-canopy generators of
+ * later versions.
+ *
+ * <p>The generator works in two passes: it first collects a list of "leaf
+ * nodes" (branch tips, each describing where a branch trunk must be drawn and
+ * where a little disc of leaves must be grown), then it places the trunk and
+ * branch wood and finally paints the leaf discs.
+ */
 public final class WorldGenBigTree extends WorldGenerator {
-	private static byte[] otherCoordPairs = new byte[]{(byte)2, (byte)0, (byte)0, (byte)1, (byte)2, (byte)1};
+	private static final byte[] otherCoordPairs = new byte[]{(byte) 2, (byte) 0, (byte) 0, (byte) 1, (byte) 2, (byte) 1};
 	private Random rand = new Random();
 	private World worldObj;
 	private int[] basePos = new int[]{0, 0, 0};
@@ -20,295 +33,267 @@ public final class WorldGenBigTree extends WorldGenerator {
 	private int leafDistanceLimit = 4;
 	private int[][] leafNodes;
 
-	private void placeBlockLine(int[] var1, int[] var2, int var3) {
-		int[] var15 = new int[]{0, 0, 0};
-		byte var4 = 0;
-
-		byte var5;
-		for(var5 = 0; var4 < 3; ++var4) {
-			var15[var4] = var2[var4] - var1[var4];
-			if(Math.abs(var15[var4]) > Math.abs(var15[var5])) {
-				var5 = var4;
+	/**
+	 * Draws a straight 3D line of solid wood from {@code start} to {@code end}.
+	 * The axis with the largest displacement is stepped along and the other two
+	 * coordinates are interpolated to match, giving a smooth diagonal of blocks.
+	 * (The {@code blockId} argument of the original signature was never passed
+	 * through and has been removed — this always places wood.)
+	 */
+	private void placeBlockLine(int[] start, int[] end) {
+		int[] delta = new int[]{0, 0, 0};
+		int maxAxis = 0;
+		for(int axis = 0; axis < 3; ++axis) {
+			delta[axis] = end[axis] - start[axis];
+			if(Math.abs(delta[axis]) > Math.abs(delta[maxAxis])) {
+				maxAxis = axis;
 			}
 		}
 
-		if(var15[var5] != 0) {
-			byte var14 = otherCoordPairs[var5];
-			var4 = otherCoordPairs[var5 + 3];
-			byte var6;
-			if(var15[var5] > 0) {
-				var6 = 1;
-			} else {
-				var6 = -1;
+		if(delta[maxAxis] != 0) {
+			byte axisB = otherCoordPairs[maxAxis];
+			byte axisC = otherCoordPairs[maxAxis + 3];
+			byte step = delta[maxAxis] > 0 ? (byte) 1 : (byte) -1;
+			double slopeB = (double) delta[axisB] / (double) delta[maxAxis];
+			double slopeC = (double) delta[axisC] / (double) delta[maxAxis];
+			int[] pos = new int[]{0, 0, 0};
+			int i = 0;
+
+			for(int limit = delta[maxAxis] + step; i != limit; i += step) {
+				pos[maxAxis] = MathHelper.floor_double((double) (start[maxAxis] + i) + 0.5D);
+				pos[axisB] = MathHelper.floor_double((double) start[axisB] + (double) i * slopeB + 0.5D);
+				pos[axisC] = MathHelper.floor_double((double) start[axisC] + (double) i * slopeC + 0.5D);
+				this.worldObj.setTileNoUpdate(pos[0], pos[1], pos[2], Block.wood.blockID);
 			}
-
-			double var10 = (double)var15[var14] / (double)var15[var5];
-			double var12 = (double)var15[var4] / (double)var15[var5];
-			int[] var7 = new int[]{0, 0, 0};
-			int var8 = 0;
-
-			for(var3 = var15[var5] + var6; var8 != var3; var8 += var6) {
-				var7[var5] = MathHelper.floor_double((double)(var1[var5] + var8) + 0.5D);
-				var7[var14] = MathHelper.floor_double((double)var1[var14] + (double)var8 * var10 + 0.5D);
-				var7[var4] = MathHelper.floor_double((double)var1[var4] + (double)var8 * var12 + 0.5D);
-				this.worldObj.setTileNoUpdate(var7[0], var7[1], var7[2], 17);
-			}
-
 		}
 	}
 
-	private int checkBlockLine(int[] var1, int[] var2) {
-		int[] var3 = new int[]{0, 0, 0};
-		byte var4 = 0;
-
-		byte var5;
-		for(var5 = 0; var4 < 3; ++var4) {
-			var3[var4] = var2[var4] - var1[var4];
-			if(Math.abs(var3[var4]) > Math.abs(var3[var5])) {
-				var5 = var4;
+	/**
+	 * Checks the blocks along the line from {@code start} to {@code end} until it
+	 * hits something solid (neither air nor leaves). Returns the distance from the
+	 * start to the first obstruction, or -1 if the whole line is clear.
+	 */
+	private int checkBlockLine(int[] start, int[] end) {
+		int[] delta = new int[]{0, 0, 0};
+		int maxAxis = 0;
+		for(int axis = 0; axis < 3; ++axis) {
+			delta[axis] = end[axis] - start[axis];
+			if(Math.abs(delta[axis]) > Math.abs(delta[maxAxis])) {
+				maxAxis = axis;
 			}
 		}
 
-		if(var3[var5] == 0) {
+		if(delta[maxAxis] == 0) {
 			return -1;
 		} else {
-			byte var14 = otherCoordPairs[var5];
-			var4 = otherCoordPairs[var5 + 3];
-			byte var6;
-			if(var3[var5] > 0) {
-				var6 = 1;
-			} else {
-				var6 = -1;
-			}
+			byte axisB = otherCoordPairs[maxAxis];
+			byte axisC = otherCoordPairs[maxAxis + 3];
+			byte step = delta[maxAxis] > 0 ? (byte) 1 : (byte) -1;
+			double slopeB = (double) delta[axisB] / (double) delta[maxAxis];
+			double slopeC = (double) delta[axisC] / (double) delta[maxAxis];
+			int[] pos = new int[]{0, 0, 0};
+			int i = 0;
 
-			double var9 = (double)var3[var14] / (double)var3[var5];
-			double var11 = (double)var3[var4] / (double)var3[var5];
-			int[] var7 = new int[]{0, 0, 0};
-			int var8 = 0;
-
-			int var15;
-			for(var15 = var3[var5] + var6; var8 != var15; var8 += var6) {
-				var7[var5] = var1[var5] + var8;
-				var7[var14] = (int)((double)var1[var14] + (double)var8 * var9);
-				var7[var4] = (int)((double)var1[var4] + (double)var8 * var11);
-				int var13 = this.worldObj.getBlockId(var7[0], var7[1], var7[2]);
-				if(var13 != 0 && var13 != 18) {
+			int endIndex;
+			for(endIndex = delta[maxAxis] + step; i != endIndex; i += step) {
+				pos[maxAxis] = start[maxAxis] + i;
+				pos[axisB] = (int) ((double) start[axisB] + (double) i * slopeB);
+				pos[axisC] = (int) ((double) start[axisC] + (double) i * slopeC);
+				int blockId = this.worldObj.getBlockId(pos[0], pos[1], pos[2]);
+				if(blockId != 0 && blockId != Block.leaves.blockID) {
 					break;
 				}
 			}
 
-			return var8 == var15 ? -1 : Math.abs(var8);
+			return i == endIndex ? -1 : Math.abs(i);
 		}
 	}
 
-	public final void setScale(double var1, double var3, double var5) {
+	@Override
+	public final void setScale(double width, double height, double leafDistance) {
 		this.heightLimitLimit = 12;
 		this.leafDistanceLimit = 5;
 		this.scaleWidth = 1.0D;
 		this.leafDensity = 1.0D;
 	}
 
-	public final boolean generate(World var1, Random var2, int var3, int var4, int var5) {
-		this.worldObj = var1;
-		long var6 = var2.nextLong();
-		this.rand.setSeed(var6);
-		this.basePos[0] = var3;
-		this.basePos[1] = var4;
-		this.basePos[2] = var5;
+	@Override
+	public final boolean generate(World world, Random random, int x, int y, int z) {
+		this.worldObj = world;
+		long seed = random.nextLong();
+		this.rand.setSeed(seed);
+		this.basePos[0] = x;
+		this.basePos[1] = y;
+		this.basePos[2] = z;
+
 		if(this.heightLimit == 0) {
 			this.heightLimit = 5 + this.rand.nextInt(this.heightLimitLimit);
 		}
 
-		int[] var39 = new int[]{this.basePos[0], this.basePos[1], this.basePos[2]};
-		int[] var41 = new int[]{this.basePos[0], this.basePos[1] + this.heightLimit - 1, this.basePos[2]};
-		var4 = this.worldObj.getBlockId(this.basePos[0], this.basePos[1] - 1, this.basePos[2]);
-		boolean var10000;
-		if(var4 != 2 && var4 != 3) {
-			var10000 = false;
+		int[] base = new int[]{this.basePos[0], this.basePos[1], this.basePos[2]};
+		int[] top = new int[]{this.basePos[0], this.basePos[1] + this.heightLimit - 1, this.basePos[2]};
+		int groundBlock = this.worldObj.getBlockId(this.basePos[0], this.basePos[1] - 1, this.basePos[2]);
+		boolean canGrow;
+		if(groundBlock != Block.grass.blockID && groundBlock != Block.dirt.blockID) {
+			canGrow = false;
 		} else {
-			var5 = this.checkBlockLine(var39, var41);
-			if(var5 == -1) {
-				var10000 = true;
-			} else if(var5 < 6) {
-				var10000 = false;
+			int clearHeight = this.checkBlockLine(base, top);
+			if(clearHeight == -1) {
+				canGrow = true;
+			} else if(clearHeight < 6) {
+				canGrow = false;
 			} else {
-				this.heightLimit = var5;
-				var10000 = true;
+				this.heightLimit = clearHeight;
+				canGrow = true;
 			}
 		}
 
-		if(!var10000) {
+		if(!canGrow) {
 			return false;
 		} else {
-			WorldGenBigTree var38 = this;
-			this.height = (int)((double)this.heightLimit * this.heightAttenuation);
+			this.height = (int) ((double) this.heightLimit * this.heightAttenuation);
 			if(this.height >= this.heightLimit) {
 				this.height = this.heightLimit - 1;
 			}
 
-			int var40 = (int)(1.382D + Math.pow(this.leafDensity * (double)this.heightLimit / 13.0D, 2.0D));
-			if(var40 <= 0) {
-				var40 = 1;
+			int nodesPerLayer = (int) (1.382D + Math.pow(this.leafDensity * (double) this.heightLimit / 13.0D, 2.0D));
+			if(nodesPerLayer <= 0) {
+				nodesPerLayer = 1;
 			}
 
-			int[][] var42 = new int[var40 * this.heightLimit][4];
-			var4 = this.basePos[1] + this.heightLimit - this.leafDistanceLimit;
-			var5 = 1;
-			int var43 = this.basePos[1] + this.height;
-			int var7 = var4 - this.basePos[1];
-			var42[0][0] = this.basePos[0];
-			var42[0][1] = var4;
-			var42[0][2] = this.basePos[2];
-			var42[0][3] = var43;
-			--var4;
+			int[][] leafNodesBuffer = new int[nodesPerLayer * this.heightLimit][4];
+			int branchY = this.basePos[1] + this.heightLimit - this.leafDistanceLimit;
+			int leafNodeCount = 1;
+			int crownBase = this.basePos[1] + this.height;
+			int workingHeight = branchY - this.basePos[1];
+			leafNodesBuffer[0][0] = this.basePos[0];
+			leafNodesBuffer[0][1] = branchY;
+			leafNodesBuffer[0][2] = this.basePos[2];
+			leafNodesBuffer[0][3] = crownBase;
+			--branchY;
 
-			int var8;
-			int var11;
-			while(var7 >= 0) {
-				var8 = 0;
-				float var61;
-				if((double)var7 < (double)((float)var38.heightLimit) * 0.3D) {
-					var61 = -1.618F;
+			int branchZ;
+			while(workingHeight >= 0) {
+				int branchIndex = 0;
+				float layerRadius;
+				if((double) workingHeight < (double) ((float) this.heightLimit) * 0.3D) {
+					layerRadius = -1.618F;
 				} else {
-					float var13 = (float)var38.heightLimit / 2.0F;
-					float var14 = (float)var38.heightLimit / 2.0F - (float)var7;
-					float var36;
-					if(var14 == 0.0F) {
-						var36 = var13;
-					} else if(Math.abs(var14) >= var13) {
-						var36 = 0.0F;
+					float radiusMax = (float) this.heightLimit / 2.0F;
+					float radiusAtHeight = (float) this.heightLimit / 2.0F - (float) workingHeight;
+					float radius;
+					if(radiusAtHeight == 0.0F) {
+						radius = radiusMax;
+					} else if(Math.abs(radiusAtHeight) >= radiusMax) {
+						radius = 0.0F;
 					} else {
-						var36 = (float)Math.sqrt(Math.pow((double)Math.abs(var13), 2.0D) - Math.pow((double)Math.abs(var14), 2.0D));
+						radius = (float) Math.sqrt(Math.pow((double) Math.abs(radiusMax), 2.0D) - Math.pow((double) Math.abs(radiusAtHeight), 2.0D));
 					}
 
-					var36 *= 0.5F;
-					var61 = var36;
+					radius *= 0.5F;
+					layerRadius = radius;
 				}
 
-				float var9 = var61;
-				if(var9 < 0.0F) {
-					--var4;
-					--var7;
+				float branchRadius = layerRadius;
+				if(branchRadius < 0.0F) {
+					--branchY;
+					--workingHeight;
 				} else {
-					for(; var8 < var40; ++var8) {
-						double var19 = var38.scaleWidth * (double)var9 * ((double)var38.rand.nextFloat() + 0.328D);
-						double var21 = (double)var38.rand.nextFloat() * 2.0D * 3.14159D;
-						int var10 = (int)(var19 * Math.sin(var21) + (double)var38.basePos[0] + 0.5D);
-						var11 = (int)(var19 * Math.cos(var21) + (double)var38.basePos[2] + 0.5D);
-						int[] var12 = new int[]{var10, var4, var11};
-						int[] var52 = new int[]{var10, var4 + var38.leafDistanceLimit, var11};
-						if(var38.checkBlockLine(var12, var52) == -1) {
-							var52 = new int[]{var38.basePos[0], var38.basePos[1], var38.basePos[2]};
-							double var28 = Math.sqrt(Math.pow((double)Math.abs(var38.basePos[0] - var12[0]), 2.0D) + Math.pow((double)Math.abs(var38.basePos[2] - var12[2]), 2.0D));
-							double var30 = var28 * var38.branchSlope;
-							if((double)var12[1] - var30 > (double)var43) {
-								var52[1] = var43;
+					for(; branchIndex < nodesPerLayer; ++branchIndex) {
+						double branchLength = this.scaleWidth * (double) branchRadius * ((double) this.rand.nextFloat() + 0.328D);
+						double branchAngle = (double) this.rand.nextFloat() * 2.0D * 3.14159D;
+						int branchPosX = (int) (branchLength * Math.sin(branchAngle) + (double) this.basePos[0] + 0.5D);
+						branchZ = (int) (branchLength * Math.cos(branchAngle) + (double) this.basePos[2] + 0.5D);
+						int[] branchStart = new int[]{branchPosX, branchY, branchZ};
+						int[] branchEnd = new int[]{branchPosX, branchY + this.leafDistanceLimit, branchZ};
+						if(this.checkBlockLine(branchStart, branchEnd) == -1) {
+							branchEnd = new int[]{this.basePos[0], this.basePos[1], this.basePos[2]};
+							double horizontalDistance = Math.sqrt(Math.pow((double) Math.abs(this.basePos[0] - branchStart[0]), 2.0D) + Math.pow((double) Math.abs(this.basePos[2] - branchStart[2]), 2.0D));
+							double branchDrop = horizontalDistance * this.branchSlope;
+							if((double) branchStart[1] - branchDrop > (double) crownBase) {
+								branchEnd[1] = crownBase;
 							} else {
-								var52[1] = (int)((double)var12[1] - var30);
+								branchEnd[1] = (int) ((double) branchStart[1] - branchDrop);
 							}
 
-							if(var38.checkBlockLine(var52, var12) == -1) {
-								var42[var5][0] = var10;
-								var42[var5][1] = var4;
-								var42[var5][2] = var11;
-								var42[var5][3] = var52[1];
-								++var5;
+							if(this.checkBlockLine(branchEnd, branchStart) == -1) {
+								leafNodesBuffer[leafNodeCount][0] = branchPosX;
+								leafNodesBuffer[leafNodeCount][1] = branchY;
+								leafNodesBuffer[leafNodeCount][2] = branchZ;
+								leafNodesBuffer[leafNodeCount][3] = branchEnd[1];
+								++leafNodeCount;
 							}
 						}
 					}
 
-					--var4;
-					--var7;
+					--branchY;
+					--workingHeight;
 				}
 			}
 
-			var38.leafNodes = new int[var5][4];
-			System.arraycopy(var42, 0, var38.leafNodes, 0, var5);
-			var38 = this;
-			var40 = 0;
+			this.leafNodes = new int[leafNodeCount][4];
+			System.arraycopy(leafNodesBuffer, 0, this.leafNodes, 0, leafNodeCount);
 
-			for(var3 = this.leafNodes.length; var40 < var3; ++var40) {
-				var4 = var38.leafNodes[var40][0];
-				var5 = var38.leafNodes[var40][1];
-				var43 = var38.leafNodes[var40][2];
-				int var10001 = var4;
-				var4 = var43;
-				int var49 = var5;
-				var8 = var10001;
-WorldGenBigTree var47 = var38;
+			for(int node = 0; node < this.leafNodes.length; ++node) {
+				int leafNodeX = this.leafNodes[node][0];
+				int leafNodeY = this.leafNodes[node][1];
+				int leafNodeZ = this.leafNodes[node][2];
 
-			for(int var56 = var49 + var38.leafDistanceLimit; var5 < var56; ++var5) {
-				int var22 = var5 - var49;
-				float var20 = var22 >= 0 && var22 < var47.leafDistanceLimit ? (var22 != 0 && var22 != var47.leafDistanceLimit - 1 ? 3.0F : 2.0F) : -1.0F;
-				float var51 = var20;
-					WorldGenBigTree var57 = var47;
-					int var58 = (int)((double)var20 + 0.618D);
-					byte var29 = otherCoordPairs[1];
-					byte var59 = otherCoordPairs[4];
-					int[] var31 = new int[]{var8, var5, var4};
-					int[] var50 = new int[]{0, 0, 0};
-					var11 = -var58;
+				for(int leafY = leafNodeY; leafY < leafNodeY + this.leafDistanceLimit; ++leafY) {
+					int layer = leafY - leafNodeY;
+					float leafRadius = layer >= 0 && layer < this.leafDistanceLimit ? (layer != 0 && layer != this.leafDistanceLimit - 1 ? 3.0F : 2.0F) : -1.0F;
+					int discRadius = (int) ((double) leafRadius + 0.618D);
+					byte axisX = otherCoordPairs[1];
+					byte axisZ = otherCoordPairs[4];
+					int[] centre = new int[]{leafNodeX, leafY, leafNodeZ};
+					int[] pos = new int[]{0, 0, 0};
+					pos[1] = centre[1];
 
-					label134:
-					for(var50[1] = var31[1]; var11 <= var58; ++var11) {
-						var50[var29] = var31[var29] + var11;
-						int var55 = -var58;
+					for(int dx = -discRadius; dx <= discRadius; ++dx) {
+						pos[0] = centre[0] + dx;
+						for(int dz = -discRadius; dz <= discRadius; ++dz) {
+							double distance = Math.sqrt(Math.pow((double) Math.abs(dx) + 0.5D, 2.0D) + Math.pow((double) Math.abs(dz) + 0.5D, 2.0D));
+							if(distance > (double) leafRadius) {
+								continue;
+							}
 
-						while(true) {
-							while(true) {
-								if(var55 > var58) {
-									continue label134;
-								}
-
-								double var60 = Math.sqrt(Math.pow((double)Math.abs(var11) + 0.5D, 2.0D) + Math.pow((double)Math.abs(var55) + 0.5D, 2.0D));
-								if(var60 > (double)var51) {
-									++var55;
-								} else {
-									var50[var59] = var31[var59] + var55;
-									int var54 = var57.worldObj.getBlockId(var50[0], var50[1], var50[2]);
-									if(var54 != 0 && var54 != 18) {
-										++var55;
-									} else {
-										var57.worldObj.setTileNoUpdate(var50[0], var50[1], var50[2], 18);
-										++var55;
-									}
-								}
+							pos[2] = centre[2] + dz;
+							int blockId = this.worldObj.getBlockId(pos[0], pos[1], pos[2]);
+							if(blockId == 0 || blockId == Block.leaves.blockID) {
+								this.worldObj.setTileNoUpdate(pos[0], pos[1], pos[2], Block.leaves.blockID);
 							}
 						}
 					}
 				}
 			}
 
-			var40 = this.basePos[0];
-			var3 = this.basePos[1];
-			var4 = this.basePos[1] + this.height;
-			var5 = this.basePos[2];
-			int[] var44 = new int[]{var40, var3, var5};
-			int[] var48 = new int[]{var40, var4, var5};
-			this.placeBlockLine(var44, var48, 17);
+			int trunkBottomX = this.basePos[0];
+			int trunkBottomY = this.basePos[1];
+			int trunkTopY = this.basePos[1] + this.height;
+			int trunkBottomZ = this.basePos[2];
+			int[] trunkBottom = new int[]{trunkBottomX, trunkBottomY, trunkBottomZ};
+			int[] trunkTop = new int[]{trunkBottomX, trunkTopY, trunkBottomZ};
+			this.placeBlockLine(trunkBottom, trunkTop);
 			if(this.trunkSize == 2) {
-				++var44[0];
-				++var48[0];
-				this.placeBlockLine(var44, var48, 17);
-				++var44[2];
-				++var48[2];
-				this.placeBlockLine(var44, var48, 17);
-				var44[0] += -1;
-				var48[0] += -1;
-				this.placeBlockLine(var44, var48, 17);
+				++trunkBottom[0];
+				++trunkTop[0];
+				this.placeBlockLine(trunkBottom, trunkTop);
+				++trunkBottom[2];
+				++trunkTop[2];
+				this.placeBlockLine(trunkBottom, trunkTop);
+				trunkBottom[0] += -1;
+				trunkTop[0] += -1;
+				this.placeBlockLine(trunkBottom, trunkTop);
 			}
 
-			var38 = this;
-			var40 = 0;
-			var3 = this.leafNodes.length;
-
-			for(int[] var45 = new int[]{this.basePos[0], this.basePos[1], this.basePos[2]}; var40 < var3; ++var40) {
-				int[] var46 = var38.leafNodes[var40];
-				var44 = new int[]{var46[0], var46[1], var46[2]};
-				var45[1] = var46[3];
-				var7 = var45[1] - var38.basePos[1];
-				if((double)var7 >= (double)var38.heightLimit * 0.2D) {
-					var38.placeBlockLine(var45, var44, 17);
+			int[] branchBase = new int[]{this.basePos[0], this.basePos[1], this.basePos[2]};
+			for(int node = 0; node < this.leafNodes.length; ++node) {
+				int[] leafNode = this.leafNodes[node];
+				int[] branchTip = new int[]{leafNode[0], leafNode[1], leafNode[2]};
+				branchBase[1] = leafNode[3];
+				int branchHeight = branchBase[1] - this.basePos[1];
+				if((double) branchHeight >= (double) this.heightLimit * 0.2D) {
+					this.placeBlockLine(branchBase, branchTip);
 				}
 			}
 
