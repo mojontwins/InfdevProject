@@ -46,7 +46,7 @@ public class BlockFluid extends Block {
 
 	public boolean update(World world, int x, int y, int z, int level) {
 		boolean flowing = false;
-		liquidSolidCheck(world, x, y, z);
+		world.getBlockMaterial(x, y - 1, z).liquidSolidCheck();
 
 		boolean movedDown;
 		do {
@@ -54,7 +54,7 @@ public class BlockFluid extends Block {
 			if(!this.canFlow(world, x, y, z)) {
 				break;
 			}
-			liquidSolidCheck(world, x, y, z);
+			world.getBlockMaterial(x, y - 1, z).liquidSolidCheck();
 			movedDown = world.setBlockWithNotify(x, y, z, this.movingId);
 			if(movedDown) {
 				flowing = true;
@@ -83,10 +83,6 @@ public class BlockFluid extends Block {
 		}
 
 		return flowing;
-	}
-
-	private static boolean liquidSolidCheck(World world, int x, int y, int z) {
-		return world.getBlockMaterial(x, y - 1, z).liquidSolidCheck();
 	}
 
 	protected final boolean canFlow(World world, int x, int y, int z) {
