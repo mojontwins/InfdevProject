@@ -32,6 +32,10 @@ public final class MovementInputFromOptions extends MovementInput {
 			var3 = 4;
 		}
 
+		if(var1 == this.gameSettings.keyBindSneak.keyCode) {
+			var3 = 5;
+		}
+
 		if(var3 >= 0) {
 			this.movementKeyStates[var3] = var2;
 		}
@@ -65,5 +69,11 @@ public final class MovementInputFromOptions extends MovementInput {
 		}
 
 		this.jump = this.movementKeyStates[4];
+		this.sneak = this.movementKeyStates[5];
+		if(this.sneak) {
+			// Sneaking: pace cut to 30% of the walk speed.
+			this.moveStrafe = (float)((double)this.moveStrafe * 0.3D);
+			this.moveForward = (float)((double)this.moveForward * 0.3D);
+		}
 	}
 }

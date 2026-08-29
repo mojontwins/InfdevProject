@@ -38,8 +38,19 @@ public class EntityMonster extends EntityCreature {
 	}
 
 	protected Entity findPlayerToAttack() {
-		double distanceSq = this.worldObj.playerEntity.getDistanceSqToEntity(this);
-		return distanceSq < 256.0D && this.canEntityBeSeen(this.worldObj.playerEntity) ? this.worldObj.playerEntity : null;
+		Entity potentialTarget = this.worldObj.playerEntity;
+		double distanceSq = potentialTarget.getDistanceSqToEntity(this);
+		if(distanceSq < 256.0D && this.canEntityBeSeen(potentialTarget)) {
+			// A sneaking player in a dim spot (light < 7) is invisible to the
+			// monster's eye beyond six blocks — only detected up close.
+			if(potentialTarget.isSneaking() && distanceSq > 36.0D && this.worldObj.getBlockLightValue(MathHelper.floor_double(potentialTarget.posX), MathHelper.floor_double(potentialTarget.posY), MathHelper.floor_double(potentialTarget.posZ)) < 7) {
+				return null;
+			}
+
+			return potentialTarget;
+		} else {
+			return null;
+		}
 	}
 
 	/** A monster that is struck turns on whoever dealt the blow. */

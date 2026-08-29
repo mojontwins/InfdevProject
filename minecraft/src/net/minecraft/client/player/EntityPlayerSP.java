@@ -51,6 +51,12 @@ public class EntityPlayerSP extends EntityPlayer {
 		this.isJumping = this.movementInput.jump;
 	}
 
+	/** The player sneaks while the sneak key is held — feeds the ledge guard and the mob sight rules. */
+	@Override
+	public final boolean isSneaking() {
+		return this.movementInput.sneak;
+	}
+
 	public final void onLivingUpdate() {
 		this.movementInput.updatePlayerMoveState();
 		super.onLivingUpdate();

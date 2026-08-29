@@ -225,6 +225,35 @@ public abstract class Entity {
 			double wantedY = motionY;
 			double wantedZ = motionZ;
 			AxisAlignedBB startBox = this.boundingBox.copy();
+
+			// Sneaking on solid ground: refuse to step over a ledge. Each axis
+			// is eased back toward zero (in 0.05 steps) while the cell it would
+			// move into has no floor beneath it, so the player skids to a stop
+			// instead of walking off the edge.
+			boolean groundedSneak = this.onGround && this.isSneaking();
+			if(groundedSneak) {
+				double sneakStep = 0.05D;
+				for(; motionX != 0.0D && this.worldObj.getCollidingBoundingBoxes(this.boundingBox.offsetCopy(motionX, -1.0D, 0.0D)).size() == 0; wantedX = motionX) {
+					if(motionX < sneakStep && motionX >= -sneakStep) {
+						motionX = 0.0D;
+					} else if(motionX > 0.0D) {
+						motionX -= sneakStep;
+					} else {
+						motionX += sneakStep;
+					}
+				}
+
+				for(; motionZ != 0.0D && this.worldObj.getCollidingBoundingBoxes(this.boundingBox.offsetCopy(0.0D, -1.0D, motionZ)).size() == 0; wantedZ = motionZ) {
+					if(motionZ < sneakStep && motionZ >= -sneakStep) {
+						motionZ = 0.0D;
+					} else if(motionZ > 0.0D) {
+						motionZ -= sneakStep;
+					} else {
+						motionZ += sneakStep;
+					}
+				}
+			}
+
 			List<AxisAlignedBB> colliders = this.worldObj.getCollidingBoundingBoxes(this.boundingBox.addCoord(motionX, motionY, motionZ));
 
 			// Clip vertically first so the box is on solid ground before the sides.
@@ -588,5 +617,10 @@ public abstract class Entity {
 
 	public boolean isEntityAlive() {
 		return !this.isDead;
+	}
+
+	/** True while the entity ducks into a sneaking crouch (the player only); the base never sneaks. */
+	public boolean isSneaking() {
+		return false;
 	}
 }
