@@ -3,14 +3,25 @@ package net.minecraft.client.render;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
+import java.util.Arrays;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.opengl.ARBVertexBufferObject;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15;
 
 public final class Tessellator {
-	private ByteBuffer byteBuffer = BufferUtils.createByteBuffer(8388608);
-	private int[] rawBuffer = new int[2097152];
+	/** Initial vertex buffer capacity (in ints) — matches the original 8 MB backing store. */
+	private static final int INITIAL_BUFFER_CAPACITY = 1 << 21;
+	/** Each vertex is 8 ints: 3 position + 2 texture + 1 color + 2 stride padding = 32 bytes. */
+	private static final int INTS_PER_VERTEX = 8;
+	private static final int BYTES_PER_INT = 4;
+	private static final int BYTES_PER_VERTEX = INTS_PER_VERTEX * BYTES_PER_INT;
+	/** Byte offsets of the texture and color slots within a 32-byte vertex. */
+	private static final int UV_OFFSET = 12;
+	private static final int COLOR_OFFSET = 20;
+
+	private ByteBuffer byteBuffer = BufferUtils.createByteBuffer(INITIAL_BUFFER_CAPACITY * BYTES_PER_INT);
+	private int[] rawBuffer = new int[INITIAL_BUFFER_CAPACITY];
 	private int vertexCount = 0;
 	private double textureU;
 	private double textureV;
@@ -31,10 +42,31 @@ public final class Tessellator {
 	private int vboCount = 10;
 
 	private Tessellator() {
-		this.useVBO = false;
-		if(this.useVBO) {
+	}
+
+	public final boolean getUseVBO() {
+		return this.useVBO;
+	}
+
+	public final void setUseVBO(boolean useVBO) {
+		if(useVBO && this.vertexBuffers == null) {
 			this.vertexBuffers = BufferUtils.createIntBuffer(this.vboCount);
 			ARBVertexBufferObject.glGenBuffersARB(this.vertexBuffers);
+		}
+
+		this.useVBO = useVBO;
+	}
+
+	/** Grows the vertex buffers so an arbitrarily large mesh is never truncated mid-batch. */
+	private void ensureCapacity(int required) {
+		if(this.rawBufferIndex + required > this.rawBuffer.length) {
+			int newCapacity = this.rawBuffer.length;
+			while(newCapacity < this.rawBufferIndex + required) {
+				newCapacity <<= 1;
+			}
+
+			this.rawBuffer = Arrays.copyOf(this.rawBuffer, newCapacity);
+			this.byteBuffer = BufferUtils.createByteBuffer(newCapacity * BYTES_PER_INT);
 		}
 
 	}
@@ -50,7 +82,7 @@ public final class Tessellator {
 				intBuffer.clear();
 				intBuffer.put(this.rawBuffer, 0, this.rawBufferIndex);
 				this.byteBuffer.position(0);
-				this.byteBuffer.limit(this.rawBufferIndex << 2);
+				this.byteBuffer.limit(this.rawBufferIndex * BYTES_PER_INT);
 				if(this.useVBO) {
 					this.vboIndex = (this.vboIndex + 1) % this.vboCount;
 					ARBVertexBufferObject.glBindBufferARB(GL15.GL_ARRAY_BUFFER, this.vertexBuffers.get(this.vboIndex));
@@ -59,10 +91,10 @@ public final class Tessellator {
 
 				if(this.hasTexture) {
 					if(this.useVBO) {
-						GL11.glTexCoordPointer(2, GL11.GL_FLOAT, 32, 12L);
+						GL11.glTexCoordPointer(2, GL11.GL_FLOAT, BYTES_PER_VERTEX, UV_OFFSET);
 					} else {
-						floatBuffer.position(3);
-						GL11.glTexCoordPointer(2, 32, (FloatBuffer)floatBuffer);
+						floatBuffer.position(UV_OFFSET / BYTES_PER_INT);
+						GL11.glTexCoordPointer(2, BYTES_PER_VERTEX, (FloatBuffer)floatBuffer);
 					}
 
 					GL11.glEnableClientState(GL11.GL_TEXTURE_COORD_ARRAY);
@@ -70,20 +102,20 @@ public final class Tessellator {
 
 				if(this.hasColor) {
 					if(this.useVBO) {
-						GL11.glColorPointer(4, GL11.GL_UNSIGNED_BYTE, 32, 20L);
+						GL11.glColorPointer(4, GL11.GL_UNSIGNED_BYTE, BYTES_PER_VERTEX, COLOR_OFFSET);
 					} else {
-						this.byteBuffer.position(20);
-						GL11.glColorPointer(4, true, 32, this.byteBuffer);
+						this.byteBuffer.position(COLOR_OFFSET);
+						GL11.glColorPointer(4, true, BYTES_PER_VERTEX, this.byteBuffer);
 					}
 
 					GL11.glEnableClientState(GL11.GL_COLOR_ARRAY);
 				}
 
 				if(this.useVBO) {
-					GL11.glVertexPointer(3, GL11.GL_FLOAT, 32, 0L);
+					GL11.glVertexPointer(3, GL11.GL_FLOAT, BYTES_PER_VERTEX, 0L);
 				} else {
 					floatBuffer.position(0);
-					GL11.glVertexPointer(3, 32, (FloatBuffer)floatBuffer);
+					GL11.glVertexPointer(3, BYTES_PER_VERTEX, (FloatBuffer)floatBuffer);
 				}
 
 				GL11.glEnableClientState(GL11.GL_VERTEX_ARRAY);
@@ -184,6 +216,7 @@ public final class Tessellator {
 	}
 
 	public final void addVertex(double x, double y, double z) {
+		this.ensureCapacity(INTS_PER_VERTEX);
 		if(this.hasTexture) {
 			this.rawBuffer[this.rawBufferIndex + 3] = Float.floatToRawIntBits((float)this.textureU);
 			this.rawBuffer[this.rawBufferIndex + 4] = Float.floatToRawIntBits((float)this.textureV);
@@ -196,12 +229,8 @@ public final class Tessellator {
 		this.rawBuffer[this.rawBufferIndex] = Float.floatToRawIntBits((float)(x + this.xOffset));
 		this.rawBuffer[this.rawBufferIndex + 1] = Float.floatToRawIntBits((float)(y + this.yOffset));
 		this.rawBuffer[this.rawBufferIndex + 2] = Float.floatToRawIntBits((float)(z + this.zOffset));
-		this.rawBufferIndex += 8;
+		this.rawBufferIndex += INTS_PER_VERTEX;
 		++this.vertexCount;
-		if(this.vertexCount % 4 == 0 && this.rawBufferIndex >= 2097120) {
-			this.draw();
-		}
-
 	}
 
 	public final void setColorOpaque_I(int colorValue) {

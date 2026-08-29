@@ -4,7 +4,9 @@ import com.mojang.nbt.NBTTagCompound;
 import net.minecraft.client.render.Tessellator;
 import net.minecraft.game.entity.Entity;
 import net.minecraft.game.world.World;
+import util.AtlasUV;
 import util.MathHelper;
+import util.TextureAtlas;
 
 public class EntityFX extends Entity {
 	protected int particleTextureIndex;
@@ -70,10 +72,11 @@ public class EntityFX extends Entity {
 	}
 
 	public void renderParticle(Tessellator var1, float var2, float var3, float var4, float var5, float var6, float var7) {
-		float var8 = (float)(this.particleTextureIndex % 16) / 16.0F;
-		float var9 = var8 + 0.999F / 16.0F;
-		float var10 = (float)(this.particleTextureIndex / 16) / 16.0F;
-		float var11 = var10 + 0.999F / 16.0F;
+		AtlasUV.calc(this.particleTextureIndex, TextureAtlas.TERRAIN);
+		float var8 = (float)AtlasUV.u1;
+		float var9 = (float)AtlasUV.u2;
+		float var10 = (float)AtlasUV.v1;
+		float var11 = (float)AtlasUV.v2;
 		float var12 = 0.1F * this.particleScale;
 		float var13 = (float)(this.prevPosX + (this.posX - this.prevPosX) * (double)var2 - interpPosX);
 		float var14 = (float)(this.prevPosY + (this.posY - this.prevPosY) * (double)var2 - interpPosY);

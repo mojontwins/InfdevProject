@@ -3,6 +3,8 @@ package net.minecraft.client.effect;
 import net.minecraft.client.render.Tessellator;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.Block;
+import util.AtlasUV;
+import util.TextureAtlas;
 
 public final class EntityDiggingFX extends EntityFX {
 	public EntityDiggingFX(World var1, double var2, double var4, double var6, double var8, double var10, double var12, Block var14) {
@@ -18,10 +20,15 @@ public final class EntityDiggingFX extends EntityFX {
 	}
 
 	public final void renderParticle(Tessellator var1, float var2, float var3, float var4, float var5, float var6, float var7) {
-		float var8 = ((float)(this.particleTextureIndex % 16) + this.particleTextureJitterX / 4.0F) / 16.0F;
-		float var9 = var8 + 0.999F / 64.0F;
-		float var10 = ((float)(this.particleTextureIndex / 16) + this.particleTextureJitterY / 4.0F) / 16.0F;
-		float var11 = var10 + 0.999F / 64.0F;
+		TextureAtlas terrain = TextureAtlas.TERRAIN;
+		AtlasUV.calc(this.particleTextureIndex, terrain);
+		// The jitter nudges the crack sprite by a few texels within its tile.
+		float jitterU = this.particleTextureJitterX * 4.0F / terrain.width;
+		float jitterV = this.particleTextureJitterY * 4.0F / terrain.height;
+		float var8 = (float)AtlasUV.u1 + jitterU;
+		float var9 = (float)AtlasUV.u2 + jitterU;
+		float var10 = (float)AtlasUV.v1 + jitterV;
+		float var11 = (float)AtlasUV.v2 + jitterV;
 		float var12 = 0.1F * this.particleScale;
 		float var13 = (float)(this.prevPosX + (this.posX - this.prevPosX) * (double)var2 - interpPosX);
 		float var14 = (float)(this.prevPosY + (this.posY - this.prevPosY) * (double)var2 - interpPosY);

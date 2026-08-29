@@ -10,7 +10,9 @@ import net.minecraft.game.entity.misc.EntityItem;
 import net.minecraft.game.item.ItemStack;
 import net.minecraft.game.world.block.Block;
 import org.lwjgl.opengl.GL11;
+import util.AtlasUV;
 import util.MathHelper;
+import util.TextureAtlas;
 
 public final class RenderItem extends Render {
 	private RenderBlocks renderBlocks = new RenderBlocks();
@@ -158,10 +160,13 @@ public final class RenderItem extends Render {
 			}
 
 			Tessellator tessellator = Tessellator.instance;
-			texU1 = (float)(icon % 16 << 4) / 256.0F;
-			float texU2 = (float)((icon % 16 << 4) + 16) / 256.0F;
-			float texV1 = (float)(icon / 16 << 4) / 256.0F;
-			float texV2 = (float)((icon / 16 << 4) + 16) / 256.0F;
+			// Block items are cut from the terrain atlas, everything else from the item atlas.
+			TextureAtlas itemAtlas = itemStack.itemID < 256 ? TextureAtlas.TERRAIN : TextureAtlas.ITEMS;
+			AtlasUV.calc(icon, itemAtlas);
+			texU1 = (float)AtlasUV.u1;
+			float texU2 = (float)AtlasUV.u2;
+			float texV1 = (float)AtlasUV.v1;
+			float texV2 = (float)AtlasUV.v2;
 
 			for(int count = 0; count < itemCount; ++count) {
 				GL11.glPushMatrix();

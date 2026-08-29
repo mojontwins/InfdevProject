@@ -9,7 +9,11 @@ import net.minecraft.client.render.entity.RenderPlayer;
 import net.minecraft.game.item.ItemStack;
 import net.minecraft.game.world.block.Block;
 import org.lwjgl.opengl.GL11;
+import util.AtlasTexel;
+import util.AtlasUV;
 import util.MathHelper;
+import util.TexelScale;
+import util.TextureAtlas;
 
 public final class ItemRenderer {
 	private Minecraft mc;
@@ -69,10 +73,13 @@ public final class ItemRenderer {
 				}
 
 				Tessellator tessellator = Tessellator.instance;
-				float texU1 = (float)(this.itemToRender.getItem().getIconFromDamage() % 16 << 4) / 256.0F;
-				float texU2 = (float)((this.itemToRender.getItem().getIconFromDamage() % 16 << 4) + 16) / 256.0F;
-				float texV1 = (float)(this.itemToRender.getItem().getIconFromDamage() / 16 << 4) / 256.0F;
-				float texV2 = (float)((this.itemToRender.getItem().getIconFromDamage() / 16 << 4) + 16) / 256.0F;
+				// Block items are cut from the terrain atlas, everything else from the item atlas.
+				TextureAtlas itemAtlas = this.itemToRender.itemID < 256 ? TextureAtlas.TERRAIN : TextureAtlas.ITEMS;
+				AtlasUV.calc(this.itemToRender.getItem().getIconFromDamage(), itemAtlas);
+				float texU1 = (float)AtlasUV.u1;
+				float texU2 = (float)AtlasUV.u2;
+				float texV1 = (float)AtlasUV.v1;
+				float texV2 = (float)AtlasUV.v2;
 				GL11.glEnable(GL11.GL_NORMALIZE);
 				GL11.glTranslatef(0.0F, -0.3F, 0.0F);
 				GL11.glScalef(1.5F, 1.5F, 1.5F);
@@ -205,19 +212,20 @@ public final class ItemRenderer {
 			for(textureId = 0; textureId < 2; ++textureId) {
 				GL11.glPushMatrix();
 				int fireTexture = Block.fire.blockIndexInTexture + (textureId << 4);
-				int texX = (fireTexture & 15) << 4;
-				fireTexture &= 240;
-				float uMax = (float)texX / 256.0F;
-				float uEdge = ((float)texX + 15.99F) / 256.0F;
-				uMin = (float)fireTexture / 256.0F;
-				vMin = ((float)fireTexture + 15.99F) / 256.0F;
+				AtlasTexel.calc(fireTexture, TextureAtlas.TERRAIN);
+				TextureAtlas terrain = TextureAtlas.TERRAIN;
+				// A 16-pixel column of the fire tile; the loop switches rows between passes.
+				float uMax = TexelScale.u(terrain, (float)AtlasTexel.u);
+				float uEdge = TexelScale.u(terrain, (float)AtlasTexel.u + terrain.tileSpan);
+				float vTop = TexelScale.v(terrain, (float)AtlasTexel.v);
+				float vBottom = TexelScale.v(terrain, (float)AtlasTexel.v + terrain.tileSpan);
 				GL11.glTranslatef((float)(-((textureId << 1) - 1)) * 0.24F, -0.3F, 0.0F);
 				GL11.glRotatef((float)((textureId << 1) - 1) * 10.0F, 0.0F, 1.0F, 0.0F);
 				tessellator.startDrawingQuads();
-				tessellator.addVertexWithUV(-0.5D, -0.5D, -0.5D, (double)uEdge, (double)vMin);
-				tessellator.addVertexWithUV(0.5D, -0.5D, -0.5D, (double)uMax, (double)vMin);
-				tessellator.addVertexWithUV(0.5D, 0.5D, -0.5D, (double)uMax, (double)uMin);
-				tessellator.addVertexWithUV(-0.5D, 0.5D, -0.5D, (double)uEdge, (double)uMin);
+				tessellator.addVertexWithUV(-0.5D, -0.5D, -0.5D, (double)uEdge, (double)vBottom);
+				tessellator.addVertexWithUV(0.5D, -0.5D, -0.5D, (double)uMax, (double)vBottom);
+				tessellator.addVertexWithUV(0.5D, 0.5D, -0.5D, (double)uMax, (double)vTop);
+				tessellator.addVertexWithUV(-0.5D, 0.5D, -0.5D, (double)uEdge, (double)vTop);
 				tessellator.draw();
 				GL11.glPopMatrix();
 			}

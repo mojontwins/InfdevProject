@@ -6,7 +6,9 @@ import net.minecraft.game.entity.Entity;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.Block;
 import org.lwjgl.opengl.GL11;
+import util.AtlasUV;
 import util.MathHelper;
+import util.TextureAtlas;
 
 public abstract class Render {
 	protected RenderManager renderManager;
@@ -93,12 +95,11 @@ public abstract class Render {
 		if(entity.fire > 0) {
 			GL11.glDisable(GL11.GL_LIGHTING);
 			int fireTextureIndex = Block.fire.blockIndexInTexture;
-			int texU = (fireTextureIndex & 15) << 4;
-			int texV = fireTextureIndex & 240;
-			float uMin = (float)texU / 256.0F;
-			float uMax = ((float)texU + 15.99F) / 256.0F;
-			float vMin = (float)texV / 256.0F;
-			float vMax = ((float)texV + 15.99F) / 256.0F;
+			AtlasUV.calc(fireTextureIndex, TextureAtlas.TERRAIN);
+			float uMin = (float)AtlasUV.u1;
+			float uMax = (float)AtlasUV.u2;
+			float vMin = (float)AtlasUV.v1;
+			float vMax = (float)AtlasUV.v2;
 			GL11.glPushMatrix();
 			GL11.glTranslatef((float)x, (float)y, (float)z);
 			float fireScale = entity.width * 1.4F;
