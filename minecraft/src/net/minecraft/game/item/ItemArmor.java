@@ -4,7 +4,7 @@ package net.minecraft.game.item;
  * A piece of wearable armour. {@code armorType} tells which slot it belongs to
  * (0 = helmet, 1 = chestplate, 2 = leggings, 3 = boots) and drives three things:
  * how much damage it reduces (see {@link #damageReduceAmount} and
- * {@link net.minecraft.game.entity.player.InventoryPlayer#getPlayerArmorValue()}),
+ * {@link net.minecraft.game.entity.player.InventoryPlayer#getTotalArmorValue()}),
  * how much durability it gets, and — through {@link #renderIndex} — which armour
  * texture layer the player renderer uses.
  */

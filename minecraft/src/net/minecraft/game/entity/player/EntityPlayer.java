@@ -1,5 +1,6 @@
 package net.minecraft.game.entity.player;
 
+import com.mojang.nbt.NBTTagCompound;
 import java.util.List;
 import net.minecraft.game.IInventory;
 import net.minecraft.game.entity.Entity;
@@ -8,7 +9,6 @@ import net.minecraft.game.entity.misc.EntityItem;
 import net.minecraft.game.entity.monster.EntityMonster;
 import net.minecraft.game.entity.projectile.EntityArrow;
 import net.minecraft.game.item.Item;
-import net.minecraft.game.item.ItemArmor;
 import net.minecraft.game.item.ItemStack;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.Block;
@@ -27,8 +27,6 @@ public class EntityPlayer extends EntityLiving {
 	public float prevCameraYaw;
 	public float cameraYaw;
 	protected String username;
-	/** Armour damage that did not divide evenly across the armour hopper; carried over to the next blow. */
-	private int damageRemainder = 0;
 
 	public EntityPlayer(World world) {
 		super(world);
@@ -175,9 +173,10 @@ public class EntityPlayer extends EntityLiving {
 	}
 
 	/**
-	 * Damage for the player: scaled by the difficulty, softened by armour on a
-	 * 25-point hopper (with the odd remainder carried over), and nullified
-	 * while the red hearts flash is still up. Returns true when the blow landed.
+	 * Damage for the player: scaled by the difficulty, then handed to
+	 * {@link EntityLiving#attackEntityFrom} whose armour hopper softens it using
+	 * the overridden armour hooks below. Nullified while the red hearts flash is
+	 * still up. Returns true when the blow landed.
 	 */
 	public final boolean attackEntityFrom(Entity attacker, int damage) {
 		this.entityAge = 0;
@@ -202,29 +201,42 @@ public class EntityPlayer extends EntityLiving {
 				}
 			}
 
-			// Armour absorbs a fraction: every protected point shaves one point
-			// from a 25-scale hopper, and whatever did not divide evenly is kept.
-			int hopper = 25 - this.inventory.getPlayerArmorValue();
-			hopper = damage * hopper + this.damageRemainder;
-
-			for(int slot = 0; slot < this.inventory.armorInventory.length; ++slot) {
-				ItemStack armorStack = this.inventory.armorInventory[slot];
-				if(armorStack != null && armorStack.getItem() instanceof ItemArmor) {
-					armorStack.damageItem(damage);
-					if(armorStack.stackSize == 0) {
-						this.inventory.armorInventory[slot] = null;
-					}
-				}
-			}
-
-			damage = hopper / 25;
-			this.damageRemainder = hopper % 25;
 			if(damage == 0) {
 				return false;
 			} else {
 				return super.attackEntityFrom(attacker, damage);
 			}
 		}
+	}
+
+	/** The player's armour lives in the inventory, so all four hooks delegate to it. */
+	@Override
+	public final int getTotalArmorValue() {
+		return this.inventory.getTotalArmorValue();
+	}
+
+	@Override
+	public final void damageArmor(int damage) {
+		this.inventory.damageArmor(damage);
+	}
+
+	@Override
+	public final ItemStack getArmorInSlot(int slot) {
+		return this.inventory.armorInventory[slot];
+	}
+
+	@Override
+	public final void setArmorInSlot(int slot, ItemStack stack) {
+		this.inventory.armorInventory[slot] = stack;
+	}
+
+	// The player's armour is already persisted inside the inventory list.
+	@Override
+	protected void writeEquipmentToNBT(NBTTagCompound compound) {
+	}
+
+	@Override
+	protected void readEquipmentFromNBT(NBTTagCompound compound) {
 	}
 
 	public void displayFurnaceGUI(TileEntityFurnace tileEntityFurnace) {

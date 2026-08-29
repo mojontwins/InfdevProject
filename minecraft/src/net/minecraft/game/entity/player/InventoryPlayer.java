@@ -179,7 +179,13 @@ public final class InventoryPlayer implements IInventory {
 		return 64;
 	}
 
-	public final int getPlayerArmorValue() {
+	/**
+	 * Total armour rating of the worn set, attenuated as the pieces wear down:
+	 * a pristine set is worth its full rating, a set about to break may only
+	 * count for 1. Feeds the 25-point damage hopper in the armour
+	 * pipeline of {@code EntityLiving#applyArmorCalculations}.
+	 */
+	public final int getTotalArmorValue() {
 		int damageReduceTotal = 0;
 		int remainingDurability = 0;
 		int totalDurability = 0;
@@ -198,6 +204,19 @@ public final class InventoryPlayer implements IInventory {
 			return 0;
 		} else {
 			return (damageReduceTotal - 1) * remainingDurability / totalDurability + 1;
+		}
+	}
+
+	/** Wears every equipped armour piece by one blow's worth of damage, dropping pieces that break. */
+	public final void damageArmor(int damage) {
+		for (int slot = 0; slot < this.armorInventory.length; ++slot) {
+			ItemStack armorStack = this.armorInventory[slot];
+			if (armorStack != null && armorStack.getItem() instanceof ItemArmor) {
+				armorStack.damageItem(damage);
+				if (armorStack.stackSize == 0) {
+					this.armorInventory[slot] = null;
+				}
+			}
 		}
 	}
 

@@ -75,11 +75,15 @@ public final class MobSpawner {
 								return var2;
 							}
 
-							var32.setLocationAndAngles((double)var16, (double)var17, (double)var18, var1.rand.nextFloat() * 360.0F, 0.0F);
-							if(var32.getCanSpawnHere(var16, var17, var18)) {
-								++var2;
-								var1.spawnEntityInWorld(var32);
+var32.setLocationAndAngles((double)var16, (double)var17, (double)var18, var1.rand.nextFloat() * 360.0F, 0.0F);
+						if(var32.getCanSpawnHere(var16, var17, var18)) {
+							++var2;
+							if(var32.mightSpawnArmored()) {
+								var32.addRandomArmor();
 							}
+
+							var1.spawnEntityInWorld(var32);
+						}
 						}
 					}
 				}

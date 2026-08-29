@@ -1,7 +1,12 @@
 package net.minecraft.game.entity;
 
 import com.mojang.nbt.NBTTagCompound;
+import com.mojang.nbt.NBTTagList;
 import java.util.List;
+import net.minecraft.game.entity.misc.EntityItem;
+import net.minecraft.game.item.Item;
+import net.minecraft.game.item.ItemArmor;
+import net.minecraft.game.item.ItemStack;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.Block;
 import net.minecraft.game.world.block.StepSound;
@@ -55,6 +60,11 @@ public class EntityLiving extends Entity {
 	private float randomYawVelocity;
 	protected boolean isJumping;
 	protected float moveSpeed;
+
+	/** Armour worn on the four body slots (index 0 = boots, 3 = helmet; see {@link ItemArmor#armorType}). */
+	protected ItemStack[] armorInventory = new ItemStack[4];
+	/** The part of a blow the armour hopper could not divide evenly; banked for the next {@link #attackEntityFrom}. */
+	protected int armorDamageCarryover = 0;
 
 	public EntityLiving(World world) {
 		super(world);
@@ -233,6 +243,72 @@ public class EntityLiving extends Entity {
 		}
 	}
 
+	/** The armour piece worn in the given slot (0 = boots, 3 = helmet), or null. */
+	public ItemStack getArmorInSlot(int slot) {
+		return this.armorInventory[slot];
+	}
+
+	public void setArmorInSlot(int slot, ItemStack stack) {
+		this.armorInventory[slot] = stack;
+	}
+
+	/**
+	 * The total armour rating of the worn set, attenuated as the pieces wear
+	 * down: a pristine leather set is worth 4, a set about to fall apart may
+	 * only count for 1.
+	 */
+	protected int getTotalArmorValue() {
+		int damageReduceTotal = 0;
+		int remainingDurability = 0;
+		int totalDurability = 0;
+
+		for (ItemStack armor : this.armorInventory) {
+			if (armor != null && armor.getItem() instanceof ItemArmor) {
+				int maxDamage = armor.getMaxDamage();
+				remainingDurability += maxDamage - armor.itemDamage;
+				totalDurability += maxDamage;
+				damageReduceTotal += ((ItemArmor) armor.getItem()).damageReduceAmount;
+			}
+		}
+
+		if (totalDurability == 0) {
+			return 0;
+		} else {
+			return (damageReduceTotal - 1) * remainingDurability / totalDurability + 1;
+		}
+	}
+
+	/** Wears every worn armour piece by one blow's worth of damage, dropping pieces that break. */
+	protected void damageArmor(int damage) {
+		for (int slot = 0; slot < this.armorInventory.length; ++slot) {
+			ItemStack armorStack = this.armorInventory[slot];
+			if (armorStack != null && armorStack.getItem() instanceof ItemArmor) {
+				armorStack.damageItem(damage);
+				if (armorStack.stackSize == 0) {
+					this.armorInventory[slot] = null;
+				}
+			}
+		}
+	}
+
+	/**
+	 * The 25-point armour hopper: every point of {@link #getTotalArmorValue()}
+	 * widens the swing by one, and whatever does not divide evenly is banked in
+	 * {@link #armorDamageCarryover} for the next blow. Environmental harm
+	 * (drowning, fire, falls — no attacker) skips armour entirely.
+	 */
+	protected int applyArmorCalculations(Entity attacker, int damage) {
+		if (attacker != null) {
+			int hopper = 25 - this.getTotalArmorValue();
+			int hopperTotal = damage * hopper + this.armorDamageCarryover;
+			this.damageArmor(damage);
+			damage = hopperTotal / 25;
+			this.armorDamageCarryover = hopperTotal % 25;
+		}
+
+		return damage;
+	}
+
 	/**
 	 * Applies {@code damage} from {@code attacker}. While the hearts flash is
 	 * still shown the blow lands at a fraction of its strength; otherwise the
@@ -246,6 +322,7 @@ public class EntityLiving extends Entity {
 		}
 
 		this.limbSwing = 1.5F;
+		damage = this.applyArmorCalculations(attacker, damage);
 		if((float)this.heartsLife > (float)this.heartsHalvesLife / 2.0F) {
 			if(this.prevHealth - damage >= this.health) {
 				return false;
@@ -300,7 +377,7 @@ public class EntityLiving extends Entity {
 		return "random.hurt";
 	}
 
-	/** Scatters the creature's dropped item a random number of times (0-2). */
+	/** Scatters the creature's dropped item a random number of times (0-2), and sheds any worn armour. */
 	public void onDeath(Entity killer) {
 		int droppedItem = this.getDroppedItem();
 		if(droppedItem > 0) {
@@ -311,10 +388,73 @@ public class EntityLiving extends Entity {
 			}
 		}
 
+		// Worn armour falls off the corpse, keeping the damage it had taken.
+		for(int slot = 0; slot < this.armorInventory.length; ++slot) {
+			ItemStack wornArmor = this.armorInventory[slot];
+			if(wornArmor != null) {
+				this.worldObj.spawnEntityInWorld(new EntityItem(this.worldObj, this.posX, this.posY + (double)0.3F, this.posZ, wornArmor));
+				this.armorInventory[slot] = null;
+			}
+		}
+
 	}
 
 	protected int getDroppedItem() {
 		return 0;
+	}
+
+	/** The five armour materials, each listing helmet, plate, leggings and boots (see {@link ItemArmor#armorType}). */
+	private static final Item[][] armorMaterialSets = new Item[][]{
+		{Item.helmetLeather, Item.plateLeather, Item.legsLeather, Item.bootsLeather},
+		{Item.helmetChain, Item.plateChain, Item.legsChain, Item.bootsChain},
+		{Item.helmetSteel, Item.plateSteel, Item.legsSteel, Item.bootsSteel},
+		{Item.helmetDiamond, Item.plateDiamond, Item.legsDiamond, Item.bootsDiamond},
+		{Item.helmetGold, Item.plateGold, Item.legsGold, Item.bootsGold}
+	};
+
+	/**
+	 * Whether this creature can spawn already wearing random armour. Off by
+	 * default; the MobSpawner only rolls armour through {@link #addRandomArmor()}
+	 * when this returns true, so subclasses may enable it for their kind only.
+	 */
+	public boolean mightSpawnArmored() {
+		return false;
+	}
+
+	/**
+	 * Bestows random pieces of armour, scaled by the difficulty and weighted
+	 * toward the cheap sets, on a creature as it spawns. The MobSpawner calls
+	 * this only when {@link #mightSpawnArmored()} allows it.
+	 */
+	public void addRandomArmor() {
+		int pieceCount = this.rand.nextInt(2 + this.worldObj.difficultySetting * 2);
+
+		for(int piece = 0; piece < pieceCount; ++piece) {
+			ItemStack armorPiece = this.randomArmorPiece();
+			this.setArmorInSlot(3 - ((ItemArmor)armorPiece.getItem()).armorType, armorPiece);
+		}
+
+	}
+
+	/** Builds one random piece: a random armour slot and a material drawn from the weighted table. */
+	private ItemStack randomArmorPiece() {
+		int armorType = this.rand.nextInt(4);
+		int materialRoll = this.rand.nextInt(10);
+		int material;
+		if(materialRoll < 4) {
+			// leather — the common early-game set.
+			material = 0;
+		} else if(materialRoll < 6) {
+			material = 1;
+		} else if(materialRoll < 8) {
+			material = 2;
+		} else if(materialRoll < 9) {
+			material = 4;
+		} else {
+			material = 3;
+		}
+
+		return new ItemStack(armorMaterialSets[material][armorType]);
 	}
 
 	/** Counts fall damage for every block past 3, and reports the landing block's step sound. */
@@ -336,6 +476,7 @@ public class EntityLiving extends Entity {
 		compound.setShort("HurtTime", (short)this.hurtTime);
 		compound.setShort("DeathTime", (short)this.deathTime);
 		compound.setShort("AttackTime", (short)this.attackTime);
+		this.writeEquipmentToNBT(compound);
 	}
 
 	public void readEntityFromNBT(NBTTagCompound compound) {
@@ -347,6 +488,40 @@ public class EntityLiving extends Entity {
 		this.hurtTime = compound.getShort("HurtTime");
 		this.deathTime = compound.getShort("DeathTime");
 		this.attackTime = compound.getShort("AttackTime");
+		this.readEquipmentFromNBT(compound);
+	}
+
+	/**
+	 * Serializes the worn armour into an {@code "Armor"} list of item tags (an
+	 * empty compound marks a missing piece). The player reads and writes its
+	 * armour through the inventory instead and overrides this to a no-op.
+	 */
+	protected void writeEquipmentToNBT(NBTTagCompound compound) {
+		NBTTagList armorList = new NBTTagList();
+
+		for(ItemStack armor : this.armorInventory) {
+			NBTTagCompound itemTag = new NBTTagCompound();
+			if(armor != null) {
+				armor.writeToNBT(itemTag);
+			}
+
+			armorList.setTag(itemTag);
+		}
+
+		compound.setTag("Armor", armorList);
+	}
+
+	protected void readEquipmentFromNBT(NBTTagCompound compound) {
+		NBTTagList armorList = compound.getTagList("Armor");
+		int slotCount = Math.min(this.armorInventory.length, armorList.tagCount());
+
+		for(int slot = 0; slot < slotCount; ++slot) {
+			NBTTagCompound itemTag = (NBTTagCompound)armorList.tagAt(slot);
+			if(itemTag != null && itemTag.hasKey("id")) {
+				this.armorInventory[slot] = new ItemStack(itemTag);
+			}
+		}
+
 	}
 
 	public final boolean isEntityAlive() {

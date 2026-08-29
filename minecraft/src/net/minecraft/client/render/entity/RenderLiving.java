@@ -1,14 +1,21 @@
 package net.minecraft.client.render.entity;
 
 import net.minecraft.client.model.ModelBase;
+import net.minecraft.client.model.ModelBiped;
 import net.minecraft.game.entity.Entity;
 import net.minecraft.game.entity.EntityLiving;
+import net.minecraft.game.item.Item;
+import net.minecraft.game.item.ItemArmor;
+import net.minecraft.game.item.ItemStack;
 import org.lwjgl.opengl.GL11;
 import util.MathHelper;
 
 public class RenderLiving extends Render {
 	protected ModelBase mainModel;
 	private ModelBase renderPassModel;
+	private ModelBiped modelArmorChestplate = new ModelBiped(1.0F);
+	private ModelBiped modelArmor = new ModelBiped(0.5F);
+	private static final String[] armorFilenamePrefix = new String[]{"cloth", "chain", "iron", "diamond", "gold"};
 
 	public RenderLiving(ModelBase mainModel, float shadowSize) {
 		this.mainModel = mainModel;
@@ -114,7 +121,33 @@ public class RenderLiving extends Render {
 		GL11.glPopMatrix();
 	}
 
+	/**
+	 * Draws the armour overlay for any living being that wears some (players
+	 * via the inventory, mobs via their own armour slots). The four passes map
+	 * one to one onto the armour slots — helmet, chestplate, leggings, boots —
+	 * using the two fitted biped models.
+	 */
 	protected boolean shouldRenderPass(EntityLiving entity, int renderPass) {
+		int armorSlot = 3 - renderPass;
+		ItemStack stack = entity.getArmorInSlot(armorSlot);
+		if(stack != null) {
+			Item item = stack.getItem();
+			if(item instanceof ItemArmor) {
+				ItemArmor armor = (ItemArmor)item;
+				this.loadTexture("/armor/" + armorFilenamePrefix[armor.renderIndex] + "_" + (renderPass == 2 ? 2 : 1) + ".png");
+				ModelBiped model = renderPass == 2 ? this.modelArmor : this.modelArmorChestplate;
+				model.bipedHead.showModel = renderPass == 0;
+				model.bipedHeadwear.showModel = renderPass == 0;
+				model.bipedBody.showModel = renderPass == 1 || renderPass == 2;
+				model.bipedRightArm.showModel = renderPass == 1;
+				model.bipedLeftArm.showModel = renderPass == 1;
+				model.bipedRightLeg.showModel = renderPass == 2 || renderPass == 3;
+				model.bipedLeftLeg.showModel = renderPass == 2 || renderPass == 3;
+				this.setRenderPassModel(model);
+				return true;
+			}
+		}
+
 		return false;
 	}
 

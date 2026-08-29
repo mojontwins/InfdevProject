@@ -53,7 +53,7 @@ public final class GuiIngame extends Gui {
 		int var12;
 		if(this.mc.playerController.shouldDrawHUD()) {
 			EntityPlayerSP var8 = this.mc.thePlayer;
-			var10 = var8.inventory.getPlayerArmorValue();
+			var10 = var8.inventory.getTotalArmorValue();
 
 			int var11;
 			int var13;
