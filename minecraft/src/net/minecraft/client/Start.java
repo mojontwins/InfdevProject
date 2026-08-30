@@ -4,6 +4,8 @@ import java.awt.BorderLayout;
 import java.awt.Frame;
 import java.awt.GraphicsEnvironment;
 import java.awt.Rectangle;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.HashMap;
@@ -137,6 +139,14 @@ public final class Start {
 			screenBounds.y + (screenBounds.height - gameHeight) / 2
 		);
 		frame.setVisible(true);
+
+		frame.addWindowListener(new WindowAdapter() {
+			@Override
+			public void windowClosing(WindowEvent e) {
+				mc.shutdownMinecraftApplet();
+				System.exit(0);
+			}
+		});
 
 		// Close the frame when the JVM exits (e.g. game window closed).
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
