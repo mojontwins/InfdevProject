@@ -8,6 +8,7 @@ import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 import org.lwjgl.opengl.GL11;
 
+/** Base class for all in-game and menu screens: manages the button list and routes input events. */
 public class GuiScreen extends Gui {
 	protected Minecraft mc;
 	public int width;
@@ -16,54 +17,59 @@ public class GuiScreen extends Gui {
 	public boolean allowUserInput = false;
 	protected FontRenderer fontRenderer;
 
-	public void drawScreen(int var1, int var2, float var3) {
-		for(int var5 = 0; var5 < this.controlList.size(); ++var5) {
-			GuiButton var4 = this.controlList.get(var5);
-			var4.drawButton(this.mc, var1, var2);
+	/** Draws the background (handled by subclasses) and every button in the control list. */
+	public void drawScreen(int mouseX, int mouseY, float partialTicks) {
+		for(int index = 0; index < this.controlList.size(); ++index) {
+			GuiButton button = this.controlList.get(index);
+			button.drawButton(this.mc, mouseX, mouseY);
 		}
 
 	}
 
-	protected void keyTyped(char var1, int var2) {
-		if(var2 == 1) {
+	/** Default keyboard handler: pressing Esc (key 1) closes the screen. */
+	protected void keyTyped(char typedChar, int keyCode) {
+		if(keyCode == 1) {
 			this.mc.displayGuiScreen((GuiScreen)null);
 			this.mc.setIngameFocus();
 		}
 
 	}
 
-	protected void mouseClicked(int var1, int var2, int var3) {
-		if(var3 == 0) {
-			for(var3 = 0; var3 < this.controlList.size(); ++var3) {
-				GuiButton var4 = this.controlList.get(var3);
-				if(var4.mousePressed(var1, var2)) {
+	/** Routes a mouse click to the matching button and fires its action. */
+	protected void mouseClicked(int mouseX, int mouseY, int button) {
+		if(button == 0) {
+			for(button = 0; button < this.controlList.size(); ++button) {
+				GuiButton control = this.controlList.get(button);
+				if(control.mousePressed(mouseX, mouseY)) {
 					this.mc.sndManager.playSoundFX("random.click", 1.0F, 1.0F);
-					this.actionPerformed(var4);
+					this.actionPerformed(control);
 				}
 			}
 		}
 
 	}
 
-	protected void actionPerformed(GuiButton var1) {
+	protected void actionPerformed(GuiButton button) {
 	}
 
-	public final void setWorldAndResolution(Minecraft var1, int var2, int var3) {
-		this.mc = var1;
-		this.fontRenderer = var1.fontRenderer;
-		this.width = var2;
-		this.height = var3;
+	/** Stores the Minecraft instance and resolution, then (re)initialises the screen. */
+	public final void setWorldAndResolution(Minecraft minecraft, int screenWidth, int screenHeight) {
+		this.mc = minecraft;
+		this.fontRenderer = minecraft.fontRenderer;
+		this.width = screenWidth;
+		this.height = screenHeight;
 		this.initGui();
 	}
 
 	public void initGui() {
 	}
 
+	/** Polls the mouse events and converts raw window coordinates to scaled screen coordinates. */
 	public final void handleMouseInput() {
 		if(Mouse.getEventButtonState()) {
-			int var1 = Mouse.getEventX() * this.width / this.mc.displayWidth;
-			int var2 = this.height - Mouse.getEventY() * this.height / this.mc.displayHeight - 1;
-			this.mouseClicked(var1, var2, Mouse.getEventButton());
+			int mouseX = Mouse.getEventX() * this.width / this.mc.displayWidth;
+			int mouseY = this.height - Mouse.getEventY() * this.height / this.mc.displayHeight - 1;
+			this.mouseClicked(mouseX, mouseY, Mouse.getEventButton());
 		} else {
 			Mouse.getEventX();
 			Mouse.getEventY();
@@ -71,6 +77,7 @@ public class GuiScreen extends Gui {
 		}
 	}
 
+	/** Polls keyboard events, handling fullscreen toggle and forwarding typed keys. */
 	public final void handleKeyboardInput() {
 		if(Keyboard.getEventKeyState()) {
 			if(Keyboard.getEventKey() == Keyboard.KEY_F11) {
@@ -89,22 +96,24 @@ public class GuiScreen extends Gui {
 	public void onGuiClosed() {
 	}
 
+	/** Fills the background: a gradient in-game, or the tiled dirt background on menus. */
 	public final void drawDefaultBackground() {
 		if(this.mc.theWorld != null) {
 			drawGradientRect(0, 0, this.width, this.height, 1610941696, -1607454624);
 		} else {
 			GL11.glDisable(GL11.GL_LIGHTING);
 			GL11.glDisable(GL11.GL_FOG);
-			Tessellator var2 = Tessellator.instance;
+			Tessellator tessellator = Tessellator.instance;
 			GL11.glBindTexture(GL11.GL_TEXTURE_2D, this.mc.renderEngine.getTexture("/dirt.png"));
 			GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-			var2.startDrawingQuads();
-			var2.setColorOpaque_I(4210752);
-			var2.addVertexWithUV(0.0D, (double)this.height, 0.0D, 0.0D, (double)((float)this.height / 32.0F));
-			var2.addVertexWithUV((double)this.width, (double)this.height, 0.0D, (double)((float)this.width / 32.0F), (double)((float)this.height / 32.0F));
-			var2.addVertexWithUV((double)this.width, 0.0D, 0.0D, (double)((float)this.width / 32.0F), 0.0D);
-			var2.addVertexWithUV(0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
-			var2.draw();
+			// Tile the 32x32 dirt texture across the whole screen.
+			tessellator.startDrawingQuads();
+			tessellator.setColorOpaque_I(4210752);
+			tessellator.addVertexWithUV(0.0D, (double)this.height, 0.0D, 0.0D, (double)((float)this.height / 32.0F));
+			tessellator.addVertexWithUV((double)this.width, (double)this.height, 0.0D, (double)((float)this.width / 32.0F), (double)((float)this.height / 32.0F));
+			tessellator.addVertexWithUV((double)this.width, 0.0D, 0.0D, (double)((float)this.width / 32.0F), 0.0D);
+			tessellator.addVertexWithUV(0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+			tessellator.draw();
 		}
 	}
 
@@ -112,6 +121,6 @@ public class GuiScreen extends Gui {
 		return true;
 	}
 
-	public void deleteWorld(boolean var1, int var2) {
+	public void deleteWorld(boolean confirmed, int slotNumber) {
 	}
 }

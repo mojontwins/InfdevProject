@@ -2,22 +2,32 @@ package net.minecraft.client.model;
 
 import util.MathHelper;
 
+/**
+ * Model for the Zombie. It reuses the biped model but overrides the arm pose
+ * so the undead hold both arms outstretched straight in front of them, the
+ * classic zombie lunge.
+ */
 public class ModelZombie extends ModelBiped {
-	public final void setRotationAngles(float var1, float var2, float var3, float var4, float var5, float var6) {
-		super.setRotationAngles(var1, var2, var3, var4, var5, var6);
-		var1 = MathHelper.sin(0.0F);
-		var2 = MathHelper.sin(0.0F);
+	public final void setRotationAngles(float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch, float scaleFactor) {
+		super.setRotationAngles(limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch, scaleFactor);
+		// Stable arm pose for a zombie: unlike a living biped its arms do not
+		// swing while walking, so the sway terms below evaluate to zero.
+		float armSwing = MathHelper.sin(0.0F);
+		float armLift = MathHelper.sin(0.0F);
 		this.bipedRightArm.rotateAngleZ = 0.0F;
 		this.bipedLeftArm.rotateAngleZ = 0.0F;
-		this.bipedRightArm.rotateAngleY = -(0.1F - var1 * 0.6F);
-		this.bipedLeftArm.rotateAngleY = 0.1F - var1 * 0.6F;
+		// Splay the arms slightly to each side (never rotates here).
+		this.bipedRightArm.rotateAngleY = -(0.1F - armSwing * 0.6F);
+		this.bipedLeftArm.rotateAngleY = 0.1F - armSwing * 0.6F;
+		// Point the arms straight ahead (a quarter turn from down to forward).
 		this.bipedRightArm.rotateAngleX = (float)Math.PI * -0.5F;
 		this.bipedLeftArm.rotateAngleX = (float)Math.PI * -0.5F;
-		this.bipedRightArm.rotateAngleX -= var1 * 1.2F - var2 * 0.4F;
-		this.bipedLeftArm.rotateAngleX -= var1 * 1.2F - var2 * 0.4F;
-		this.bipedRightArm.rotateAngleZ += MathHelper.cos(var3 * 0.09F) * 0.05F + 0.05F;
-		this.bipedLeftArm.rotateAngleZ -= MathHelper.cos(var3 * 0.09F) * 0.05F + 0.05F;
-		this.bipedRightArm.rotateAngleX += MathHelper.sin(var3 * 0.067F) * 0.05F;
-		this.bipedLeftArm.rotateAngleX -= MathHelper.sin(var3 * 0.067F) * 0.05F;
+		this.bipedRightArm.rotateAngleX -= armSwing * 1.2F - armLift * 0.4F;
+		this.bipedLeftArm.rotateAngleX -= armSwing * 1.2F - armLift * 0.4F;
+		// Slow idle sway of the arms over time, using ageInTicks.
+		this.bipedRightArm.rotateAngleZ += MathHelper.cos(ageInTicks * 0.09F) * 0.05F + 0.05F;
+		this.bipedLeftArm.rotateAngleZ -= MathHelper.cos(ageInTicks * 0.09F) * 0.05F + 0.05F;
+		this.bipedRightArm.rotateAngleX += MathHelper.sin(ageInTicks * 0.067F) * 0.05F;
+		this.bipedLeftArm.rotateAngleX -= MathHelper.sin(ageInTicks * 0.067F) * 0.05F;
 	}
 }

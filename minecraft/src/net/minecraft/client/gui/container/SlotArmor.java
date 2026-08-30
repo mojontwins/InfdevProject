@@ -4,16 +4,17 @@ import net.minecraft.game.IInventory;
 import net.minecraft.game.item.ItemArmor;
 import net.minecraft.game.item.ItemStack;
 
+/** An armour slot that only accepts items matching the armour piece type, and draws the appropriate placeholder icon. */
 final class SlotArmor extends Slot {
 	private int armorType;
 
-	SlotArmor(GuiInventory var1, GuiContainer var2, IInventory var3, int var4, int var5, int var6, int var7) {
-		super(var2, var3, var4, 8, var6);
-		this.armorType = var7;
+	SlotArmor(GuiInventory parent, GuiContainer guiHandler, IInventory inventory, int slotIndex, int xPos, int yPos, int armorType) {
+		super(guiHandler, inventory, slotIndex, 8, yPos);
+		this.armorType = armorType;
 	}
 
-	public final boolean isItemValid(ItemStack var1) {
-		return var1.getItem() instanceof ItemArmor ? ((ItemArmor)var1.getItem()).armorType == this.armorType : false;
+	public final boolean isItemValid(ItemStack stack) {
+		return stack.getItem() instanceof ItemArmor ? ((ItemArmor)stack.getItem()).armorType == this.armorType : false;
 	}
 
 	public final int getBackgroundIconIndex() {

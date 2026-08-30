@@ -3,6 +3,11 @@ package net.minecraft.game.world.block;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 
+/**
+ * Sponge. This is a faithful stub of the era: on placement it scans the 5x5x5
+ * neighbourhood but its water-absorption behaviour never shipped (the block
+ * reads the adjacent materials and does nothing with them).
+ */
 public final class BlockSponge extends Block {
 	protected BlockSponge(int blockID) {
 		super(blockID, Material.sponge);

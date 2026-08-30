@@ -1,6 +1,7 @@
 package net.minecraft.client.player;
 
 public class MovementInput {
+	// Base class for reading player movement input (keyboard, mouse, etc.).
 	public float moveStrafe = 0.0F;
 	public float moveForward = 0.0F;
 	public boolean jump = false;
@@ -13,6 +14,7 @@ public class MovementInput {
 	public void resetKeyState() {
 	}
 
-	public void checkKeyForMovementInput(int var1, boolean var2) {
+	// Records which movement action a pressed key corresponds to.
+	public void checkKeyForMovementInput(int keyCode, boolean isPressed) {
 	}
 }

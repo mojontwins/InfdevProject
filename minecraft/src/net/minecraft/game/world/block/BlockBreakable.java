@@ -3,6 +3,11 @@ package net.minecraft.game.world.block;
 import net.minecraft.game.world.IBlockAccess;
 import net.minecraft.game.world.material.Material;
 
+/**
+ * A translucent block that hides its faces against neighbouring tiles of the
+ * same type (so glass sides touching glass are not drawn). When
+ * {@link #renderAllFaces} is set every face is drawn regardless.
+ */
 public class BlockBreakable extends Block {
 	private boolean renderAllFaces;
 

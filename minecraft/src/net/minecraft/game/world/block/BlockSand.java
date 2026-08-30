@@ -4,6 +4,12 @@ import net.minecraft.game.entity.misc.EntityFallingSand;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 
+/**
+ * Sand (and, via {@link BlockGravel}, gravel): a gravity block. When the cell
+ * below is air, water, lava or fire the block turns into an {@link
+ * EntityFallingSand} (or simply drops to the floor below when physics are at
+ * their coarsest).
+ */
 public class BlockSand extends Block {
 	public static boolean fallInstantly = false;
 

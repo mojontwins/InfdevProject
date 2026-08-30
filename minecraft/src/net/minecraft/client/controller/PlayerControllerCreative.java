@@ -6,17 +6,19 @@ import net.minecraft.game.entity.player.EntityPlayer;
 import net.minecraft.game.item.ItemStack;
 
 public final class PlayerControllerCreative extends PlayerController {
-	public PlayerControllerCreative(Minecraft var1) {
-		super(var1);
+	// Creative-mode controller: gives the player an instant, infinite inventory and disables the HUD.
+	public PlayerControllerCreative(Minecraft mc) {
+		super(mc);
 		this.isInTestMode = true;
 	}
 
-	public final void onRespawn(EntityPlayer var1) {
-		for(int var2 = 0; var2 < 9; ++var2) {
-			if(var1.inventory.mainInventory[var2] == null) {
-				this.mc.thePlayer.inventory.mainInventory[var2] = new ItemStack(Session.registeredBlocksList.get(var2).blockID);
+	// On respawn, refill the hotbar: give one of each creative block where empty, reset stack sizes otherwise.
+	public final void onRespawn(EntityPlayer player) {
+		for(int slot = 0; slot < 9; ++slot) {
+			if(player.inventory.mainInventory[slot] == null) {
+				this.mc.thePlayer.inventory.mainInventory[slot] = new ItemStack(Session.registeredBlocksList.get(slot).blockID);
 			} else {
-				this.mc.thePlayer.inventory.mainInventory[var2].stackSize = 1;
+				this.mc.thePlayer.inventory.mainInventory[slot].stackSize = 1;
 			}
 		}
 

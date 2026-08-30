@@ -2,12 +2,18 @@ package net.minecraft.client;
 
 import java.awt.Canvas;
 
+/**
+ * The AWT Canvas embedded inside the Minecraft applet.
+ *
+ * When the canvas is attached to a native peer ({@code addNotify}) the main
+ * render thread is started; when it is detached the game is shut down.
+ */
 final class CanvasMinecraftApplet extends Canvas {
 	private static final long serialVersionUID = 1L;
 	private MinecraftApplet mcApplet;
 
-	CanvasMinecraftApplet(MinecraftApplet var1) {
-		this.mcApplet = var1;
+	CanvasMinecraftApplet(MinecraftApplet mcApplet) {
+		this.mcApplet = mcApplet;
 	}
 
 	public final synchronized void addNotify() {

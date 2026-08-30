@@ -3,52 +3,56 @@ package net.minecraft.client.player;
 import net.minecraft.client.GameSettings;
 
 public final class MovementInputFromOptions extends MovementInput {
+	// Reads movement from the configured key bindings.
 	private boolean[] movementKeyStates = new boolean[10];
 	private GameSettings gameSettings;
 
-	public MovementInputFromOptions(GameSettings var1) {
-		this.gameSettings = var1;
+	public MovementInputFromOptions(GameSettings gameSettings) {
+		this.gameSettings = gameSettings;
 	}
 
-	public final void checkKeyForMovementInput(int var1, boolean var2) {
-		byte var3 = -1;
-		if(var1 == this.gameSettings.keyBindForward.keyCode) {
-			var3 = 0;
+	// Track which movement key (forward/back/left/right/jump/sneak) was pressed or released.
+	public final void checkKeyForMovementInput(int keyCode, boolean isPressed) {
+		byte action = -1;
+		if(keyCode == this.gameSettings.keyBindForward.keyCode) {
+			action = 0;
 		}
 
-		if(var1 == this.gameSettings.keyBindBack.keyCode) {
-			var3 = 1;
+		if(keyCode == this.gameSettings.keyBindBack.keyCode) {
+			action = 1;
 		}
 
-		if(var1 == this.gameSettings.keyBindLeft.keyCode) {
-			var3 = 2;
+		if(keyCode == this.gameSettings.keyBindLeft.keyCode) {
+			action = 2;
 		}
 
-		if(var1 == this.gameSettings.keyBindRight.keyCode) {
-			var3 = 3;
+		if(keyCode == this.gameSettings.keyBindRight.keyCode) {
+			action = 3;
 		}
 
-		if(var1 == this.gameSettings.keyBindJump.keyCode) {
-			var3 = 4;
+		if(keyCode == this.gameSettings.keyBindJump.keyCode) {
+			action = 4;
 		}
 
-		if(var1 == this.gameSettings.keyBindSneak.keyCode) {
-			var3 = 5;
+		if(keyCode == this.gameSettings.keyBindSneak.keyCode) {
+			action = 5;
 		}
 
-		if(var3 >= 0) {
-			this.movementKeyStates[var3] = var2;
+		if(action >= 0) {
+			this.movementKeyStates[action] = isPressed;
 		}
 
 	}
 
+	// Release all held movement keys.
 	public final void resetKeyState() {
-		for(int var1 = 0; var1 < 10; ++var1) {
-			this.movementKeyStates[var1] = false;
+		for(int i = 0; i < 10; ++i) {
+			this.movementKeyStates[i] = false;
 		}
 
 	}
 
+	// Combine the current key states into forward/strafe/jump/sneak movement for this tick.
 	public final void updatePlayerMoveState() {
 		this.moveStrafe = 0.0F;
 		this.moveForward = 0.0F;

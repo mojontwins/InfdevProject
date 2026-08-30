@@ -5,6 +5,12 @@ import net.minecraft.game.world.IBlockAccess;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 
+/**
+ * Slabs (single and double). Placing a single slab onto an existing slab below
+ * fuses them into a double slab, and the double variant reuses the same id with
+ * its {@code doubleSlab} flag instead of a separate block. Slabs drop the
+ * single form.
+ */
 public final class BlockStep extends Block {
 	private boolean doubleSlab;
 

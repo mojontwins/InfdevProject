@@ -7,172 +7,206 @@ import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 import util.MathHelper;
 
+/**
+ * A* pathfinder for creature movement. The search runs over block cells and
+ * only ever looks at the four horizontal neighbours of a node (plus optional
+ * 1-block descents) - it cannot jump, swim into water, or squeeze through gaps
+ * narrower than the entity's footprint.
+ *
+ * <p>The A* bookkeeping lives on {@link PathPoint}: the {@link Path} field is
+ * the open list (a min-heap keyed on F = G + H), {@link #pointMap} maps each
+ * coordinate to its single node instance so the heap can be re-weighted in
+ * place, and {@link #pathOptions} is a scratch buffer for the neighbour cells
+ * of the node being expanded. If the target turns out to be unreachable, the
+ * search still returns a partial path to whatever reachable node came closest.
+ */
 public final class Pathfinder {
-	private World worldMap;
+	private World world;
 	private Path path = new Path();
 	private Map<Integer, PathPoint> pointMap = new HashMap<>();
 	private PathPoint[] pathOptions = new PathPoint[32];
 
-	public Pathfinder(World var1) {
-		this.worldMap = var1;
+	public Pathfinder(World world) {
+		this.world = world;
 	}
 
-	public final PathEntity createEntityPathTo(Entity var1, Entity var2, float var3) {
-		return this.addToPath(var1, var2.posX, var2.boundingBox.minY, var2.posZ, 16.0F);
+	/**
+	 * Plans a path from {@code entity} to {@code target}. The {@code range}
+	 * argument is historic and unused - the search always caps candidates at
+	 * {@code 16.0F} blocks from the target.
+	 */
+	public final PathEntity createEntityPathTo(Entity entity, Entity target, float range) {
+		return this.addToPath(entity, target.posX, target.boundingBox.minY, target.posZ, 16.0F);
 	}
 
-	public final PathEntity createEntityPathToXYZ(Entity var1, int var2, int var3, int var4, float var5) {
-		return this.addToPath(var1, (double)((float)var2 + 0.5F), (double)((float)var3 + 0.5F), (double)((float)var4 + 0.5F), 16.0F);
+	/** Plans a path from {@code entity} to the centre of the given block cell. */
+	public final PathEntity createEntityPathToXYZ(Entity entity, int targetX, int targetY, int targetZ, float range) {
+		return this.addToPath(entity, (double)((float)targetX + 0.5F), (double)((float)targetY + 0.5F), (double)((float)targetZ + 0.5F), 16.0F);
 	}
 
-	private PathEntity addToPath(Entity var1, double var2, double var4, double var6, float var8) {
+	/**
+	 * Runs one A* search from the entity's current cell to {@code targetX/Y/Z}.
+	 * The entity's own footprint is captured as {@code sizePoint} (width+1 by
+	 * height+1) and used to test whether cells around it are passable.
+	 */
+	private PathEntity addToPath(Entity entity, double targetX, double targetY, double targetZ, float range) {
 		this.path.clearPath();
 		this.pointMap.clear();
-		PathPoint var9 = this.openPoint(MathHelper.floor_double(var1.boundingBox.minX), MathHelper.floor_double(var1.boundingBox.minY), MathHelper.floor_double(var1.boundingBox.minZ));
-		PathPoint var22 = this.openPoint(MathHelper.floor_double(var2 - (double)(var1.width / 2.0F)), MathHelper.floor_double(var4), MathHelper.floor_double(var6 - (double)(var1.width / 2.0F)));
-		PathPoint var3 = new PathPoint(MathHelper.floor_float(var1.width + 1.0F), MathHelper.floor_float(var1.height + 1.0F), MathHelper.floor_float(var1.width + 1.0F));
-		float var25 = var8;
-		PathPoint var5 = var3;
-		PathPoint var24 = var22;
-		Entity var23 = var1;
-		Pathfinder var20 = this;
-		var9.totalPathDistance = 0.0F;
-		var9.distanceToNext = var9.distanceTo(var22);
-		var9.distanceToTarget = var9.distanceToNext;
-		this.path.clearPath();
-		this.path.addPoint(var9);
-		Object var7 = var9;
+		PathPoint startPoint = this.openPoint(MathHelper.floor_double(entity.boundingBox.minX), MathHelper.floor_double(entity.boundingBox.minY), MathHelper.floor_double(entity.boundingBox.minZ));
+		PathPoint targetPoint = this.openPoint(MathHelper.floor_double(targetX - (double)(entity.width / 2.0F)), MathHelper.floor_double(targetY), MathHelper.floor_double(targetZ - (double)(entity.width / 2.0F)));
+		PathPoint sizePoint = new PathPoint(MathHelper.floor_float(entity.width + 1.0F), MathHelper.floor_float(entity.height + 1.0F), MathHelper.floor_float(entity.width + 1.0F));
+		float maxDistance = range;
 
-		PathEntity var10000;
+		startPoint.totalPathDistance = 0.0F;
+		startPoint.distanceToNext = startPoint.distanceTo(targetPoint);
+		startPoint.distanceToTarget = startPoint.distanceToNext;
+		this.path.addPoint(startPoint);
+		PathPoint closestPoint = startPoint;
+
 		while(true) {
-			if(var20.path.isPathEmpty()) {
-				var10000 = var7 == var9 ? null : createEntityPath((PathPoint)var7);
-				break;
+			if(this.path.isPathEmpty()) {
+				// No reachable node left: return the best partial path, or null when
+				// the start cell itself was never even expanded.
+				return closestPoint == startPoint ? null : createEntityPath(closestPoint);
 			}
 
-			PathPoint var26 = var20.path.dequeue();
-			if(var26.hash == var24.hash) {
-				var10000 = createEntityPath(var24);
-				break;
+			PathPoint current = this.path.dequeue();
+			if(current.hash == targetPoint.hash) {
+				return createEntityPath(targetPoint);
 			}
 
-			if(var26.distanceTo(var24) < ((PathPoint)var7).distanceTo(var24)) {
-				var7 = var26;
+			if(current.distanceTo(targetPoint) < closestPoint.distanceTo(targetPoint)) {
+				closestPoint = current;
 			}
 
-			var26.isFirst = true;
-			int var15 = 0;
-			byte var16 = 0;
-			if(var20.getVerticalOffset(var26.xCoord, var26.yCoord + 1, var26.zCoord, var5) > 0) {
-				var16 = 1;
+			current.isFirst = true;
+
+			// The cell straight above the node is open, neighbours may also sit one
+			// block higher - this is what lets the path climb single steps.
+			byte stepUp = 0;
+			if(this.getVerticalOffset(current.xCoord, current.yCoord + 1, current.zCoord, sizePoint) > 0) {
+				stepUp = 1;
 			}
 
-			PathPoint var17 = var20.getSafePoint(var23, var26.xCoord, var26.yCoord, var26.zCoord + 1, var5, var16);
-			PathPoint var18 = var20.getSafePoint(var23, var26.xCoord - 1, var26.yCoord, var26.zCoord, var5, var16);
-			PathPoint var19 = var20.getSafePoint(var23, var26.xCoord + 1, var26.yCoord, var26.zCoord, var5, var16);
-			PathPoint var10 = var20.getSafePoint(var23, var26.xCoord, var26.yCoord, var26.zCoord - 1, var5, var16);
-			if(var17 != null && !var17.isFirst && var17.distanceTo(var24) < var25) {
-				++var15;
-				var20.pathOptions[0] = var17;
+			// Gather the four sideways neighbours in the original order (+Z, -X, +X, -Z).
+			// Each is only a candidate while it stays inside maxDistance of the target.
+			int optionCount = 0;
+			PathPoint candidatePosZ = this.getSafePoint(entity, current.xCoord, current.yCoord, current.zCoord + 1, sizePoint, stepUp);
+			PathPoint candidateNegX = this.getSafePoint(entity, current.xCoord - 1, current.yCoord, current.zCoord, sizePoint, stepUp);
+			PathPoint candidatePosX = this.getSafePoint(entity, current.xCoord + 1, current.yCoord, current.zCoord, sizePoint, stepUp);
+			PathPoint candidateNegZ = this.getSafePoint(entity, current.xCoord, current.yCoord, current.zCoord - 1, sizePoint, stepUp);
+			if(candidatePosZ != null && !candidatePosZ.isFirst && candidatePosZ.distanceTo(targetPoint) < maxDistance) {
+				this.pathOptions[optionCount++] = candidatePosZ;
+			}
+			if(candidateNegX != null && !candidateNegX.isFirst && candidateNegX.distanceTo(targetPoint) < maxDistance) {
+				this.pathOptions[optionCount++] = candidateNegX;
+			}
+			if(candidatePosX != null && !candidatePosX.isFirst && candidatePosX.distanceTo(targetPoint) < maxDistance) {
+				this.pathOptions[optionCount++] = candidatePosX;
+			}
+			if(candidateNegZ != null && !candidateNegZ.isFirst && candidateNegZ.distanceTo(targetPoint) < maxDistance) {
+				this.pathOptions[optionCount++] = candidateNegZ;
 			}
 
-			if(var18 != null && !var18.isFirst && var18.distanceTo(var24) < var25) {
-				var20.pathOptions[var15++] = var18;
-			}
-
-			if(var19 != null && !var19.isFirst && var19.distanceTo(var24) < var25) {
-				var20.pathOptions[var15++] = var19;
-			}
-
-			if(var10 != null && !var10.isFirst && var10.distanceTo(var24) < var25) {
-				var20.pathOptions[var15++] = var10;
-			}
-
-			for(int var27 = 0; var27 < var15; ++var27) {
-				PathPoint var11 = var20.pathOptions[var27];
-				float var12 = var26.totalPathDistance + var26.distanceTo(var11);
-				if(!var11.isAssigned() || var12 < var11.totalPathDistance) {
-					var11.previous = var26;
-					var11.totalPathDistance = var12;
-					var11.distanceToNext = var11.distanceTo(var24);
-					if(var11.isAssigned()) {
-						var20.path.changeDistance(var11, var11.totalPathDistance + var11.distanceToNext);
+			// Relax each surviving candidate: a shorter route through `current`
+			// replaces its stored one and re-weights it inside the open list.
+			for(int option = 0; option < optionCount; ++option) {
+				PathPoint candidate = this.pathOptions[option];
+				float newTotalDistance = current.totalPathDistance + current.distanceTo(candidate);
+				if(!candidate.isAssigned() || newTotalDistance < candidate.totalPathDistance) {
+					candidate.previous = current;
+					candidate.totalPathDistance = newTotalDistance;
+					candidate.distanceToNext = candidate.distanceTo(targetPoint);
+					if(candidate.isAssigned()) {
+						this.path.changeDistance(candidate, candidate.totalPathDistance + candidate.distanceToNext);
 					} else {
-						var11.distanceToTarget = var11.totalPathDistance + var11.distanceToNext;
-						var20.path.addPoint(var11);
+						candidate.distanceToTarget = candidate.totalPathDistance + candidate.distanceToNext;
+						this.path.addPoint(candidate);
 					}
 				}
 			}
 		}
-
-		PathEntity var21 = var10000;
-		return var21;
 	}
 
-	private PathPoint getSafePoint(Entity var1, int var2, int var3, int var4, PathPoint var5, int var6) {
-		PathPoint var8 = null;
-		if(this.getVerticalOffset(var2, var3, var4, var5) > 0) {
-			var8 = this.openPoint(var2, var3, var4);
+	/**
+	 * Looks for a walkable cell near (x, y, z): first the cell itself, then - if
+	 * that is blocked - the cell {@code stepExtra} blocks higher. Once a cell is
+	 * found, it is slid down up to four steps to the floor of any drop, so the
+	 * path does not float in mid-air; cells whose floor is water or lava are
+	 * rejected (the entity would drown/burn, not walk).
+	 */
+	private PathPoint getSafePoint(Entity entity, int x, int y, int z, PathPoint size, int stepExtra) {
+		PathPoint safePoint = null;
+		if(this.getVerticalOffset(x, y, z, size) > 0) {
+			safePoint = this.openPoint(x, y, z);
 		}
 
-		if(var8 == null && this.getVerticalOffset(var2, var3 + var6, var4, var5) > 0) {
-			var8 = this.openPoint(var2, var3 + var6, var4);
+		if(safePoint == null && this.getVerticalOffset(x, y + stepExtra, z, size) > 0) {
+			safePoint = this.openPoint(x, y + stepExtra, z);
 		}
 
-		if(var8 != null) {
-			var6 = 0;
+		if(safePoint != null) {
+			int stepCount = 0;
 
 			while(true) {
-				if(var3 > 0) {
-					int var7 = this.getVerticalOffset(var2, var3 - 1, var4, var5);
-					if(var7 > 0) {
-						if(var7 < 0) {
+				if(y > 0) {
+					int dropBelow = this.getVerticalOffset(x, y - 1, z, size);
+					if(dropBelow > 0) {
+						if(++stepCount >= 4) {
 							return null;
 						}
 
-						++var6;
-						if(var6 >= 4) {
-							return null;
-						}
-
-						--var3;
-						var8 = this.openPoint(var2, var3, var4);
+						--y;
+						safePoint = this.openPoint(x, y, z);
 						continue;
 					}
 				}
 
-				Material var9 = this.worldMap.getBlockMaterial(var2, var3 - 1, var4);
-				if(var9 == Material.water || var9 == Material.lava) {
+				Material floorMaterial = this.world.getBlockMaterial(x, y - 1, z);
+				if(floorMaterial == Material.water || floorMaterial == Material.lava) {
 					return null;
 				}
 				break;
 			}
 		}
 
-		return var8;
+		return safePoint;
 	}
 
-	private final PathPoint openPoint(int var1, int var2, int var3) {
-		int var4 = var1 | var2 << 10 | var3 << 20;
-		PathPoint var5 = this.pointMap.get(Integer.valueOf(var4));
-		if(var5 == null) {
-			var5 = new PathPoint(var1, var2, var3);
-			this.pointMap.put(Integer.valueOf(var4), var5);
+	/**
+	 * Returns the single cached node for a cell, creating it on first use so
+	 * that every open-point and safe-point of the same coordinate is one shared
+	 * instance (which is what lets the heap re-weight nodes in place).
+	 */
+	private final PathPoint openPoint(int x, int y, int z) {
+		int hash = x | y << 10 | z << 20;
+		PathPoint point = this.pointMap.get(hash);
+		if(point == null) {
+			point = new PathPoint(x, y, z);
+			this.pointMap.put(hash, point);
 		}
 
-		return var5;
+		return point;
 	}
 
-	private int getVerticalOffset(int var1, int var2, int var3, PathPoint var4) {
-		for(int var5 = var1; var5 < var1 + var4.xCoord; ++var5) {
-			for(int var6 = var2; var6 < var2 + var4.yCoord; ++var6) {
-				for(int var7 = var3; var7 < var3 + var4.zCoord; ++var7) {
-					Material var8 = this.worldMap.getBlockMaterial(var1, var2, var3);
-					if(var8.getIsSolid()) {
+	/**
+	 * Classifies the single cell at (x, y, z): 1 = open (walkable), 0 = solid
+	 * (impassable), -1 = water or lava. It is called with {@code size} set to
+	 * the entity's footprint and the enclosing loops still iterate that whole
+	 * volume - but every iteration reads the very same (x, y, z) cell, so the
+	 * loops are dead scaffolding that is kept verbatim for fidelity with the
+	 * original 2010 code.
+	 */
+	private int getVerticalOffset(int x, int y, int z, PathPoint size) {
+		for(int scanX = x; scanX < x + size.xCoord; ++scanX) {
+			for(int scanY = y; scanY < y + size.yCoord; ++scanY) {
+				for(int scanZ = z; scanZ < z + size.zCoord; ++scanZ) {
+					Material material = this.world.getBlockMaterial(x, y, z);
+					if(material.getIsSolid()) {
 						return 0;
 					}
 
-					if(var8 == Material.water || var8 == Material.lava) {
+					if(material == Material.water || material == Material.lava) {
 						return -1;
 					}
 				}
@@ -182,23 +216,24 @@ public final class Pathfinder {
 		return 1;
 	}
 
-	private static PathEntity createEntityPath(PathPoint var0) {
-		int var1 = 1;
+	/** Walks the {@code previous} chain back from the end point, then reverses it into the point array of a {@link PathEntity}. */
+	private static PathEntity createEntityPath(PathPoint endPoint) {
+		int pathLength = 1;
 
-		PathPoint var2;
-		for(var2 = var0; var2.previous != null; var2 = var2.previous) {
-			++var1;
+		PathPoint current;
+		for(current = endPoint; current.previous != null; current = current.previous) {
+			++pathLength;
 		}
 
-		PathPoint[] var3 = new PathPoint[var1];
-		var2 = var0;
-		--var1;
+		PathPoint[] points = new PathPoint[pathLength];
+		current = endPoint;
+		--pathLength;
 
-		for(var3[var1] = var0; var2.previous != null; var3[var1] = var2) {
-			var2 = var2.previous;
-			--var1;
+		for(points[pathLength] = endPoint; current.previous != null; points[pathLength] = current) {
+			current = current.previous;
+			--pathLength;
 		}
 
-		return new PathEntity(var3);
+		return new PathEntity(points);
 	}
 }

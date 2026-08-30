@@ -5,6 +5,13 @@ import net.minecraft.game.physics.AxisAlignedBB;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 
+/**
+ * Base of all short plants (flowers, saplings, mushrooms, crops): a
+ * non-colliding, non-cube block that sits on a supporting block below, is
+ * re-checked every tick, and drops itself when that support is removed.
+ * Subclasses tune the {@link #canThisPlantGrowOnThisBlockID} support rule and
+ * the {@link #canBlockStay} light requirement.
+ */
 public class BlockFlower extends Block {
 	protected BlockFlower(int blockID, int textureIndex) {
 		super(blockID, Material.plants);

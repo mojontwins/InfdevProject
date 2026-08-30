@@ -8,46 +8,49 @@ import net.minecraft.game.world.block.Block;
 import net.minecraft.game.world.block.StepSound;
 
 public class PlayerController {
+	// The base player controller: mediates player <-> world interaction (blast, breath, test/survival modes).
 	protected final Minecraft mc;
 	public boolean isInTestMode = false;
 
-	public PlayerController(Minecraft var1) {
-		this.mc = var1;
+	public PlayerController(Minecraft mc) {
+		this.mc = mc;
 	}
 
-	public void clickBlock(int var1, int var2, int var3) {
-		this.sendBlockRemoved(var1, var2, var3);
+	public void clickBlock(int x, int y, int z) {
+		this.sendBlockRemoved(x, y, z);
 	}
 
-	public boolean sendBlockRemoved(int var1, int var2, int var3) {
-		this.mc.effectRenderer.addBlockDestroyEffects(var1, var2, var3);
-		World var4 = this.mc.theWorld;
-		Block var5 = Block.blocksList[var4.getBlockId(var1, var2, var3)];
-		int var6 = var4.getBlockMetadata(var1, var2, var3);
-		boolean var7 = var4.setBlockWithNotify(var1, var2, var3, 0);
-		if(var5 != null && var7) {
-			SoundManager var10000 = this.mc.sndManager;
-			String var10001 = var5.stepSound.getBreakSound();
-			float var10002 = (float)var1 + 0.5F;
-			float var10003 = (float)var2 + 0.5F;
-			float var10004 = (float)var3 + 0.5F;
-			StepSound var8 = var5.stepSound;
-			float var10005 = (var8.stepSoundVolume + 1.0F) / 2.0F;
-			var8 = var5.stepSound;
-			var10000.playSound(var10001, var10002, var10003, var10004, var10005, var8.stepSoundPitch * 0.8F);
-			var5.onBlockDestroyedByPlayer(var4, var1, var2, var3, var6);
+	// Removes the block at (x, y, z), plays the break sound and triggers block destroy callbacks.
+	public boolean sendBlockRemoved(int x, int y, int z) {
+		this.mc.effectRenderer.addBlockDestroyEffects(x, y, z);
+		World world = this.mc.theWorld;
+		Block block = Block.blocksList[world.getBlockId(x, y, z)];
+		int metadata = world.getBlockMetadata(x, y, z);
+		boolean removed = world.setBlockWithNotify(x, y, z, 0);
+		if(block != null && removed) {
+			// Play the block's break sound centred on the block, scaled from its volume/pitch.
+			SoundManager sndManager = this.mc.sndManager;
+			String breakSound = block.stepSound.getBreakSound();
+			float soundX = (float)x + 0.5F;
+			float soundY = (float)y + 0.5F;
+			float soundZ = (float)z + 0.5F;
+			StepSound stepSound = block.stepSound;
+			float volume = (stepSound.stepSoundVolume + 1.0F) / 2.0F;
+			stepSound = block.stepSound;
+			sndManager.playSound(breakSound, soundX, soundY, soundZ, volume, stepSound.stepSoundPitch * 0.8F);
+			block.onBlockDestroyedByPlayer(world, x, y, z, metadata);
 		}
 
-		return var7;
+		return removed;
 	}
 
-	public void sendBlockRemoving(int var1, int var2, int var3, int var4) {
+	public void sendBlockRemoving(int x, int y, int z, int side) {
 	}
 
 	public void resetBlockRemoving() {
 	}
 
-	public void setPartialTime(float var1) {
+	public void setPartialTime(float partialTick) {
 	}
 
 	public float getBlockReachDistance() {
@@ -61,6 +64,6 @@ public class PlayerController {
 		return true;
 	}
 
-	public void onRespawn(EntityPlayer var1) {
+	public void onRespawn(EntityPlayer player) {
 	}
 }

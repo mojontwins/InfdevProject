@@ -4,12 +4,17 @@ import java.util.ArrayList;
 import java.util.List;
 import net.minecraft.game.world.block.Block;
 
+/**
+ * Represents a logged-in player session (the user name plus credentials).
+ * The static block records every block available for creative placement so
+ * the creative inventory can enumerate them.
+ */
 public final class Session {
 	public static List<Block> registeredBlocksList;
 	public String name;
 
-	public Session(String var1, String var2) {
-		this.name = var1;
+	public Session(String username, String sessionId) {
+		this.name = username;
 	}
 
 	static {

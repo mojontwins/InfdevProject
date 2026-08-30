@@ -4,6 +4,11 @@ import java.util.Random;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 
+/**
+ * Grass block: spreads to adjacent dirt when well lit and dies back to dirt
+ * when its top stays dark. The top/side textures are hard-coded sprite indices
+ * (0 = grass top, 2 = dirt, 3 = grass side).
+ */
 public final class BlockGrass extends Block {
 	protected BlockGrass(int blockID) {
 		super(blockID, Material.ground);

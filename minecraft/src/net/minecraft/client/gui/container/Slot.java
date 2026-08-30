@@ -3,6 +3,7 @@ package net.minecraft.client.gui.container;
 import net.minecraft.game.IInventory;
 import net.minecraft.game.item.ItemStack;
 
+/** A single inventory slot used by container GUIs: maps a position in an IInventory to a 2D screen location. */
 public class Slot {
 	public final int slotIndex;
 	public final int xPos;
@@ -10,32 +11,34 @@ public class Slot {
 	public final IInventory inventory;
 	private final GuiContainer guiHandler;
 
-	public Slot(GuiContainer var1, IInventory var2, int var3, int var4, int var5) {
-		this.guiHandler = var1;
-		this.inventory = var2;
-		this.slotIndex = var3;
-		this.xPos = var4;
-		this.yPos = var5;
+	public Slot(GuiContainer guiHandler, IInventory inventory, int slotIndex, int xPos, int yPos) {
+		this.guiHandler = guiHandler;
+		this.inventory = inventory;
+		this.slotIndex = slotIndex;
+		this.xPos = xPos;
+		this.yPos = yPos;
 	}
 
-	public final boolean isAtCursorPos(int var1, int var2) {
-		int var3 = (this.guiHandler.width - this.guiHandler.xSize) / 2;
-		int var4 = (this.guiHandler.height - this.guiHandler.ySize) / 2;
-		var1 -= var3;
-		var2 -= var4;
-		return var1 >= this.xPos - 1 && var1 < this.xPos + 16 + 1 && var2 >= this.yPos - 1 && var2 < this.yPos + 16 + 1;
+	/** Returns true if the given screen coordinates fall within (or slightly around) this slot. */
+	public final boolean isAtCursorPos(int mouseX, int mouseY) {
+		int guiLeft = (this.guiHandler.width - this.guiHandler.xSize) / 2;
+		int guiTop = (this.guiHandler.height - this.guiHandler.ySize) / 2;
+		// Convert to container-local coordinates by subtracting the GUI origin.
+		mouseX -= guiLeft;
+		mouseY -= guiTop;
+		return mouseX >= this.xPos - 1 && mouseX < this.xPos + 16 + 1 && mouseY >= this.yPos - 1 && mouseY < this.yPos + 16 + 1;
 	}
 
 	public void onPickupFromSlot() {
 		this.onSlotChanged();
 	}
 
-	public boolean isItemValid(ItemStack var1) {
+	public boolean isItemValid(ItemStack stack) {
 		return true;
 	}
 
-	public final void putStack(ItemStack var1) {
-		this.inventory.setInventorySlotContents(this.slotIndex, var1);
+	public final void putStack(ItemStack stack) {
+		this.inventory.setInventorySlotContents(this.slotIndex, stack);
 		this.onSlotChanged();
 	}
 

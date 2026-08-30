@@ -12,6 +12,14 @@ import net.minecraft.game.world.block.tileentity.TileEntity;
 import net.minecraft.game.world.block.tileentity.TileEntityChest;
 import net.minecraft.game.world.material.Material;
 
+/**
+ * Chest: a container whose sprite is chosen per side from the surrounding
+ * blocks so adjacent chests read as one connected double chest. The big
+ * {@link #getBlockTexture} face-picking logic handles the two placement axes,
+ * the doubled halves and the facing door; a blocked top or a disallowed
+ * neighbour count (more than one chest or a chest already doubled) keeps the
+ * GUI shut. Spilled contents are flung out with a random burst on removal.
+ */
 public final class BlockChest extends BlockContainer {
 	private Random random = new Random();
 

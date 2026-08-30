@@ -11,6 +11,7 @@ import net.minecraft.game.IInventory;
 import net.minecraft.game.item.ItemStack;
 import org.lwjgl.opengl.GL11;
 
+/** Base class for container GUIs (chest, crafting, furnace, inventory): manages slots and held-item drag logic. */
 public abstract class GuiContainer extends GuiScreen {
 	private static RenderItem itemRenderer = new RenderItem();
 	private ItemStack itemStack = null;
@@ -18,59 +19,63 @@ public abstract class GuiContainer extends GuiScreen {
 	protected int ySize = 166;
 	protected List<Slot> inventorySlots = new ArrayList<>();
 
-	public void drawScreen(int var1, int var2, float var3) {
+	/** Draws each slot (with its item or placeholder icon), the held stack, and highlights the hovered slot. */
+	public void drawScreen(int mouseX, int mouseY, float partialTicks) {
 		this.drawDefaultBackground();
-		int var13 = (this.width - this.xSize) / 2;
-		int var4 = (this.height - this.ySize) / 2;
+		int guiLeft = (this.width - this.xSize) / 2;
+		int guiTop = (this.height - this.ySize) / 2;
 		this.drawGuiContainerBackgroundLayer();
 		GL11.glPushMatrix();
 		GL11.glRotatef(180.0F, 1.0F, 0.0F, 0.0F);
 		RenderHelper.enableStandardItemLighting();
 		GL11.glPopMatrix();
 		GL11.glPushMatrix();
-		GL11.glTranslatef((float)var13, (float)var4, 0.0F);
+		GL11.glTranslatef((float)guiLeft, (float)guiTop, 0.0F);
 		GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
 		GL11.glEnable(GL11.GL_NORMALIZE);
 
-		for(int var5 = 0; var5 < this.inventorySlots.size(); ++var5) {
-			Slot var6;
+		for(int slotIndex = 0; slotIndex < this.inventorySlots.size(); ++slotIndex) {
+			Slot slot;
 			label24: {
-				var6 = this.inventorySlots.get(var5);
-				IInventory var9 = var6.inventory;
-				int var10 = var6.slotIndex;
-				int var11 = var6.xPos;
-				int var12 = var6.yPos;
-				ItemStack var15 = var9.getStackInSlot(var10);
-				if(var15 == null) {
-					int var8 = var6.getBackgroundIconIndex();
-					if(var8 >= 0) {
+				slot = this.inventorySlots.get(slotIndex);
+				IInventory inventory = slot.inventory;
+				int stackSlot = slot.slotIndex;
+				int slotX = slot.xPos;
+				int slotY = slot.yPos;
+				ItemStack stack = inventory.getStackInSlot(stackSlot);
+				if(stack == null) {
+					// Empty slot: draw its placeholder icon (e.g. armour shape) if it has one.
+					int backgroundIcon = slot.getBackgroundIconIndex();
+					if(backgroundIcon >= 0) {
 						GL11.glDisable(GL11.GL_LIGHTING);
 						RenderEngine.bindTexture(this.mc.renderEngine.getTexture("/gui/items.png"));
-						this.drawTexturedModalRect(var11, var12, var8 % 16 << 4, var8 / 16 << 4, 16, 16);
+						this.drawTexturedModalRect(slotX, slotY, backgroundIcon % 16 << 4, backgroundIcon / 16 << 4, 16, 16);
 						GL11.glEnable(GL11.GL_LIGHTING);
 						break label24;
 					}
 				}
 
-				itemRenderer.renderItemIntoGUI(this.mc.renderEngine, var15, var11, var12);
-				itemRenderer.renderItemOverlayIntoGUI(this.fontRenderer, var15, var11, var12);
+				itemRenderer.renderItemIntoGUI(this.mc.renderEngine, stack, slotX, slotY);
+				itemRenderer.renderItemOverlayIntoGUI(this.fontRenderer, stack, slotX, slotY);
 			}
 
-			if(var6.isAtCursorPos(var1, var2)) {
+			// Highlight the slot currently under the mouse cursor.
+			if(slot.isAtCursorPos(mouseX, mouseY)) {
 				GL11.glDisable(GL11.GL_LIGHTING);
 				GL11.glDisable(GL11.GL_DEPTH_TEST);
-				int var7 = var6.xPos;
-				int var14 = var6.yPos;
-				drawGradientRect(var7, var14, var7 + 16, var14 + 16, -2130706433, -2130706433);
+				int slotX = slot.xPos;
+				int slotY = slot.yPos;
+				drawGradientRect(slotX, slotY, slotX + 16, slotY + 16, -2130706433, -2130706433);
 				GL11.glEnable(GL11.GL_LIGHTING);
 				GL11.glEnable(GL11.GL_DEPTH_TEST);
 			}
 		}
 
+		// Draw the held stack following the cursor.
 		if(this.itemStack != null) {
 			GL11.glTranslatef(0.0F, 0.0F, 32.0F);
-			itemRenderer.renderItemIntoGUI(this.mc.renderEngine, this.itemStack, var1 - var13 - 8, var2 - var4 - 8);
-			itemRenderer.renderItemOverlayIntoGUI(this.fontRenderer, this.itemStack, var1 - var13 - 8, var2 - var4 - 8);
+			itemRenderer.renderItemIntoGUI(this.mc.renderEngine, this.itemStack, mouseX - guiLeft - 8, mouseY - guiTop - 8);
+			itemRenderer.renderItemOverlayIntoGUI(this.fontRenderer, this.itemStack, mouseX - guiLeft - 8, mouseY - guiTop - 8);
 		}
 
 		GL11.glDisable(GL11.GL_NORMALIZE);
@@ -88,77 +93,84 @@ public abstract class GuiContainer extends GuiScreen {
 
 	protected abstract void drawGuiContainerBackgroundLayer();
 
-	protected final void mouseClicked(int var1, int var2, int var3) {
-		if(var3 == 0 || var3 == 1) {
-			int var6 = var2;
-			int var4 = var1;
-			GuiContainer var5 = this;
-			int var7 = 0;
-
-			Slot var10000;
+	/**
+	 * Handles left/right mouse clicks on slots: pickup, place, stack and merge
+	 * logic for moving item stacks between the cursor and container slots, plus
+	 * dropping items when clicking outside the container.
+	 */
+	protected final void mouseClicked(int mouseX, int mouseY, int button) {
+		if(button == 0 || button == 1) {
+			int clickY = mouseY;
+			int clickX = mouseX;
+			int index = 0;
+			Slot foundSlot;
+			// Find the slot under the cursor, if any.
 			while(true) {
-				if(var7 >= var5.inventorySlots.size()) {
-					var10000 = null;
+				if(index >= this.inventorySlots.size()) {
+					foundSlot = null;
 					break;
 				}
 
-				Slot var8 = var5.inventorySlots.get(var7);
-				if(var8.isAtCursorPos(var4, var6)) {
-					var10000 = var8;
+				Slot candidate = this.inventorySlots.get(index);
+				if(candidate.isAtCursorPos(clickX, clickY)) {
+					foundSlot = candidate;
 					break;
 				}
 
-				++var7;
+				++index;
 			}
 
-			Slot var11 = var10000;
-			if(var11 != null) {
-				var11.onSlotChanged();
-				ItemStack var12 = var11.inventory.getStackInSlot(var11.slotIndex);
-				if(var12 == null && this.itemStack == null) {
+			Slot slot = foundSlot;
+			if(slot != null) {
+				slot.onSlotChanged();
+				ItemStack stackInSlot = slot.inventory.getStackInSlot(slot.slotIndex);
+				if(stackInSlot == null && this.itemStack == null) {
 					return;
 				}
 
-				if(var12 != null && this.itemStack == null) {
-					var6 = var3 == 0 ? var12.stackSize : (var12.stackSize + 1) / 2;
-					this.itemStack = var11.inventory.decrStackSize(var11.slotIndex, var6);
-					if(var12.stackSize == 0) {
-						var11.putStack((ItemStack)null);
+				if(stackInSlot != null && this.itemStack == null) {
+					// Pick up the whole stack, or half of it when right-clicking.
+					int transferSize = button == 0 ? stackInSlot.stackSize : (stackInSlot.stackSize + 1) / 2;
+					this.itemStack = slot.inventory.decrStackSize(slot.slotIndex, transferSize);
+					if(stackInSlot.stackSize == 0) {
+						slot.putStack((ItemStack)null);
 					}
 
-					var11.onPickupFromSlot();
-				} else if(var12 == null && this.itemStack != null && var11.isItemValid(this.itemStack)) {
-					var6 = var3 == 0 ? this.itemStack.stackSize : 1;
-					if(var6 > var11.inventory.getInventoryStackLimit()) {
-						var6 = var11.inventory.getInventoryStackLimit();
+					slot.onPickupFromSlot();
+				} else if(stackInSlot == null && this.itemStack != null && slot.isItemValid(this.itemStack)) {
+					// Place the held stack into the empty slot.
+					int transferSize = button == 0 ? this.itemStack.stackSize : 1;
+					if(transferSize > slot.inventory.getInventoryStackLimit()) {
+						transferSize = slot.inventory.getInventoryStackLimit();
 					}
 
-					var11.putStack(this.itemStack.splitStack(var6));
+					slot.putStack(this.itemStack.splitStack(transferSize));
 					if(this.itemStack.stackSize == 0) {
 						this.itemStack = null;
 					}
 				} else {
-					if(var12 == null || this.itemStack == null) {
+					if(stackInSlot == null || this.itemStack == null) {
 						return;
 					}
 
-					ItemStack var9;
-					if(!var11.isItemValid(this.itemStack)) {
-						if(var12.itemID == this.itemStack.itemID) {
-							var9 = this.itemStack;
-							if(var9.getItem().getItemStackLimit() > 1) {
-								var6 = var12.stackSize;
-								if(var6 > 0) {
-									int var14 = var6 + this.itemStack.stackSize;
-									var9 = this.itemStack;
-									if(var14 <= var9.getItem().getItemStackLimit()) {
-										this.itemStack.stackSize += var6;
-										var12.splitStack(var6);
-										if(var12.stackSize == 0) {
-											var11.putStack((ItemStack)null);
+					ItemStack heldItem;
+					if(!slot.isItemValid(this.itemStack)) {
+						// Cursor item can't sit in this slot; if it matches the slot's item, add it to the stored stack.
+						if(stackInSlot.itemID == this.itemStack.itemID) {
+							heldItem = this.itemStack;
+							if(heldItem.getItem().getItemStackLimit() > 1) {
+								int transferSize = stackInSlot.stackSize;
+								if(transferSize > 0) {
+									int combinedSize = transferSize + this.itemStack.stackSize;
+									heldItem = this.itemStack;
+									if(combinedSize <= heldItem.getItem().getItemStackLimit()) {
+										this.itemStack.stackSize += transferSize;
+										stackInSlot.splitStack(transferSize);
+										if(stackInSlot.stackSize == 0) {
+											slot.putStack((ItemStack)null);
 										}
 
-										var11.onPickupFromSlot();
+										slot.onPickupFromSlot();
 										return;
 									}
 								}
@@ -170,73 +182,77 @@ public abstract class GuiContainer extends GuiScreen {
 						return;
 					}
 
-					if(var12.itemID != this.itemStack.itemID) {
-						if(this.itemStack.stackSize > var11.inventory.getInventoryStackLimit()) {
+					if(stackInSlot.itemID != this.itemStack.itemID) {
+						// Different items: swap the stored slot contents with the held stack.
+						if(this.itemStack.stackSize > slot.inventory.getInventoryStackLimit()) {
 							return;
 						}
 
-						var11.putStack(this.itemStack);
-						this.itemStack = var12;
+						slot.putStack(this.itemStack);
+						this.itemStack = stackInSlot;
 					} else {
-						if(var12.itemID != this.itemStack.itemID) {
+						if(stackInSlot.itemID != this.itemStack.itemID) {
 							return;
 						}
 
-						if(var3 == 0) {
-							var6 = this.itemStack.stackSize;
-							if(var6 > var11.inventory.getInventoryStackLimit() - var12.stackSize) {
-								var6 = var11.inventory.getInventoryStackLimit() - var12.stackSize;
+						if(button == 0) {
+							// Left click: move as much of the held stack as fits into the slot.
+							int transferSize = this.itemStack.stackSize;
+							if(transferSize > slot.inventory.getInventoryStackLimit() - stackInSlot.stackSize) {
+								transferSize = slot.inventory.getInventoryStackLimit() - stackInSlot.stackSize;
 							}
 
-							var9 = this.itemStack;
-							if(var6 > var9.getItem().getItemStackLimit() - var12.stackSize) {
-								var9 = this.itemStack;
-								var6 = var9.getItem().getItemStackLimit() - var12.stackSize;
+							heldItem = this.itemStack;
+							if(transferSize > heldItem.getItem().getItemStackLimit() - stackInSlot.stackSize) {
+								heldItem = this.itemStack;
+								transferSize = heldItem.getItem().getItemStackLimit() - stackInSlot.stackSize;
 							}
 
-							this.itemStack.splitStack(var6);
+							this.itemStack.splitStack(transferSize);
 							if(this.itemStack.stackSize == 0) {
 								this.itemStack = null;
 							}
 
-							var12.stackSize += var6;
+							stackInSlot.stackSize += transferSize;
 						} else {
-							if(var3 != 1) {
+							if(button != 1) {
 								return;
 							}
 
-							var6 = 1;
-							if(1 > var11.inventory.getInventoryStackLimit() - var12.stackSize) {
-								var6 = var11.inventory.getInventoryStackLimit() - var12.stackSize;
+							// Right click: move exactly one item from the held stack.
+							int transferSize = 1;
+							if(1 > slot.inventory.getInventoryStackLimit() - stackInSlot.stackSize) {
+								transferSize = slot.inventory.getInventoryStackLimit() - stackInSlot.stackSize;
 							}
 
-							var9 = this.itemStack;
-							if(var6 > var9.getItem().getItemStackLimit() - var12.stackSize) {
-								var9 = this.itemStack;
-								var6 = var9.getItem().getItemStackLimit() - var12.stackSize;
+							heldItem = this.itemStack;
+							if(transferSize > heldItem.getItem().getItemStackLimit() - stackInSlot.stackSize) {
+								heldItem = this.itemStack;
+								transferSize = heldItem.getItem().getItemStackLimit() - stackInSlot.stackSize;
 							}
 
-							this.itemStack.splitStack(var6);
+							this.itemStack.splitStack(transferSize);
 							if(this.itemStack.stackSize == 0) {
 								this.itemStack = null;
 							}
 
-							var12.stackSize += var6;
+							stackInSlot.stackSize += transferSize;
 						}
 					}
 				}
 			} else if(this.itemStack != null) {
-				int var13 = (this.width - this.xSize) / 2;
-				var6 = (this.height - this.ySize) / 2;
-				if(var1 < var13 || var2 < var6 || var1 >= var13 + this.xSize || var2 >= var6 + this.xSize) {
-					EntityPlayerSP var10 = this.mc.thePlayer;
-					if(var3 == 0) {
-						var10.dropPlayerItem(this.itemStack);
+				// Clicking outside the container bounds drops the held stack (or one item) into the world.
+				int guiLeft = (this.width - this.xSize) / 2;
+				clickY = (this.height - this.ySize) / 2;
+				if(mouseX < guiLeft || mouseY < clickY || mouseX >= guiLeft + this.xSize || mouseY >= clickY + this.xSize) {
+					EntityPlayerSP player = this.mc.thePlayer;
+					if(button == 0) {
+						player.dropPlayerItem(this.itemStack);
 						this.itemStack = null;
 					}
 
-					if(var3 == 1) {
-						var10.dropPlayerItem(this.itemStack.splitStack(1));
+					if(button == 1) {
+						player.dropPlayerItem(this.itemStack.splitStack(1));
 						if(this.itemStack.stackSize == 0) {
 							this.itemStack = null;
 						}
@@ -247,8 +263,8 @@ public abstract class GuiContainer extends GuiScreen {
 
 	}
 
-	protected final void keyTyped(char var1, int var2) {
-		if(var2 == 1 || var2 == this.mc.gameSettings.keyBindInventory.keyCode) {
+	protected final void keyTyped(char typedChar, int keyCode) {
+		if(keyCode == 1 || keyCode == this.mc.gameSettings.keyBindInventory.keyCode) {
 			this.mc.displayGuiScreen((GuiScreen)null);
 		}
 

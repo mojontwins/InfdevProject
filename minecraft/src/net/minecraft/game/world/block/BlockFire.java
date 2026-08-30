@@ -6,12 +6,21 @@ import net.minecraft.game.world.IBlockAccess;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 
+/**
+ * Fire. The two tables rate every block id for flammability: how eagerly fire
+ * spreads onto it ({@link #chanceToEncourageFire}) and how long it burns before
+ * being consumed ({@link #abilityToCatchFire}). The block ages 0-15 in its
+ * metadata, spreading to neighbours only late in its life, and dies when it has
+ * nothing burnable left around or beneath it.
+ */
 public final class BlockFire extends Block {
 	private int[] chanceToEncourageFire = new int[256];
 	private int[] abilityToCatchFire = new int[256];
 
 	protected BlockFire(int blockID, int textureIndex) {
 		super(blockID, textureIndex, Material.fire);
+		// Planks/wood catch fire with odds 5/20, while wood, leaves, bookshelves and
+		// every dyed cloth burn at the eager 30/60 pace; TNT sparks almost at once.
 		this.setBurnRate(Block.planks.blockID, 5, 20);
 		this.setBurnRate(Block.wood.blockID, 5, 5);
 		this.setBurnRate(Block.leaves.blockID, 30, 60);

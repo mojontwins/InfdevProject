@@ -8,6 +8,9 @@ import net.minecraft.game.world.World;
 import org.lwjgl.opengl.GL11;
 import util.MathHelper;
 
+// Renders the "item flying into your inventory" effect: the picked-up entity
+// animates along an eased arc from its drop point up to the player, offset by
+// yOffs to settle into the hotbar slot area.
 public final class EntityPickupFX extends EntityFX {
 	private Entity entityToPickUp;
 	private EntityLiving entityPickingUp;
@@ -15,35 +18,38 @@ public final class EntityPickupFX extends EntityFX {
 	private int maxAge = 0;
 	private float yOffs;
 
-	public EntityPickupFX(World var1, Entity var2, EntityLiving var3, float var4) {
-		super(var1, var2.posX, var2.posY, var2.posZ, var2.motionX, var2.motionY, var2.motionZ);
-		this.entityToPickUp = var2;
-		this.entityPickingUp = var3;
+	public EntityPickupFX(World world, Entity entityToPickUp, EntityLiving entityPickingUp, float scale) {
+		super(world, entityToPickUp.posX, entityToPickUp.posY, entityToPickUp.posZ, entityToPickUp.motionX, entityToPickUp.motionY, entityToPickUp.motionZ);
+		this.entityToPickUp = entityToPickUp;
+		this.entityPickingUp = entityPickingUp;
 		this.maxAge = 3;
 		this.yOffs = -0.5F;
 	}
 
-	public final void renderParticle(Tessellator var1, float var2, float var3, float var4, float var5, float var6, float var7) {
-		float var27 = ((float)this.age + var2) / (float)this.maxAge;
-		var27 *= var27;
-		double var9 = this.entityToPickUp.posX;
-		double var11 = this.entityToPickUp.posY;
-		double var13 = this.entityToPickUp.posZ;
-		double var15 = this.entityPickingUp.lastTickPosX + (this.entityPickingUp.posX - this.entityPickingUp.lastTickPosX) * (double)var2;
-		double var17 = this.entityPickingUp.lastTickPosY + (this.entityPickingUp.posY - this.entityPickingUp.lastTickPosY) * (double)var2 + (double)this.yOffs;
-		double var19 = this.entityPickingUp.lastTickPosZ + (this.entityPickingUp.posZ - this.entityPickingUp.lastTickPosZ) * (double)var2;
-		double var21 = var9 + (var15 - var9) * (double)var27;
-		double var23 = var11 + (var17 - var11) * (double)var27;
-		double var25 = var13 + (var19 - var13) * (double)var27;
-		int var28 = MathHelper.floor_double(var21);
-		int var29 = MathHelper.floor_double(var23 + (double)(this.yOffset / 2.0F));
-		int var30 = MathHelper.floor_double(var25);
-		var27 = this.worldObj.getBrightness(var28, var29, var30);
-		var21 -= interpPosX;
-		var23 -= interpPosY;
-		var25 -= interpPosZ;
-		GL11.glColor4f(var27, var27, var27, 1.0F);
-		RenderManager.instance.renderEntityWithPosYaw(this.entityToPickUp, (double)((float)var21), (double)((float)var23), (double)((float)var25), this.entityToPickUp.rotationYaw, var2);
+	public final void renderParticle(Tessellator tessellator, float partialTick, float offsetX, float offsetY, float offsetZ, float surfU, float surfV) {
+		// Normalized interpolation factor; squaring it gives an ease-in that
+		// starts fast then slows as the item arcs toward its target.
+		float progress = ((float)this.age + partialTick) / (float)this.maxAge;
+		progress *= progress;
+		double startX = this.entityToPickUp.posX;
+		double startY = this.entityToPickUp.posY;
+		double startZ = this.entityToPickUp.posZ;
+		double targetX = this.entityPickingUp.lastTickPosX + (this.entityPickingUp.posX - this.entityPickingUp.lastTickPosX) * (double)partialTick;
+		double targetY = this.entityPickingUp.lastTickPosY + (this.entityPickingUp.posY - this.entityPickingUp.lastTickPosY) * (double)partialTick + (double)this.yOffs;
+		double targetZ = this.entityPickingUp.lastTickPosZ + (this.entityPickingUp.posZ - this.entityPickingUp.lastTickPosZ) * (double)partialTick;
+		double interpolatedX = startX + (targetX - startX) * (double)progress;
+		double interpolatedY = startY + (targetY - startY) * (double)progress;
+		double interpolatedZ = startZ + (targetZ - startZ) * (double)progress;
+		int blockX = MathHelper.floor_double(interpolatedX);
+		int blockY = MathHelper.floor_double(interpolatedY + (double)(this.yOffset / 2.0F));
+		int blockZ = MathHelper.floor_double(interpolatedZ);
+		// Color the item by the brightness of the block it currently hovers over.
+		float brightness = this.worldObj.getBrightness(blockX, blockY, blockZ);
+		interpolatedX -= interpPosX;
+		interpolatedY -= interpPosY;
+		interpolatedZ -= interpPosZ;
+		GL11.glColor4f(brightness, brightness, brightness, 1.0F);
+		RenderManager.instance.renderEntityWithPosYaw(this.entityToPickUp, (double)((float)interpolatedX), (double)((float)interpolatedY), (double)((float)interpolatedZ), this.entityToPickUp.rotationYaw, partialTick);
 	}
 
 	public final void onUpdate() {

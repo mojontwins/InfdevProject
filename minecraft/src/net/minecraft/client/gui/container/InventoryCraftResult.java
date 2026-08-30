@@ -3,6 +3,7 @@ package net.minecraft.client.gui.container;
 import net.minecraft.game.IInventory;
 import net.minecraft.game.item.ItemStack;
 
+/** A one-slot inventory holding the result of a crafting recipe. */
 public final class InventoryCraftResult implements IInventory {
 	private ItemStack[] stackResult = new ItemStack[1];
 
@@ -10,26 +11,27 @@ public final class InventoryCraftResult implements IInventory {
 		return 1;
 	}
 
-	public final ItemStack getStackInSlot(int var1) {
-		return this.stackResult[var1];
+	public final ItemStack getStackInSlot(int slotIndex) {
+		return this.stackResult[slotIndex];
 	}
 
 	public final String getInvName() {
 		return "Result";
 	}
 
-	public final ItemStack decrStackSize(int var1, int var2) {
-		if(this.stackResult[var1] != null) {
-			ItemStack var3 = this.stackResult[var1];
-			this.stackResult[var1] = null;
-			return var3;
+	/** Removes and returns the whole crafted result, clearing the slot. */
+	public final ItemStack decrStackSize(int slotIndex, int count) {
+		if(this.stackResult[slotIndex] != null) {
+			ItemStack result = this.stackResult[slotIndex];
+			this.stackResult[slotIndex] = null;
+			return result;
 		} else {
 			return null;
 		}
 	}
 
-	public final void setInventorySlotContents(int var1, ItemStack var2) {
-		this.stackResult[var1] = var2;
+	public final void setInventorySlotContents(int slotIndex, ItemStack stack) {
+		this.stackResult[slotIndex] = stack;
 	}
 
 	public final int getInventoryStackLimit() {

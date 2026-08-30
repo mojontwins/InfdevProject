@@ -3,6 +3,7 @@ package net.minecraft.game.world.block;
 import net.minecraft.game.physics.AxisAlignedBB;
 import net.minecraft.game.world.material.Material;
 
+/** The decorative cog ("gear") block: a non-colliding, transparent non-cube with its own render type. */
 public final class BlockGears extends Block {
 	protected BlockGears(int blockID, int textureIndex) {
 		super(blockID, textureIndex, Material.circuits);

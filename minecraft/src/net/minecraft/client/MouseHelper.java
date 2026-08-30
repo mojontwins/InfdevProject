@@ -11,6 +11,14 @@ import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Cursor;
 import org.lwjgl.input.Mouse;
 
+/**
+ * Handles capturing the mouse for first-person look.
+ *
+ * The cursor is hidden (by swapping in a blank cursor), and each frame the
+ * pointer is recentred on the window so the game can read the movement delta
+ * between centres. The first few frames discard the large jump that occurs
+ * while the pointer initially recentres.
+ */
 public final class MouseHelper {
 	private Component windowComponent;
 	private Robot robot;
@@ -21,32 +29,33 @@ public final class MouseHelper {
 	public int deltaY;
 	private int mouseInt = 10;
 
-	public MouseHelper(Component var1) {
-		this.windowComponent = var1;
+	public MouseHelper(Component windowComponent) {
+		this.windowComponent = windowComponent;
 
 		try {
 			this.robot = new Robot();
-		} catch (AWTException var4) {
-			var4.printStackTrace();
+		} catch (AWTException e) {
+			e.printStackTrace();
 		}
 
-		IntBuffer var5 = BufferUtils.createIntBuffer(1);
-		var5.put(0);
-		var5.flip();
-		IntBuffer var2 = BufferUtils.createIntBuffer(1024);
+		// A blank (all-transparent) cursor that will hide the visible pointer.
+		IntBuffer cursorImage = BufferUtils.createIntBuffer(1);
+		cursorImage.put(0);
+		cursorImage.flip();
+		IntBuffer cursorPixels = BufferUtils.createIntBuffer(1024);
 
 		try {
-			this.cursor = new Cursor(32, 32, 16, 16, 1, var2, var5);
-		} catch (LWJGLException var3) {
-			var3.printStackTrace();
+			this.cursor = new Cursor(32, 32, 16, 16, 1, cursorPixels, cursorImage);
+		} catch (LWJGLException e) {
+			e.printStackTrace();
 		}
 	}
 
 	public final void grabMouseCursor() {
 		try {
 			Mouse.setNativeCursor(this.cursor);
-		} catch (LWJGLException var2) {
-			var2.printStackTrace();
+		} catch (LWJGLException e) {
+			e.printStackTrace();
 		}
 
 		this.ungrabMouseCursor();
@@ -55,15 +64,17 @@ public final class MouseHelper {
 	}
 
 	public final void ungrabMouseCursor() {
-		Point var1 = MouseInfo.getPointerInfo().getLocation();
-		Point var2 = this.windowComponent.getLocationOnScreen();
+		Point pointerLocation = MouseInfo.getPointerInfo().getLocation();
+		Point componentLocation = this.windowComponent.getLocationOnScreen();
 		this.robot.mouseMove(this.mouseX, this.mouseY);
-		this.mouseX = var2.x + this.windowComponent.getWidth() / 2;
-		this.mouseY = var2.y + this.windowComponent.getHeight() / 2;
+		// Recentre the pointer on the window so deltas are relative to centre.
+		this.mouseX = componentLocation.x + this.windowComponent.getWidth() / 2;
+		this.mouseY = componentLocation.y + this.windowComponent.getHeight() / 2;
 		if(this.mouseInt == 0) {
-			this.deltaX = var1.x - this.mouseX;
-			this.deltaY = var1.y - this.mouseY;
+			this.deltaX = pointerLocation.x - this.mouseX;
+			this.deltaY = pointerLocation.y - this.mouseY;
 		} else {
+			// First few moves: ignore the jump from the original position.
 			this.deltaX = this.deltaY = 0;
 			--this.mouseInt;
 		}

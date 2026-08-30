@@ -18,6 +18,7 @@ import net.minecraft.game.world.block.Block;
 import net.minecraft.game.world.block.StepSound;
 
 public final class PlayerControllerSP extends PlayerController {
+	// Single-player controller: adds block-breaking progress, damage repair, and mob/animal spawning.
 	private int curBlockX = -1;
 	private int curBlockY = -1;
 	private int curBlockZ = -1;
@@ -28,68 +29,74 @@ public final class PlayerControllerSP extends PlayerController {
 	private MobSpawner monsterSpawner = new MobSpawner(100, EntityMonster.class, new Class<?>[]{EntityZombie.class, EntitySkeleton.class, EntityCreeper.class, EntitySpider.class});
 	private MobSpawner animalSpawner = new MobSpawner(50, EntityAnimal.class, new Class<?>[]{EntitySheep.class, EntityPig.class});
 
-	public PlayerControllerSP(Minecraft var1) {
-		super(var1);
+	public PlayerControllerSP(Minecraft mc) {
+		super(mc);
 	}
 
-	public final boolean sendBlockRemoved(int var1, int var2, int var3) {
-		int var4 = this.mc.theWorld.getBlockId(var1, var2, var3);
-		int var5 = this.mc.theWorld.getBlockMetadata(var1, var2, var3);
-		boolean var6 = super.sendBlockRemoved(var1, var2, var3);
-		EntityPlayerSP var7 = this.mc.thePlayer;
-		ItemStack var9 = var7.inventory.getCurrentItem();
-		if(var9 != null) {
-			Item.itemsList[var9.itemID].onBlockDestroyed(var9);
-			if(var9.stackSize == 0) {
+	public final boolean sendBlockRemoved(int x, int y, int z) {
+		int blockId = this.mc.theWorld.getBlockId(x, y, z);
+		int metadata = this.mc.theWorld.getBlockMetadata(x, y, z);
+		boolean removed = super.sendBlockRemoved(x, y, z);
+		EntityPlayerSP player = this.mc.thePlayer;
+		ItemStack currentItem = player.inventory.getCurrentItem();
+		// Damaging the held item on each broken block.
+		if(currentItem != null) {
+			Item.itemsList[currentItem.itemID].onBlockDestroyed(currentItem);
+			if(currentItem.stackSize == 0) {
 				this.mc.thePlayer.displayInventoryGUI();
 			}
 		}
 
-		if(var6 && this.mc.thePlayer.canHarvestBlock(Block.blocksList[var4])) {
-			Block.blocksList[var4].dropBlockAsItem(this.mc.theWorld, var1, var2, var3, var5);
+		// Drop harvested drops only if the player can actually harvest this block type.
+		if(removed && this.mc.thePlayer.canHarvestBlock(Block.blocksList[blockId])) {
+			Block.blocksList[blockId].dropBlockAsItem(this.mc.theWorld, x, y, z, metadata);
 		}
 
-		return var6;
+		return removed;
 	}
 
-	public final void clickBlock(int var1, int var2, int var3) {
-		int var4 = this.mc.theWorld.getBlockId(var1, var2, var3);
-		if(var4 > 0 && Block.blocksList[var4].blockStrength(this.mc.thePlayer, this.mc.theWorld.getBlockMetadata(var1, var2, var3)) >= 1.0F) {
-			this.sendBlockRemoved(var1, var2, var3);
+	// Creative-instant break: blocks that are brittle enough are broken in one click.
+	public final void clickBlock(int x, int y, int z) {
+		int blockId = this.mc.theWorld.getBlockId(x, y, z);
+		if(blockId > 0 && Block.blocksList[blockId].blockStrength(this.mc.thePlayer, this.mc.theWorld.getBlockMetadata(x, y, z)) >= 1.0F) {
+			this.sendBlockRemoved(x, y, z);
 		}
 
 	}
 
+	// Cancel any in-progress block damage.
 	public final void resetBlockRemoving() {
 		this.curBlockDamage = 0.0F;
 		this.blockHitWait = 0;
 	}
 
-	public final void sendBlockRemoving(int var1, int var2, int var3, int var4) {
+	public final void sendBlockRemoving(int x, int y, int z, int side) {
 		if(this.blockHitWait > 0) {
 			--this.blockHitWait;
 		} else {
-			super.sendBlockRemoving(var1, var2, var3, var4);
-			if(var1 == this.curBlockX && var2 == this.curBlockY && var3 == this.curBlockZ) {
-				var4 = this.mc.theWorld.getBlockId(var1, var2, var3);
-				if(var4 != 0) {
-					Block var6 = Block.blocksList[var4];
-					this.curBlockDamage += var6.blockStrength(this.mc.thePlayer, this.mc.theWorld.getBlockMetadata(var1, var2, var3));
-					if(this.blockDestroySoundCounter % 4.0F == 0.0F && var6 != null) {
-						SoundManager var10000 = this.mc.sndManager;
-						String var10001 = var6.stepSound.getStepSound();
-						float var10002 = (float)var1 + 0.5F;
-						float var10003 = (float)var2 + 0.5F;
-						float var10004 = (float)var3 + 0.5F;
-						StepSound var5 = var6.stepSound;
-						float var10005 = (var5.stepSoundVolume + 1.0F) / 8.0F;
-						var5 = var6.stepSound;
-						var10000.playSound(var10001, var10002, var10003, var10004, var10005, var5.stepSoundPitch * 0.5F);
+			super.sendBlockRemoving(x, y, z, side);
+			if(x == this.curBlockX && y == this.curBlockY && z == this.curBlockZ) {
+				int blockId = this.mc.theWorld.getBlockId(x, y, z);
+				if(blockId != 0) {
+					Block block = Block.blocksList[blockId];
+					this.curBlockDamage += block.blockStrength(this.mc.thePlayer, this.mc.theWorld.getBlockMetadata(x, y, z));
+					// Play a periodic chip/dig sound while destroying the block.
+					if(this.blockDestroySoundCounter % 4.0F == 0.0F && block != null) {
+						SoundManager sndManager = this.mc.sndManager;
+						String digSound = block.stepSound.getStepSound();
+						float soundX = (float)x + 0.5F;
+						float soundY = (float)y + 0.5F;
+						float soundZ = (float)z + 0.5F;
+						StepSound stepSound = block.stepSound;
+						float volume = (stepSound.stepSoundVolume + 1.0F) / 8.0F;
+						stepSound = block.stepSound;
+						sndManager.playSound(digSound, soundX, soundY, soundZ, volume, stepSound.stepSoundPitch * 0.5F);
 					}
 
 					++this.blockDestroySoundCounter;
+					// Block fully destroyed: remove it and pause briefly before the next break.
 					if(this.curBlockDamage >= 1.0F) {
-						this.sendBlockRemoved(var1, var2, var3);
+						this.sendBlockRemoved(x, y, z);
 						this.curBlockDamage = 0.0F;
 						this.prevBlockDamage = 0.0F;
 						this.blockDestroySoundCounter = 0.0F;
@@ -98,22 +105,24 @@ public final class PlayerControllerSP extends PlayerController {
 
 				}
 			} else {
+				// Switched to a different block: reset damage progress and track the new target.
 				this.curBlockDamage = 0.0F;
 				this.prevBlockDamage = 0.0F;
 				this.blockDestroySoundCounter = 0.0F;
-				this.curBlockX = var1;
-				this.curBlockY = var2;
-				this.curBlockZ = var3;
+				this.curBlockX = x;
+				this.curBlockY = y;
+				this.curBlockZ = z;
 			}
 		}
 	}
 
-	public final void setPartialTime(float var1) {
+	public final void setPartialTime(float partialTick) {
 		if(this.curBlockDamage <= 0.0F) {
 			this.mc.renderGlobal.damagePartialTime = 0.0F;
 		} else {
-			var1 = this.prevBlockDamage + (this.curBlockDamage - this.prevBlockDamage) * var1;
-			this.mc.renderGlobal.damagePartialTime = var1;
+			// Interpolate the crack overlay the surviving block between last frame and now.
+			partialTick = this.prevBlockDamage + (this.curBlockDamage - this.prevBlockDamage) * partialTick;
+			this.mc.renderGlobal.damagePartialTime = partialTick;
 		}
 	}
 

@@ -4,6 +4,7 @@ import net.minecraft.game.entity.player.EntityPlayer;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 
+/** Crafting table: fires the 3x3 crafting GUI on activation. */
 public final class BlockWorkbench extends Block {
 	protected BlockWorkbench(int blockID) {
 		super(blockID, Material.wood);

@@ -6,6 +6,8 @@ import net.minecraft.game.IInventory;
 import net.minecraft.game.item.ItemStack;
 
 public class TileEntityChest extends TileEntity implements IInventory {
+	// The backing array is sized 36 while the chest only exposes 27 slots, and
+	// NBT reads even re-size it to 27 - a harmless over-allocated field.
 	private ItemStack[] chestContents = new ItemStack[36];
 
 	@Override

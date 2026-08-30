@@ -2,6 +2,11 @@ package net.minecraft.game.world.block;
 
 import net.minecraft.game.world.World;
 
+/**
+ * A mushroom: instead of the flower's grass/dirt support rule it will grow on
+ * any opaque block, but only while it is dimly lit (light level 13 is the
+ * cutoff).
+ */
 public final class BlockMushroom extends BlockFlower {
 	protected BlockMushroom(int blockID, int textureIndex) {
 		super(blockID, textureIndex);

@@ -2,6 +2,12 @@ package net.minecraft.client.model;
 
 import util.MathHelper;
 
+/**
+ * Model for the Spider: a small head, a neck, a large low-slung body and eight
+ * legs arranged symmetrically on each side. The legs get their permanently
+ * splayed pose here, with a walking gait added on top in
+ * {@link #setRotationAngles}.
+ */
 public final class ModelSpider extends ModelBase {
 	private ModelRenderer spiderHead = new ModelRenderer(32, 4);
 	private ModelRenderer spiderNeck;
@@ -24,6 +30,8 @@ public final class ModelSpider extends ModelBase {
 		this.spiderBody = new ModelRenderer(0, 12);
 		this.spiderBody.addBox(-5.0F, -4.0F, -6.0F, 10, 8, 12, 0.0F);
 		this.spiderBody.setRotationPoint(0.0F, 15.0F, 9.0F);
+		// The eight legs: odd ones extend from the left side, even ones from the
+		// right; they repeat at four depths (z = 2, 1, 0, -1).
 		this.spiderLeg1 = new ModelRenderer(18, 0);
 		this.spiderLeg1.addBox(-15.0F, -1.0F, -1.0F, 16, 2, 2, 0.0F);
 		this.spiderLeg1.setRotationPoint(-4.0F, 15.0F, 2.0F);
@@ -50,8 +58,8 @@ public final class ModelSpider extends ModelBase {
 		this.spiderLeg8.setRotationPoint(4.0F, 15.0F, -1.0F);
 	}
 
-	public final void render(float var1, float var2, float var3, float var4, float var5, float var6) {
-		this.setRotationAngles(var1, var2, var3, var4, var5, 1.0F);
+	public final void render(float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch, float scaleFactor) {
+		this.setRotationAngles(limbSwing, limbSwingAmount, ageInTicks, netHeadYaw, headPitch, 1.0F);
 		this.spiderHead.render(1.0F);
 		this.spiderNeck.render(1.0F);
 		this.spiderBody.render(1.0F);
@@ -65,9 +73,12 @@ public final class ModelSpider extends ModelBase {
 		this.spiderLeg8.render(1.0F);
 	}
 
-	public final void setRotationAngles(float var1, float var2, float var3, float var4, float var5, float var6) {
-		this.spiderHead.rotateAngleY = var4 / (180.0F / (float)Math.PI);
-		this.spiderHead.rotateAngleX = var5 / (180.0F / (float)Math.PI);
+	public final void setRotationAngles(float limbSwing, float limbSwingAmount, float ageInTicks, float netHeadYaw, float headPitch, float scaleFactor) {
+		// Head follows the entity's look direction (degrees to radians).
+		this.spiderHead.rotateAngleY = netHeadYaw / (180.0F / (float)Math.PI);
+		this.spiderHead.rotateAngleX = headPitch / (180.0F / (float)Math.PI);
+		// Permanent spread of the eight legs: rear and front pairs stick out
+		// farthest, middle pairs are pulled in slightly.
 		this.spiderLeg1.rotateAngleZ = (float)Math.PI * -0.25F;
 		this.spiderLeg2.rotateAngleZ = (float)Math.PI * 0.25F;
 		this.spiderLeg3.rotateAngleZ = -((float)Math.PI * 0.185F);
@@ -76,6 +87,8 @@ public final class ModelSpider extends ModelBase {
 		this.spiderLeg6.rotateAngleZ = (float)Math.PI * 0.185F;
 		this.spiderLeg7.rotateAngleZ = (float)Math.PI * -0.25F;
 		this.spiderLeg8.rotateAngleZ = (float)Math.PI * 0.25F;
+		// Each leg is angled backward on the right side and forward on the left,
+		// giving the spider its characteristic crouched stance.
 		this.spiderLeg1.rotateAngleY = (float)Math.PI * 0.25F;
 		this.spiderLeg2.rotateAngleY = (float)Math.PI * -0.25F;
 		this.spiderLeg3.rotateAngleY = (float)Math.PI * 0.125F;
@@ -84,29 +97,32 @@ public final class ModelSpider extends ModelBase {
 		this.spiderLeg6.rotateAngleY = (float)Math.PI * 0.125F;
 		this.spiderLeg7.rotateAngleY = (float)Math.PI * -0.25F;
 		this.spiderLeg8.rotateAngleY = (float)Math.PI * 0.25F;
-		var3 = -(MathHelper.cos(var1 * 0.6662F * 2.0F) * 0.4F) * var2;
-		var4 = -(MathHelper.cos(var1 * 0.6662F * 2.0F + (float)Math.PI) * 0.4F) * var2;
-		var5 = -(MathHelper.cos(var1 * 0.6662F * 2.0F + (float)Math.PI * 0.5F) * 0.4F) * var2;
-		var6 = -(MathHelper.cos(var1 * 0.6662F * 2.0F + (float)Math.PI * 3.0F / 2.0F) * 0.4F) * var2;
-		float var7 = Math.abs(MathHelper.sin(var1 * 0.6662F) * 0.4F) * var2;
-		float var8 = Math.abs(MathHelper.sin(var1 * 0.6662F + (float)Math.PI) * 0.4F) * var2;
-		float var9 = Math.abs(MathHelper.sin(var1 * 0.6662F + (float)Math.PI * 0.5F) * 0.4F) * var2;
-		var1 = Math.abs(MathHelper.sin(var1 * 0.6662F + (float)Math.PI * 3.0F / 2.0F) * 0.4F) * var2;
-		this.spiderLeg1.rotateAngleY += var3;
-		this.spiderLeg2.rotateAngleY -= var3;
-		this.spiderLeg3.rotateAngleY += var4;
-		this.spiderLeg4.rotateAngleY -= var4;
-		this.spiderLeg5.rotateAngleY += var5;
-		this.spiderLeg6.rotateAngleY -= var5;
-		this.spiderLeg7.rotateAngleY += var6;
-		this.spiderLeg8.rotateAngleY -= var6;
-		this.spiderLeg1.rotateAngleZ += var7;
-		this.spiderLeg2.rotateAngleZ -= var7;
-		this.spiderLeg3.rotateAngleZ += var8;
-		this.spiderLeg4.rotateAngleZ -= var8;
-		this.spiderLeg5.rotateAngleZ += var9;
-		this.spiderLeg6.rotateAngleZ -= var9;
-		this.spiderLeg7.rotateAngleZ += var1;
-		this.spiderLeg8.rotateAngleZ -= var1;
+		// Walking gait: the four leg pairs alternate between sweeping outward in
+		// yaw and lifting upward in pitch, using a doubled limb-swing wave.
+		float yawSweepLeft = -(MathHelper.cos(limbSwing * 0.6662F * 2.0F) * 0.4F) * limbSwingAmount;
+		float yawSweepRight = -(MathHelper.cos(limbSwing * 0.6662F * 2.0F + (float)Math.PI) * 0.4F) * limbSwingAmount;
+		float yawSweepLeftMid = -(MathHelper.cos(limbSwing * 0.6662F * 2.0F + (float)Math.PI * 0.5F) * 0.4F) * limbSwingAmount;
+		float yawSweepRightMid = -(MathHelper.cos(limbSwing * 0.6662F * 2.0F + (float)Math.PI * 3.0F / 2.0F) * 0.4F) * limbSwingAmount;
+		float liftLeft = Math.abs(MathHelper.sin(limbSwing * 0.6662F) * 0.4F) * limbSwingAmount;
+		float liftRight = Math.abs(MathHelper.sin(limbSwing * 0.6662F + (float)Math.PI) * 0.4F) * limbSwingAmount;
+		float liftLeftMid = Math.abs(MathHelper.sin(limbSwing * 0.6662F + (float)Math.PI * 0.5F) * 0.4F) * limbSwingAmount;
+		float liftRightMid = Math.abs(MathHelper.sin(limbSwing * 0.6662F + (float)Math.PI * 3.0F / 2.0F) * 0.4F) * limbSwingAmount;
+		// Opposite legs on the two sides sweep in opposite directions.
+		this.spiderLeg1.rotateAngleY += yawSweepLeft;
+		this.spiderLeg2.rotateAngleY -= yawSweepLeft;
+		this.spiderLeg3.rotateAngleY += yawSweepRight;
+		this.spiderLeg4.rotateAngleY -= yawSweepRight;
+		this.spiderLeg5.rotateAngleY += yawSweepLeftMid;
+		this.spiderLeg6.rotateAngleY -= yawSweepLeftMid;
+		this.spiderLeg7.rotateAngleY += yawSweepRightMid;
+		this.spiderLeg8.rotateAngleY -= yawSweepRightMid;
+		this.spiderLeg1.rotateAngleZ += liftLeft;
+		this.spiderLeg2.rotateAngleZ -= liftLeft;
+		this.spiderLeg3.rotateAngleZ += liftRight;
+		this.spiderLeg4.rotateAngleZ -= liftRight;
+		this.spiderLeg5.rotateAngleZ += liftLeftMid;
+		this.spiderLeg6.rotateAngleZ -= liftLeftMid;
+		this.spiderLeg7.rotateAngleZ += liftRightMid;
+		this.spiderLeg8.rotateAngleZ -= liftRightMid;
 	}
 }

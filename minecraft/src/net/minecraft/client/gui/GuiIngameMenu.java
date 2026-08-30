@@ -3,6 +3,7 @@ package net.minecraft.client.gui;
 import net.minecraft.client.GuiMainMenu;
 import net.minecraft.game.world.World;
 
+/** The pause/options menu shown while in-game, giving access to options, world selection and quitting. */
 public final class GuiIngameMenu extends GuiScreen {
 	public final void initGui() {
 		this.controlList.clear();
@@ -12,30 +13,32 @@ public final class GuiIngameMenu extends GuiScreen {
 		this.controlList.add(new GuiButton(4, this.width / 2 - 100, this.height / 4 + 120, "Back to game"));
 	}
 
-	protected final void actionPerformed(GuiButton var1) {
-		if(var1.id == 0) {
+	/** Performs the action associated with the clicked button. */
+	protected final void actionPerformed(GuiButton button) {
+		if(button.id == 0) {
 			this.mc.displayGuiScreen(new GuiOptions(this, this.mc.gameSettings));
 		}
 
-		if(var1.id == 1) {
+		if(button.id == 1) {
 			this.mc.displayGuiScreen(new GuiSelectWorld(this));
 		}
 
-		if(var1.id == 2) {
+		if(button.id == 2) {
 			this.mc.closeWorld((World)null);
 			this.mc.displayGuiScreen(new GuiMainMenu());
 		}
 
-		if(var1.id == 4) {
+		if(button.id == 4) {
 			this.mc.displayGuiScreen((GuiScreen)null);
 			this.mc.setIngameFocus();
 		}
 
 	}
 
-	public final void drawScreen(int var1, int var2, float var3) {
+	/** Draws the background, the menu title and the buttons. */
+	public final void drawScreen(int mouseX, int mouseY, float partialTicks) {
 		this.drawDefaultBackground();
 		drawCenteredString(this.fontRenderer, "Game menu", this.width / 2, 40, 16777215);
-		super.drawScreen(var1, var2, var3);
+		super.drawScreen(mouseX, mouseY, partialTicks);
 	}
 }

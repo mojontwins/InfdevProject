@@ -5,48 +5,53 @@ import net.minecraft.game.entity.player.InventoryPlayer;
 import net.minecraft.game.world.block.tileentity.TileEntityFurnace;
 import org.lwjgl.opengl.GL11;
 
+/** The furnace GUI: shows the fuel/input/result slots plus progress and burning indicators. */
 public final class GuiFurnace extends GuiContainer {
 	private TileEntityFurnace furnaceInventory;
 
-	public GuiFurnace(InventoryPlayer var1, TileEntityFurnace var2) {
+	public GuiFurnace(InventoryPlayer inventoryPlayer, TileEntityFurnace furnace) {
 		new InventoryCraftResult();
-		this.furnaceInventory = var2;
-		this.inventorySlots.add(new Slot(this, var2, 0, 56, 17));
-		this.inventorySlots.add(new Slot(this, var2, 1, 56, 53));
-		this.inventorySlots.add(new Slot(this, var2, 2, 116, 35));
+		this.furnaceInventory = furnace;
+		this.inventorySlots.add(new Slot(this, furnace, 0, 56, 17));
+		this.inventorySlots.add(new Slot(this, furnace, 1, 56, 53));
+		this.inventorySlots.add(new Slot(this, furnace, 2, 116, 35));
 
-		int var4;
-		for(var4 = 0; var4 < 3; ++var4) {
-			for(int var3 = 0; var3 < 9; ++var3) {
-				this.inventorySlots.add(new Slot(this, var1, var3 + (var4 + 1) * 9, 8 + var3 * 18, 84 + var4 * 18));
+		int row;
+		for(row = 0; row < 3; ++row) {
+			for(int column = 0; column < 9; ++column) {
+				this.inventorySlots.add(new Slot(this, inventoryPlayer, column + (row + 1) * 9, 8 + column * 18, 84 + row * 18));
 			}
 		}
 
-		for(var4 = 0; var4 < 9; ++var4) {
-			this.inventorySlots.add(new Slot(this, var1, var4, 8 + var4 * 18, 142));
+		for(row = 0; row < 9; ++row) {
+			this.inventorySlots.add(new Slot(this, inventoryPlayer, row, 8 + row * 18, 142));
 		}
 
 	}
 
+	/** Draws the "Furnace" and "Inventory" labels. */
 	protected final void drawGuiContainerForegroundLayer() {
 		this.fontRenderer.drawString("Furnace", 60, 6, 4210752);
 		this.fontRenderer.drawString("Inventory", 8, this.ySize - 96 + 2, 4210752);
 	}
 
+	/** Draws the furnace background, the flame while burning and the cook progress arrow. */
 	protected final void drawGuiContainerBackgroundLayer() {
-		int var1 = this.mc.renderEngine.getTexture("/gui/furnace.png");
+		int texture = this.mc.renderEngine.getTexture("/gui/furnace.png");
 		GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-		RenderEngine.bindTexture(var1);
-		var1 = (this.width - this.xSize) / 2;
-		int var2 = (this.height - this.ySize) / 2;
-		this.drawTexturedModalRect(var1, var2, 0, 0, this.xSize, this.ySize);
-		int var3;
+		RenderEngine.bindTexture(texture);
+		int guiLeft = (this.width - this.xSize) / 2;
+		int guiTop = (this.height - this.ySize) / 2;
+		this.drawTexturedModalRect(guiLeft, guiTop, 0, 0, this.xSize, this.ySize);
+		int flameHeight;
+		// Draw the flame, scaled in height as fuel is consumed.
 		if(this.furnaceInventory.isBurning()) {
-			var3 = this.furnaceInventory.getBurnTimeRemainingScaled(12);
-			this.drawTexturedModalRect(var1 + 56, var2 + 36 + 12 - var3, 176, 12 - var3, 14, var3 + 2);
+			flameHeight = this.furnaceInventory.getBurnTimeRemainingScaled(12);
+			this.drawTexturedModalRect(guiLeft + 56, guiTop + 36 + 12 - flameHeight, 176, 12 - flameHeight, 14, flameHeight + 2);
 		}
 
-		var3 = this.furnaceInventory.getCookProgressScaled(24);
-		this.drawTexturedModalRect(var1 + 79, var2 + 34, 176, 14, var3 + 1, 16);
+		// Draw the cook-progress arrow, scaled in width as the item cooks.
+		flameHeight = this.furnaceInventory.getCookProgressScaled(24);
+		this.drawTexturedModalRect(guiLeft + 79, guiTop + 34, 176, 14, flameHeight + 1, 16);
 	}
 }

@@ -2,6 +2,7 @@ package net.minecraft.game.world.block;
 
 import net.minecraft.game.world.material.Material;
 
+/** Wood log: bark on the sides, a ring texture on the top and bottom faces. */
 public final class BlockLog extends Block {
 	protected BlockLog(int blockID) {
 		super(blockID, Material.wood);

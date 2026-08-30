@@ -5,11 +5,111 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.PrintWriter;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
 import org.lwjgl.input.Keyboard;
 
+/**
+ * Holds every user-tweakable option (sound, video, controls) plus the key
+ * bindings, persisted to "options.txt" in the minecraft data directory.
+ *
+ * <p>The options themselves are described by the {@link GameOption} enum: each
+ * constant knows its options.txt key, its value type and how to read/write its
+ * backing field, so a new option is added by declaring one enum constant and
+ * (if needed) one value field. The int-based methods ({@link #getKeyBinding(int)}
+ * and {@link #setOptionFloatValue(int, int)}) address options by their row id
+ * and are the public API used by the options screen.
+ */
 public final class GameSettings {
 	private static final String[] RENDER_DISTANCES = new String[]{"FAR", "NORMAL", "SHORT", "TINY"};
 	private static final String[] DIFFICULTIES = new String[]{"Peaceful", "Easy", "Normal", "Hard"};
+
+	/** Step size used to nudge a 0-1 float option up or down by one delta. */
+	private static final float FLOAT_OPTION_STEP = 0.05F;
+
+	/** Clamps a value into the legal range of a float option (0-1). */
+	private static float clamp01(float value) {
+		return value < 0.0F ? 0.0F : (value > 1.0F ? 1.0F : value);
+	}
+
+	/**
+	 * The kind of value an option holds. It drives how the option is cycled,
+	 * rendered, loaded and saved.
+	 */
+	private enum OptionType {
+		/** An ON/OFF toggle; delta is ignored, the option is inverted. */
+		BOOLEAN,
+		/** A discrete integer that wraps around through {@link GameOption#levelLabels}. */
+		INTEGER,
+		/** A continuous value between 0.0 and 1.0 (e.g. a percentage). */
+		FLOAT;
+	}
+
+	/**
+	 * A single row of the options screen. Each constant declares how its value
+	 * is stored on disk, which backing field it reads/writes, how it should be
+	 * displayed and what should happen when it changes.
+	 */
+	private enum GameOption {
+		MUSIC(0, "music", OptionType.BOOLEAN, "Music", null, settings -> settings.music, (settings, value) -> settings.music = (Boolean) value, settings -> settings.mc.sndManager.onSoundOptionsChanged()),
+		SOUND(1, "sound", OptionType.BOOLEAN, "Sound", null, settings -> settings.sound, (settings, value) -> settings.sound = (Boolean) value, settings -> settings.mc.sndManager.onSoundOptionsChanged()),
+		INVERT_MOUSE(2, "invertYMouse", OptionType.BOOLEAN, "Invert mouse", null, settings -> settings.invertMouse, (settings, value) -> settings.invertMouse = (Boolean) value, null),
+		SHOW_FPS(3, "showFrameRate", OptionType.BOOLEAN, "Show FPS", null, settings -> settings.showFPS, (settings, value) -> settings.showFPS = (Boolean) value, null),
+		RENDER_DISTANCE(4, "viewDistance", OptionType.INTEGER, "Render distance", RENDER_DISTANCES, settings -> settings.renderDistance, (settings, value) -> settings.renderDistance = (Integer) value, null),
+		VIEW_BOBBING(5, "bobView", OptionType.BOOLEAN, "View bobbing", null, settings -> settings.fancyGraphics, (settings, value) -> settings.fancyGraphics = (Boolean) value, null),
+		ANAGLYPH(6, "anaglyph3d", OptionType.BOOLEAN, "3d anaglyph", null, settings -> settings.anaglyph, (settings, value) -> settings.anaglyph = (Boolean) value, settings -> settings.mc.renderEngine.refreshTextures()),
+		LIMIT_FRAMERATE(7, "limitFramerate", OptionType.BOOLEAN, "Limit framerate", null, settings -> settings.limitFramerate, (settings, value) -> settings.limitFramerate = (Boolean) value, null),
+		DIFFICULTY(8, "difficulty", OptionType.INTEGER, "Difficulty", DIFFICULTIES, settings -> settings.difficulty, (settings, value) -> settings.difficulty = (Integer) value, null);
+
+		private final int id;
+		private final String saveKey;
+		private final OptionType type;
+		private final String displayName;
+		private final String[] levelLabels;
+		private final Function<GameSettings, Object> getter;
+		private final BiConsumer<GameSettings, Object> setter;
+		private final Consumer<GameSettings> onChanged;
+
+		GameOption(int id, String saveKey, OptionType type, String displayName, String[] levelLabels, Function<GameSettings, Object> getter, BiConsumer<GameSettings, Object> setter, Consumer<GameSettings> onChanged) {
+			this.id = id;
+			this.saveKey = saveKey;
+			this.type = type;
+			this.displayName = displayName;
+			this.levelLabels = levelLabels;
+			this.getter = getter;
+			this.setter = setter;
+			this.onChanged = onChanged;
+		}
+
+		/** Looks up an option by its options-screen row id, or returns null when unknown. */
+		static GameOption byId(int optionId) {
+			for(GameOption option : values()) {
+				if(option.id == optionId) {
+					return option;
+				}
+			}
+
+			return null;
+		}
+
+		/** Looks up an option by its options.txt key, or returns null when unknown (e.g. a key binding line). */
+		static GameOption bySaveKey(String saveKey) {
+			for(GameOption option : values()) {
+				if(option.saveKey.equals(saveKey)) {
+					return option;
+				}
+			}
+
+			return null;
+		}
+
+		/** The number of discrete levels of an integer option (labels.length), 0 for other types. */
+		int levelCount() {
+			return this.levelLabels == null ? 0 : this.levelLabels.length;
+		}
+	}
+
 	public boolean music = true;
 	public boolean sound = true;
 	public boolean invertMouse = false;
@@ -33,155 +133,186 @@ public final class GameSettings {
 	public KeyBinding[] keyBindings = new KeyBinding[]{this.keyBindForward, this.keyBindLeft, this.keyBindBack, this.keyBindRight, this.keyBindJump, this.keyBindSneak, this.keyBindInventory, this.keyBindDrop, this.keyBindChat, this.keyBindToggleFog, this.keyBindSave, this.keyBindLoad};
 	private Minecraft mc;
 	private File optionsFile;
-	public int numberOfOptions = 9;
+
+	/** Number of option rows in the options screen; always equals the number of {@link GameOption} constants. */
+	public int numberOfOptions = GameOption.values().length;
 	public int difficulty = 2;
 	public boolean thirdPersonView = false;
 
-	public GameSettings(Minecraft var1, File var2) {
-		this.mc = var1;
-		this.optionsFile = new File(var2, "options.txt");
+	/** Creates the settings holder and immediately loads any saved options. */
+	public GameSettings(Minecraft minecraft, File dataDir) {
+		this.mc = minecraft;
+		this.optionsFile = new File(dataDir, "options.txt");
 		this.loadOptions();
 	}
 
-	public final String getOptionDisplayString(int var1) {
-		return this.keyBindings[var1].keyDescription + ": " + Keyboard.getKeyName(this.keyBindings[var1].keyCode);
+	/** Returns the label shown next to a key binding in the options screen. */
+	public final String getOptionDisplayString(int bindingIndex) {
+		return this.keyBindings[bindingIndex].keyDescription + ": " + Keyboard.getKeyName(this.keyBindings[bindingIndex].keyCode);
 	}
 
-	public final void setKeyBinding(int var1, int var2) {
-		this.keyBindings[var1].keyCode = var2;
+	/** Stores a new key code for a binding and persists the change. */
+	public final void setKeyBinding(int bindingIndex, int keyCode) {
+		this.keyBindings[bindingIndex].keyCode = keyCode;
 		this.saveOptions();
 	}
 
-	public final void setOptionFloatValue(int var1, int var2) {
-		if(var1 == 0) {
-			this.music = !this.music;
-			this.mc.sndManager.onSoundOptionsChanged();
-		}
+	/** Reads the current boolean value of the given option. */
+	private boolean getBoolean(GameOption option) {
+		return (Boolean)option.getter.apply(this);
+	}
 
-		if(var1 == 1) {
-			this.sound = !this.sound;
-			this.mc.sndManager.onSoundOptionsChanged();
-		}
+	/** Reads the current integer value of the given option. */
+	private int getInteger(GameOption option) {
+		return (Integer)option.getter.apply(this);
+	}
 
-		if(var1 == 2) {
-			this.invertMouse = !this.invertMouse;
-		}
+	/** Reads the current 0-1 float value of the given option. */
+	private float getFloat(GameOption option) {
+		return (Float)option.getter.apply(this);
+	}
 
-		if(var1 == 3) {
-			this.showFPS = !this.showFPS;
-		}
+	/** Writes a new value (Boolean, Integer or Float matching the option type) to the option's field. */
+	private void setValue(GameOption option, Object value) {
+		option.setter.accept(this, value);
+	}
 
-		if(var1 == 4) {
-			this.renderDistance = this.renderDistance + var2 & 3;
-		}
+	/**
+	 * Advances one option row by one step: {@code delta} is the cycle step for
+	 * integer/float options and is ignored for boolean toggles. Persists the
+	 * change afterwards.
+	 */
+	public final void setOptionFloatValue(int optionId, int delta) {
+		GameOption option = GameOption.byId(optionId);
+		if(option != null) {
+			switch(option.type) {
+				case BOOLEAN:
+					setValue(option, !getBoolean(option));
+					break;
+				case INTEGER:
+					// Wrap around through the option's levels, e.g. (0 + -1) % 4 -> 3.
+					int levelCount = option.levelCount();
+					int nextLevel = (getInteger(option) + delta) % levelCount;
+					if(nextLevel < 0) {
+						nextLevel += levelCount;
+					}
 
-		if(var1 == 5) {
-			this.fancyGraphics = !this.fancyGraphics;
-		}
+					setValue(option, nextLevel);
+					break;
+				case FLOAT:
+					// Nudge by the fixed step and clamp into the legal 0-1 range.
+					setValue(option, clamp01(getFloat(option) + (float)delta * FLOAT_OPTION_STEP));
+					break;
+			}
 
-		if(var1 == 6) {
-			this.anaglyph = !this.anaglyph;
-			this.mc.renderEngine.refreshTextures();
-		}
-
-		if(var1 == 7) {
-			this.limitFramerate = !this.limitFramerate;
-		}
-
-		if(var1 == 8) {
-			this.difficulty = this.difficulty + var2 & 3;
+			if(option.onChanged != null) {
+				option.onChanged.accept(this);
+			}
 		}
 
 		this.saveOptions();
 	}
 
-	public final String getKeyBinding(int var1) {
-		return var1 == 0 ? "Music: " + (this.music ? "ON" : "OFF") : (var1 == 1 ? "Sound: " + (this.sound ? "ON" : "OFF") : (var1 == 2 ? "Invert mouse: " + (this.invertMouse ? "ON" : "OFF") : (var1 == 3 ? "Show FPS: " + (this.showFPS ? "ON" : "OFF") : (var1 == 4 ? "Render distance: " + RENDER_DISTANCES[this.renderDistance] : (var1 == 5 ? "View bobbing: " + (this.fancyGraphics ? "ON" : "OFF") : (var1 == 6 ? "3d anaglyph: " + (this.anaglyph ? "ON" : "OFF") : (var1 == 7 ? "Limit framerate: " + (this.limitFramerate ? "ON" : "OFF") : (var1 == 8 ? "Difficulty: " + DIFFICULTIES[this.difficulty] : ""))))))));
+	/**
+	 * Builds the textual description of one option row for the options screen,
+	 * e.g. "Music: ON", "Render distance: FAR" or a percentage for float options.
+	 */
+	public final String getKeyBinding(int optionId) {
+		GameOption option = GameOption.byId(optionId);
+		if(option == null) {
+			return "";
+		}
+
+		String prefix = option.displayName + ": ";
+		switch(option.type) {
+			case BOOLEAN:
+				return prefix + (getBoolean(option) ? "ON" : "OFF");
+			case INTEGER:
+				return prefix + option.levelLabels[getInteger(option)];
+			case FLOAT:
+				return prefix + (int)(getFloat(option) * 100.0F) + "%";
+		}
+
+		return "";
 	}
 
+	/** Parses "options.txt": each line is a "key:value" pair applied to the matching setting or key binding. */
 	private void loadOptions() {
 		try {
 			if(this.optionsFile.exists()) {
-				BufferedReader var1 = new BufferedReader(new FileReader(this.optionsFile));
+				BufferedReader reader = new BufferedReader(new FileReader(this.optionsFile));
 
 				while(true) {
-					String var2 = var1.readLine();
-					if(var2 == null) {
-						var1.close();
+					String line = reader.readLine();
+					if(line == null) {
+						reader.close();
 						return;
 					}
 
-					String[] var5 = var2.split(":");
-					if(var5[0].equals("music")) {
-						this.music = var5[1].equals("true");
-					}
-
-					if(var5[0].equals("sound")) {
-						this.sound = var5[1].equals("true");
-					}
-
-					if(var5[0].equals("invertYMouse")) {
-						this.invertMouse = var5[1].equals("true");
-					}
-
-					if(var5[0].equals("showFrameRate")) {
-						this.showFPS = var5[1].equals("true");
-					}
-
-					if(var5[0].equals("viewDistance")) {
-						this.renderDistance = Integer.parseInt(var5[1]);
-					}
-
-					if(var5[0].equals("bobView")) {
-						this.fancyGraphics = var5[1].equals("true");
-					}
-
-					if(var5[0].equals("anaglyph3d")) {
-						this.anaglyph = var5[1].equals("true");
-					}
-
-					if(var5[0].equals("limitFramerate")) {
-						this.limitFramerate = var5[1].equals("true");
-					}
-
-					if(var5[0].equals("difficulty")) {
-						this.difficulty = Integer.parseInt(var5[1]);
-					}
-
-					for(int var3 = 0; var3 < this.keyBindings.length; ++var3) {
-						if(var5[0].equals("key_" + this.keyBindings[var3].keyDescription)) {
-							this.keyBindings[var3].keyCode = Integer.parseInt(var5[1]);
+					String[] parts = line.split(":");
+					GameOption option = GameOption.bySaveKey(parts[0]);
+					if(option != null) {
+						applyLoadedValue(option, parts[1]);
+					} else {
+						for(int i = 0; i < this.keyBindings.length; ++i) {
+							if(parts[0].equals("key_" + this.keyBindings[i].keyDescription)) {
+								this.keyBindings[i].keyCode = Integer.parseInt(parts[1]);
+							}
 						}
 					}
 				}
 			}
-		} catch (Exception var4) {
+		} catch (Exception e) {
 			System.out.println("Failed to load options");
-			var4.printStackTrace();
+			e.printStackTrace();
 		}
 	}
 
+	/** Parses the string value read from options.txt into the option's field. */
+	private void applyLoadedValue(GameOption option, String value) {
+		switch(option.type) {
+			case BOOLEAN:
+				setValue(option, value.equals("true"));
+				break;
+			case INTEGER:
+				setValue(option, Integer.parseInt(value));
+				break;
+			case FLOAT:
+				setValue(option, clamp01(Float.parseFloat(value)));
+				break;
+		}
+	}
+
+	/** Writes every setting plus all key bindings back to "options.txt". */
 	public final void saveOptions() {
 		try {
-			PrintWriter var1 = new PrintWriter(new FileWriter(this.optionsFile));
-			var1.println("music:" + this.music);
-			var1.println("sound:" + this.sound);
-			var1.println("invertYMouse:" + this.invertMouse);
-			var1.println("showFrameRate:" + this.showFPS);
-			var1.println("viewDistance:" + this.renderDistance);
-			var1.println("bobView:" + this.fancyGraphics);
-			var1.println("anaglyph3d:" + this.anaglyph);
-			var1.println("limitFramerate:" + this.limitFramerate);
-			var1.println("difficulty:" + this.difficulty);
-
-			for(int var2 = 0; var2 < this.keyBindings.length; ++var2) {
-				var1.println("key_" + this.keyBindings[var2].keyDescription + ":" + this.keyBindings[var2].keyCode);
+			PrintWriter writer = new PrintWriter(new FileWriter(this.optionsFile));
+			for(GameOption option : GameOption.values()) {
+				writer.println(option.saveKey + ":" + optionValueToString(option));
 			}
 
-			var1.close();
-		} catch (Exception var3) {
+			for(int i = 0; i < this.keyBindings.length; ++i) {
+				writer.println("key_" + this.keyBindings[i].keyDescription + ":" + this.keyBindings[i].keyCode);
+			}
+
+			writer.close();
+		} catch (Exception e) {
 			System.out.println("Failed to save options");
-			var3.printStackTrace();
+			e.printStackTrace();
 		}
+	}
+
+	/** Serialises the option's current value to its text form for options.txt. */
+	private String optionValueToString(GameOption option) {
+		switch(option.type) {
+			case BOOLEAN:
+				return Boolean.toString(getBoolean(option));
+			case INTEGER:
+				return Integer.toString(getInteger(option));
+			case FLOAT:
+				return Float.toString(getFloat(option));
+		}
+
+		return "";
 	}
 }

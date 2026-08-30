@@ -5,6 +5,10 @@ import net.minecraft.game.entity.misc.EntityTNT;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 
+/**
+ * TNT: mined or exploded, it spawns a primed {@link EntityTNT} (with a random
+ * shortened fuse variant when set off by an explosion) instead of dropping.
+ */
 public final class BlockTNT extends Block {
 	public BlockTNT(int blockID, int textureIndex) {
 		super(blockID, textureIndex, Material.tnt);

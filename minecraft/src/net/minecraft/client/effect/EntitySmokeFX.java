@@ -3,39 +3,46 @@ package net.minecraft.client.effect;
 import net.minecraft.client.render.Tessellator;
 import net.minecraft.game.world.World;
 
+// Smoke that drifts upward, expands many-fold over its life, fades out, and
+// picks a smaller texture tile as it ages. The optional scale argument lets
+// callers (e.g. erupting lava) control its start size and lifespan.
 public final class EntitySmokeFX extends EntityFX {
 	private float smokeParticleScale;
 
-	public EntitySmokeFX(World var1, double var2, double var4, double var6) {
-		this(var1, var2, var4, var6, 1.0F);
+	public EntitySmokeFX(World world, double x, double y, double z) {
+		this(world, x, y, z, 1.0F);
 	}
 
-	public EntitySmokeFX(World var1, double var2, double var4, double var6, float var8) {
-		super(var1, var2, var4, var6, 0.0D, 0.0D, 0.0D);
+	public EntitySmokeFX(World world, double x, double y, double z, float scale) {
+		super(world, x, y, z, 0.0D, 0.0D, 0.0D);
 		this.motionX *= (double)0.1F;
 		this.motionY *= (double)0.1F;
 		this.motionZ *= (double)0.1F;
 		this.particleRed = this.particleGreen = this.particleBlue = (float)(Math.random() * (double)0.3F);
+		// Fit to a 12x12 tile inside the 16x16 smoke sprite, then apply caller scale.
 		this.particleScale *= 12.0F / 16.0F;
-		this.particleScale *= var8;
+		this.particleScale *= scale;
 		this.smokeParticleScale = this.particleScale;
 		this.particleMaxAge = (int)(8.0D / (Math.random() * 0.8D + 0.2D));
-		this.particleMaxAge = (int)((float)this.particleMaxAge * var8);
+		// Scale both the size and the lifespan by the requested scale factor.
+		this.particleMaxAge = (int)((float)this.particleMaxAge * scale);
 		this.noClip = false;
 	}
 
-	public final void renderParticle(Tessellator var1, float var2, float var3, float var4, float var5, float var6, float var7) {
-		float var8 = ((float)this.particleAge + var2) / (float)this.particleMaxAge * 32.0F;
-		if(var8 < 0.0F) {
-			var8 = 0.0F;
+	public final void renderParticle(Tessellator tessellator, float partialTick, float offsetX, float offsetY, float offsetZ, float surfU, float surfV) {
+		// Life ratio over 32 frames, clamped to [0,1]: smoke grows from zero up
+		// to its full starting size as it drifts.
+		float lifeRatio = ((float)this.particleAge + partialTick) / (float)this.particleMaxAge * 32.0F;
+		if(lifeRatio < 0.0F) {
+			lifeRatio = 0.0F;
 		}
 
-		if(var8 > 1.0F) {
-			var8 = 1.0F;
+		if(lifeRatio > 1.0F) {
+			lifeRatio = 1.0F;
 		}
 
-		this.particleScale = this.smokeParticleScale * var8;
-		super.renderParticle(var1, var2, var3, var4, var5, var6, var7);
+		this.particleScale = this.smokeParticleScale * lifeRatio;
+		super.renderParticle(tessellator, partialTick, offsetX, offsetY, offsetZ, surfU, surfV);
 	}
 
 	public final void onUpdate() {

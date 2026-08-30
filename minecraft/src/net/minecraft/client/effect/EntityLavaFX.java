@@ -3,11 +3,13 @@ package net.minecraft.client.effect;
 import net.minecraft.client.render.Tessellator;
 import net.minecraft.game.world.World;
 
+// A molten lava ember that rises off lava flows, shrinks over its life, and
+// sheds a smoke particle behind it more often as it matures.
 public final class EntityLavaFX extends EntityFX {
 	private float lavaParticleScale;
 
-	public EntityLavaFX(World var1, double var2, double var4, double var6) {
-		super(var1, var2, var4, var6, 0.0D, 0.0D, 0.0D);
+	public EntityLavaFX(World world, double x, double y, double z) {
+		super(world, x, y, z, 0.0D, 0.0D, 0.0D);
 		this.motionX *= (double)0.8F;
 		this.motionY *= (double)0.8F;
 		this.motionZ *= (double)0.8F;
@@ -20,14 +22,17 @@ public final class EntityLavaFX extends EntityFX {
 		this.particleTextureIndex = 49;
 	}
 
-	public final float getEntityBrightness(float var1) {
+	public final float getEntityBrightness(float partialTick) {
+		// Glowing embers are always rendered at full brightness.
 		return 1.0F;
 	}
 
-	public final void renderParticle(Tessellator var1, float var2, float var3, float var4, float var5, float var6, float var7) {
-		float var8 = ((float)this.particleAge + var2) / (float)this.particleMaxAge;
-		this.particleScale = this.lavaParticleScale * (1.0F - var8 * var8);
-		super.renderParticle(var1, var2, var3, var4, var5, var6, var7);
+	public final void renderParticle(Tessellator tessellator, float partialTick, float offsetX, float offsetY, float offsetZ, float surfU, float surfV) {
+		// Life ratio from 0 (born) to 1 (about to die).
+		float lifeRatio = ((float)this.particleAge + partialTick) / (float)this.particleMaxAge;
+		// The ember shrinks down to nothing as it ages (quadratic fade-out).
+		this.particleScale = this.lavaParticleScale * (1.0F - lifeRatio * lifeRatio);
+		super.renderParticle(tessellator, partialTick, offsetX, offsetY, offsetZ, surfU, surfV);
 	}
 
 	public final void onUpdate() {
@@ -38,8 +43,10 @@ public final class EntityLavaFX extends EntityFX {
 			super.isDead = true;
 		}
 
-		float var1 = (float)this.particleAge / (float)this.particleMaxAge;
-		if(this.rand.nextFloat() > var1) {
+		// Life ratio; as it approaches 1 the ember spawns smoke more frequently,
+		// modelling cooling lava (nextFloat() must beat the ratio to emit).
+		float lifeRatio = (float)this.particleAge / (float)this.particleMaxAge;
+		if(this.rand.nextFloat() > lifeRatio) {
 			this.worldObj.spawnParticle("smoke", this.posX, this.posY, this.posZ, this.motionX, this.motionY, this.motionZ);
 		}
 

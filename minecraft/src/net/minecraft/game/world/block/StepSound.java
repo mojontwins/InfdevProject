@@ -1,5 +1,11 @@
 package net.minecraft.game.world.block;
 
+/**
+ * A block's footstep/break sound words, e.g. {@code step.stone} /
+ * {@code step.wood}. Small subclasses ({@link StepSoundGlass},
+ * {@link StepSoundSand}) only special-case the break variant - a mismatch the
+ * original shipped with.
+ */
 public class StepSound {
 	private final String stepSoundName;
 	public final float stepSoundVolume;

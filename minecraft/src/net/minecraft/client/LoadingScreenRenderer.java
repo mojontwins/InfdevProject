@@ -15,102 +15,115 @@ import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.GL11;
 import util.IProgressUpdate;
 
+/**
+ * Draws the in-game loading screen (fading dirt background and a progress
+ * bar) while a world or game state is being prepared, and drives it via the
+ * {@link IProgressUpdate} interface.
+ *
+ * This class also hosts static NBT {@link #read}/{@link #write} helpers used
+ * to load and save gzip-compressed compound data (e.g. level metadata), which
+ * have nothing to do with the loading screen itself.
+ */
 public class LoadingScreenRenderer implements IProgressUpdate {
 	private String text;
 	private Minecraft mc;
 	private String title;
 	private long start;
 
-	public LoadingScreenRenderer(Minecraft var1) {
+	public LoadingScreenRenderer(Minecraft mc) {
 		this.text = "";
 		this.title = "";
 		this.start = System.currentTimeMillis();
-		this.mc = var1;
+		this.mc = mc;
 	}
 
-	public final void setTitle(String var1) {
+	public final void setTitle(String title) {
 		if(!this.mc.running) {
 			throw new MinecraftError();
 		} else {
-			this.title = var1;
-			ScaledResolution var3 = new ScaledResolution(this.mc.displayWidth, this.mc.displayHeight);
-			int var2 = var3.getScaledWidth();
-			int var4 = var3.getScaledHeight();
+			this.title = title;
+			ScaledResolution resolution = new ScaledResolution(this.mc.displayWidth, this.mc.displayHeight);
+			int scaledWidth = resolution.getScaledWidth();
+			int scaledHeight = resolution.getScaledHeight();
 			GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
+			// Reset to a 2D orthographic projection for screen-space drawing.
 			GL11.glMatrixMode(GL11.GL_PROJECTION);
 			GL11.glLoadIdentity();
-			GL11.glOrtho(0.0D, (double)var2, (double)var4, 0.0D, 100.0D, 300.0D);
+			GL11.glOrtho(0.0D, (double)scaledWidth, (double)scaledHeight, 0.0D, 100.0D, 300.0D);
 			GL11.glMatrixMode(GL11.GL_MODELVIEW);
 			GL11.glLoadIdentity();
 			GL11.glTranslatef(0.0F, 0.0F, -200.0F);
 		}
 	}
 
-	public final void setText(String var1) {
+	public final void setText(String text) {
 		if(!this.mc.running) {
 			throw new MinecraftError();
 		} else {
 			this.start = 0L;
-			this.text = var1;
+			this.text = text;
 			this.setProgress(-1);
 			this.start = 0L;
 		}
 	}
 
-	public final void setProgress(int var1) {
+	public final void setProgress(int progress) {
 		if(!this.mc.running) {
 			throw new MinecraftError();
 		} else {
-			long var2 = System.currentTimeMillis();
-			if(var2 - this.start >= 20L) {
-				this.start = var2;
-				ScaledResolution var8 = new ScaledResolution(this.mc.displayWidth, this.mc.displayHeight);
-				int var3 = var8.getScaledWidth();
-				int var9 = var8.getScaledHeight();
+			long now = System.currentTimeMillis();
+			// Only redraw at most every 20 ms to avoid hammering the display.
+			if(now - this.start >= 20L) {
+				this.start = now;
+				ScaledResolution resolution = new ScaledResolution(this.mc.displayWidth, this.mc.displayHeight);
+				int scaledWidth = resolution.getScaledWidth();
+				int scaledHeight = resolution.getScaledHeight();
 				GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT);
 				GL11.glMatrixMode(GL11.GL_PROJECTION);
 				GL11.glLoadIdentity();
-				GL11.glOrtho(0.0D, (double)var3, (double)var9, 0.0D, 100.0D, 300.0D);
+				GL11.glOrtho(0.0D, (double)scaledWidth, (double)scaledHeight, 0.0D, 100.0D, 300.0D);
 				GL11.glMatrixMode(GL11.GL_MODELVIEW);
 				GL11.glLoadIdentity();
 				GL11.glTranslatef(0.0F, 0.0F, -200.0F);
 				GL11.glClear(GL11.GL_DEPTH_BUFFER_BIT | GL11.GL_COLOR_BUFFER_BIT);
-				Tessellator var4 = Tessellator.instance;
-				int var5 = this.mc.renderEngine.getTexture("/dirt.png");
-				GL11.glBindTexture(GL11.GL_TEXTURE_2D, var5);
-				var4.startDrawingQuads();
-				var4.setColorOpaque_I(4210752);
-				var4.addVertexWithUV(0.0D, (double)var9, 0.0D, 0.0D, (double)((float)var9 / 32.0F));
-				var4.addVertexWithUV((double)var3, (double)var9, 0.0D, (double)((float)var3 / 32.0F), (double)((float)var9 / 32.0F));
-				var4.addVertexWithUV((double)var3, 0.0D, 0.0D, (double)((float)var3 / 32.0F), 0.0D);
-				var4.addVertexWithUV(0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
-				var4.draw();
-				if(var1 >= 0) {
-					var5 = var3 / 2 - 50;
-					int var6 = var9 / 2 + 16;
+				Tessellator tessellator = Tessellator.instance;
+				int textureId = this.mc.renderEngine.getTexture("/dirt.png");
+				GL11.glBindTexture(GL11.GL_TEXTURE_2D, textureId);
+				// Draw the dirt texture as the background, tiled every 32 px.
+				tessellator.startDrawingQuads();
+				tessellator.setColorOpaque_I(4210752);
+				tessellator.addVertexWithUV(0.0D, (double)scaledHeight, 0.0D, 0.0D, (double)((float)scaledHeight / 32.0F));
+				tessellator.addVertexWithUV((double)scaledWidth, (double)scaledHeight, 0.0D, (double)((float)scaledWidth / 32.0F), (double)((float)scaledHeight / 32.0F));
+				tessellator.addVertexWithUV((double)scaledWidth, 0.0D, 0.0D, (double)((float)scaledWidth / 32.0F), 0.0D);
+				tessellator.addVertexWithUV(0.0D, 0.0D, 0.0D, 0.0D, 0.0D);
+				tessellator.draw();
+				if(progress >= 0) {
+					// Draw the progress bar: grey track plus green fill proportional to progress.
+					textureId = scaledWidth / 2 - 50;
+					int barY = scaledHeight / 2 + 16;
 					GL11.glDisable(GL11.GL_TEXTURE_2D);
-					var4.startDrawingQuads();
-					var4.setColorOpaque_I(8421504);
-					var4.addVertex((double)var5, (double)var6, 0.0D);
-					var4.addVertex((double)var5, (double)(var6 + 2), 0.0D);
-					var4.addVertex((double)(var5 + 100), (double)(var6 + 2), 0.0D);
-					var4.addVertex((double)(var5 + 100), (double)var6, 0.0D);
-					var4.setColorOpaque_I(8454016);
-					var4.addVertex((double)var5, (double)var6, 0.0D);
-					var4.addVertex((double)var5, (double)(var6 + 2), 0.0D);
-					var4.addVertex((double)(var5 + var1), (double)(var6 + 2), 0.0D);
-					var4.addVertex((double)(var5 + var1), (double)var6, 0.0D);
-					var4.draw();
+					tessellator.startDrawingQuads();
+					tessellator.setColorOpaque_I(8421504);
+					tessellator.addVertex((double)textureId, (double)barY, 0.0D);
+					tessellator.addVertex((double)textureId, (double)(barY + 2), 0.0D);
+					tessellator.addVertex((double)(textureId + 100), (double)(barY + 2), 0.0D);
+					tessellator.addVertex((double)(textureId + 100), (double)barY, 0.0D);
+					tessellator.setColorOpaque_I(8454016);
+					tessellator.addVertex((double)textureId, (double)barY, 0.0D);
+					tessellator.addVertex((double)textureId, (double)(barY + 2), 0.0D);
+					tessellator.addVertex((double)(textureId + progress), (double)(barY + 2), 0.0D);
+					tessellator.addVertex((double)(textureId + progress), (double)barY, 0.0D);
+					tessellator.draw();
 					GL11.glEnable(GL11.GL_TEXTURE_2D);
 				}
 
-				this.mc.fontRenderer.drawStringWithShadow(this.title, (var3 - this.mc.fontRenderer.getStringWidth(this.title)) / 2, var9 / 2 - 4 - 16, 16777215);
-				this.mc.fontRenderer.drawStringWithShadow(this.text, (var3 - this.mc.fontRenderer.getStringWidth(this.text)) / 2, var9 / 2 - 4 + 8, 16777215);
+				this.mc.fontRenderer.drawStringWithShadow(this.title, (scaledWidth - this.mc.fontRenderer.getStringWidth(this.title)) / 2, scaledHeight / 2 - 4 - 16, 16777215);
+				this.mc.fontRenderer.drawStringWithShadow(this.text, (scaledWidth - this.mc.fontRenderer.getStringWidth(this.text)) / 2, scaledHeight / 2 - 4 + 8, 16777215);
 				Display.update();
 
 				try {
 					Thread.yield();
-				} catch (Exception var7) {
+				} catch (Exception ignored) {
 				}
 			}
 		}
@@ -119,31 +132,31 @@ public class LoadingScreenRenderer implements IProgressUpdate {
 	public LoadingScreenRenderer() {
 	}
 
-	public static NBTTagCompound read(InputStream var0) throws IOException {
-		DataInputStream var4 = new DataInputStream(new GZIPInputStream(var0));
+	public static NBTTagCompound read(InputStream in) throws IOException {
+		DataInputStream dataIn = new DataInputStream(new GZIPInputStream(in));
 
-		NBTTagCompound var5;
+		NBTTagCompound rootTag;
 		try {
-			NBTBase var1 = NBTBase.readNamedTag(var4);
-			if(!(var1 instanceof NBTTagCompound)) {
+			NBTBase tag = NBTBase.readNamedTag(dataIn);
+			if(!(tag instanceof NBTTagCompound)) {
 				throw new IOException("Root tag must be a named compound tag");
 			}
 
-			var5 = (NBTTagCompound)var1;
+			rootTag = (NBTTagCompound)tag;
 		} finally {
-			var4.close();
+			dataIn.close();
 		}
 
-		return var5;
+		return rootTag;
 	}
 
-	public static void write(NBTTagCompound var0, OutputStream var1) throws IOException {
-		DataOutputStream var5 = new DataOutputStream(new GZIPOutputStream(var1));
+	public static void write(NBTTagCompound tag, OutputStream out) throws IOException {
+		DataOutputStream dataOut = new DataOutputStream(new GZIPOutputStream(out));
 
 		try {
-			NBTBase.writeNamedTag(var0, var5);
+			NBTBase.writeNamedTag(tag, dataOut);
 		} finally {
-			var5.close();
+			dataOut.close();
 		}
 
 	}

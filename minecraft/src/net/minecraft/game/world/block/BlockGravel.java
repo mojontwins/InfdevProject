@@ -3,6 +3,7 @@ package net.minecraft.game.world.block;
 import java.util.Random;
 import net.minecraft.game.item.Item;
 
+/** Gravel: sand that drops flint (one in ten) instead of itself. */
 public final class BlockGravel extends BlockSand {
 	public BlockGravel(int blockID, int textureIndex) {
 		super(blockID, textureIndex);

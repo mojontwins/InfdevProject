@@ -7,6 +7,12 @@ import net.minecraft.game.physics.Vec3D;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 
+/**
+ * Wall/floor torch. Its metadata records which face it sticks to (1 = -X, 2 =
+ * +X, 3 = -Z, 4 = +Z, 5 = floor); when the support block disappears the torch
+ * drops. The ray-trace box and the smoke/flame particles are shifted to match
+ * that orientation.
+ */
 public final class BlockTorch extends Block {
 	protected BlockTorch(int blockID, int textureIndex) {
 		super(blockID, textureIndex, Material.circuits);

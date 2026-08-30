@@ -18,106 +18,114 @@ public final class EffectRenderer {
 	private RenderEngine renderer;
 	private Random rand = new Random();
 
-	public EffectRenderer(World var1, RenderEngine var2) {
-		if(var1 != null) {
-			this.worldObj = var1;
+	// Owns all active particles. They are split across three render layers
+	// (terrain-textured crack bits, particle-texture world particles, and
+	// lit/pickup particles drawn without the world), each updated and drawn here.
+	public EffectRenderer(World world, RenderEngine renderEngine) {
+		if(world != null) {
+			this.worldObj = world;
 		}
 
-		this.renderer = var2;
+		this.renderer = renderEngine;
 
-		for(int var3 = 0; var3 < 3; ++var3) {
-			this.fxLayers[var3] = new ArrayList<>();
+		for(int layer = 0; layer < 3; ++layer) {
+			this.fxLayers[layer] = new ArrayList<>();
 		}
 
 	}
 
-	public final void addEffect(EntityFX var1) {
-		int var2 = var1.getFXLayer();
-		this.fxLayers[var2].add(var1);
+	public final void addEffect(EntityFX fx) {
+		int layer = fx.getFXLayer();
+		this.fxLayers[layer].add(fx);
 	}
 
 	public final void updateEffects() {
-		for(int var1 = 0; var1 < 3; ++var1) {
-			for(int var2 = 0; var2 < this.fxLayers[var1].size(); ++var2) {
-				EntityFX var3 = this.fxLayers[var1].get(var2);
-				var3.onUpdate();
-				if(var3.isDead) {
-					this.fxLayers[var1].remove(var2--);
+		// Iterate with an index because dead particles are removed mid-loop.
+		for(int layer = 0; layer < 3; ++layer) {
+			for(int index = 0; index < this.fxLayers[layer].size(); ++index) {
+				EntityFX fx = this.fxLayers[layer].get(index);
+				fx.onUpdate();
+				if(fx.isDead) {
+					this.fxLayers[layer].remove(index--);
 				}
 			}
 		}
 
 	}
 
-	public final void renderParticles(Entity var1, float var2) {
-		float var3 = MathHelper.cos(var1.rotationYaw * (float)Math.PI / 180.0F);
-		float var4 = MathHelper.sin(var1.rotationYaw * (float)Math.PI / 180.0F);
-		float var5 = -var4 * MathHelper.sin(var1.rotationPitch * (float)Math.PI / 180.0F);
-		float var6 = var3 * MathHelper.sin(var1.rotationPitch * (float)Math.PI / 180.0F);
-		float var7 = MathHelper.cos(var1.rotationPitch * (float)Math.PI / 180.0F);
-		EntityFX.interpPosX = var1.lastTickPosX + (var1.posX - var1.lastTickPosX) * (double)var2;
-		EntityFX.interpPosY = var1.lastTickPosY + (var1.posY - var1.lastTickPosY) * (double)var2;
-		EntityFX.interpPosZ = var1.lastTickPosZ + (var1.posZ - var1.lastTickPosZ) * (double)var2;
+	public final void renderParticles(Entity entity, float partialTick) {
+		// Build the camera's three basis axes from the player's rotation; these
+		// orient each particle quad so it always faces the camera.
+		float yawCos = MathHelper.cos(entity.rotationYaw * (float)Math.PI / 180.0F);
+		float yawSin = MathHelper.sin(entity.rotationYaw * (float)Math.PI / 180.0F);
+		float pitchYawCos = -yawSin * MathHelper.sin(entity.rotationPitch * (float)Math.PI / 180.0F);
+		float pitchYawSin = yawCos * MathHelper.sin(entity.rotationPitch * (float)Math.PI / 180.0F);
+		float pitchCos = MathHelper.cos(entity.rotationPitch * (float)Math.PI / 180.0F);
+		EntityFX.interpPosX = entity.lastTickPosX + (entity.posX - entity.lastTickPosX) * (double)partialTick;
+		EntityFX.interpPosY = entity.lastTickPosY + (entity.posY - entity.lastTickPosY) * (double)partialTick;
+		EntityFX.interpPosZ = entity.lastTickPosZ + (entity.posZ - entity.lastTickPosZ) * (double)partialTick;
 
-		for(int var11 = 0; var11 < 2; ++var11) {
-			if(this.fxLayers[var11].size() != 0) {
-				int var8 = 0;
-				if(var11 == 0) {
-					var8 = this.renderer.getTexture("/particles.png");
+		for(int layer = 0; layer < 2; ++layer) {
+			if(this.fxLayers[layer].size() != 0) {
+				int texture = 0;
+				if(layer == 0) {
+					texture = this.renderer.getTexture("/particles.png");
 				}
 
-				if(var11 == 1) {
-					var8 = this.renderer.getTexture("/terrain.png");
+				if(layer == 1) {
+					texture = this.renderer.getTexture("/terrain.png");
 				}
 
-				GL11.glBindTexture(GL11.GL_TEXTURE_2D, var8);
-				Tessellator var12 = Tessellator.instance;
-				var12.startDrawingQuads();
+				GL11.glBindTexture(GL11.GL_TEXTURE_2D, texture);
+				Tessellator tessellator = Tessellator.instance;
+				tessellator.startDrawingQuads();
 
-				for(int var9 = 0; var9 < this.fxLayers[var11].size(); ++var9) {
-					EntityFX var10 = this.fxLayers[var11].get(var9);
-					var10.renderParticle(var12, var2, var3, var7, var4, var5, var6);
+				for(int index = 0; index < this.fxLayers[layer].size(); ++index) {
+					EntityFX fx = this.fxLayers[layer].get(index);
+					fx.renderParticle(tessellator, partialTick, yawCos, pitchCos, yawSin, pitchYawCos, pitchYawSin);
 				}
 
-				var12.draw();
+				tessellator.draw();
 			}
 		}
 
 	}
 
-	public final void renderLitParticles(float var1) {
+	public final void renderLitParticles(float partialTick) {
 		if(this.fxLayers[2].size() != 0) {
-			Tessellator var2 = Tessellator.instance;
+			Tessellator tessellator = Tessellator.instance;
 
-			for(int var3 = 0; var3 < this.fxLayers[2].size(); ++var3) {
-				EntityFX var4 = this.fxLayers[2].get(var3);
-				var4.renderParticle(var2, var1, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F);
+			for(int index = 0; index < this.fxLayers[2].size(); ++index) {
+				EntityFX fx = this.fxLayers[2].get(index);
+				fx.renderParticle(tessellator, partialTick, 0.0F, 0.0F, 0.0F, 0.0F, 0.0F);
 			}
 
 		}
 	}
 
-	public final void clearEffects(World var1) {
-		this.worldObj = var1;
+	public final void clearEffects(World world) {
+		this.worldObj = world;
 
-		for(int var2 = 0; var2 < 3; ++var2) {
-			this.fxLayers[var2].clear();
+		for(int layer = 0; layer < 3; ++layer) {
+			this.fxLayers[layer].clear();
 		}
 
 	}
 
-	public final void addBlockDestroyEffects(int var1, int var2, int var3) {
-		int var4 = this.worldObj.getBlockId(var1, var2, var3);
-		if(var4 != 0) {
-			Block var15 = Block.blocksList[var4];
+	// Spawns a burst of 64 crack particles evenly spaced through the block's
+	// volume, each flying outward from the block's center.
+	public final void addBlockDestroyEffects(int x, int y, int z) {
+		int blockId = this.worldObj.getBlockId(x, y, z);
+		if(blockId != 0) {
+			Block block = Block.blocksList[blockId];
 
-			for(int var5 = 0; var5 < 4; ++var5) {
-				for(int var6 = 0; var6 < 4; ++var6) {
-					for(int var7 = 0; var7 < 4; ++var7) {
-						double var9 = (double)var1 + ((double)var5 + 0.5D) / 4.0D;
-						double var11 = (double)var2 + ((double)var6 + 0.5D) / 4.0D;
-						double var13 = (double)var3 + ((double)var7 + 0.5D) / 4.0D;
-						this.addEffect(new EntityDiggingFX(this.worldObj, var9, var11, var13, var9 - (double)var1 - 0.5D, var11 - (double)var2 - 0.5D, var13 - (double)var3 - 0.5D, var15));
+			for(int dx = 0; dx < 4; ++dx) {
+				for(int dy = 0; dy < 4; ++dy) {
+					for(int dz = 0; dz < 4; ++dz) {
+						double posX = (double)x + ((double)dx + 0.5D) / 4.0D;
+						double posY = (double)y + ((double)dy + 0.5D) / 4.0D;
+						double posZ = (double)z + ((double)dz + 0.5D) / 4.0D;
+						this.addEffect(new EntityDiggingFX(this.worldObj, posX, posY, posZ, posX - (double)x - 0.5D, posY - (double)y - 0.5D, posZ - (double)z - 0.5D, block));
 					}
 				}
 			}
@@ -125,43 +133,44 @@ public final class EffectRenderer {
 		}
 	}
 
-	public final void addBlockHitEffects(int var1, int var2, int var3, int var4) {
-		int var5 = this.worldObj.getBlockId(var1, var2, var3);
-		if(var5 != 0) {
-			Block var15 = Block.blocksList[var5];
-			double var7 = (double)var1 + this.rand.nextDouble() * (var15.maxX - var15.minX - (double)0.2F) + (double)0.1F + var15.minX;
-			double var9 = (double)var2 + this.rand.nextDouble() * (var15.maxY - var15.minY - (double)0.2F) + (double)0.1F + var15.minY;
-			double var11 = (double)var3 + this.rand.nextDouble() * (var15.maxZ - var15.minZ - (double)0.2F) + (double)0.1F + var15.minZ;
-			if(var4 == 0) {
-				var9 = (double)var2 + var15.minY - (double)0.1F;
+	// Spawns a single crack particle where the block face was hit; `side` selects
+	// which face so the particle is placed just outside that surface.
+	public final void addBlockHitEffects(int x, int y, int z, int side) {
+		int blockId = this.worldObj.getBlockId(x, y, z);
+		if(blockId != 0) {
+			Block block = Block.blocksList[blockId];
+			double posX = (double)x + this.rand.nextDouble() * (block.maxX - block.minX - (double)0.2F) + (double)0.1F + block.minX;
+			double posY = (double)y + this.rand.nextDouble() * (block.maxY - block.minY - (double)0.2F) + (double)0.1F + block.minY;
+			double posZ = (double)z + this.rand.nextDouble() * (block.maxZ - block.minZ - (double)0.2F) + (double)0.1F + block.minZ;
+			if(side == 0) {
+				posY = (double)y + block.minY - (double)0.1F;
 			}
 
-			if(var4 == 1) {
-				var9 = (double)var2 + var15.maxY + (double)0.1F;
+			if(side == 1) {
+				posY = (double)y + block.maxY + (double)0.1F;
 			}
 
-			if(var4 == 2) {
-				var11 = (double)var3 + var15.minZ - (double)0.1F;
+			if(side == 2) {
+				posZ = (double)z + block.minZ - (double)0.1F;
 			}
 
-			if(var4 == 3) {
-				var11 = (double)var3 + var15.maxZ + (double)0.1F;
+			if(side == 3) {
+				posZ = (double)z + block.maxZ + (double)0.1F;
 			}
 
-			if(var4 == 4) {
-				var7 = (double)var1 + var15.minX - (double)0.1F;
+			if(side == 4) {
+				posX = (double)x + block.minX - (double)0.1F;
 			}
 
-			if(var4 == 5) {
-				var7 = (double)var1 + var15.maxX + (double)0.1F;
+			if(side == 5) {
+				posX = (double)x + block.maxX + (double)0.1F;
 			}
 
-			EntityDiggingFX var10001 = new EntityDiggingFX(this.worldObj, var7, var9, var11, 0.0D, 0.0D, 0.0D, var15);
-			EntityDiggingFX var14 = var10001;
-			var14.motionX *= (double)0.2F;
-			var14.motionY = (var14.motionY - (double)0.1F) * (double)0.2F + (double)0.1F;
-			var14.motionZ *= (double)0.2F;
-			this.addEffect(var14.multiplyParticleScaleBy(0.6F));
+			EntityDiggingFX fx = new EntityDiggingFX(this.worldObj, posX, posY, posZ, 0.0D, 0.0D, 0.0D, block);
+			fx.motionX *= (double)0.2F;
+			fx.motionY = (fx.motionY - (double)0.1F) * (double)0.2F + (double)0.1F;
+			fx.motionZ *= (double)0.2F;
+			this.addEffect(fx.multiplyParticleScaleBy(0.6F));
 		}
 	}
 

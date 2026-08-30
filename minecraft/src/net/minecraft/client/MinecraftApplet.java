@@ -4,6 +4,11 @@ import java.applet.Applet;
 import java.awt.BorderLayout;
 import java.awt.Canvas;
 
+/**
+ * Browser/desktop applet wrapper that hosts the Minecraft {@link Canvas} in an
+ * AWT layout. Reads launch parameters (fullscreen, username/session, map or
+ * server) from the applet and drives the game's main thread lifecycle.
+ */
 public class MinecraftApplet extends Applet {
 	private static final long serialVersionUID = 1L;
 	private Canvas mcCanvas;
@@ -12,12 +17,12 @@ public class MinecraftApplet extends Applet {
 
 	public void init() {
 		this.mcCanvas = new CanvasMinecraftApplet(this);
-		boolean var1 = false;
+		boolean fullscreen = false;
 		if(this.getParameter("fullscreen") != null) {
-			var1 = this.getParameter("fullscreen").equalsIgnoreCase("true");
+			fullscreen = this.getParameter("fullscreen").equalsIgnoreCase("true");
 		}
 
-		this.mc = new Minecraft(this.mcCanvas, this, this.getWidth(), this.getHeight(), var1);
+		this.mc = new Minecraft(this.mcCanvas, this, this.getWidth(), this.getHeight(), fullscreen);
 		this.mc.minecraftUri = this.getDocumentBase().getHost();
 		if(this.getDocumentBase().getPort() > 0) {
 			this.mc.minecraftUri = this.mc.minecraftUri + ":" + this.getDocumentBase().getPort();
@@ -65,16 +70,16 @@ public class MinecraftApplet extends Applet {
 
 	public final void shutdown() {
 		if(this.mcThread != null) {
-			Minecraft var1 = this.mc;
-			var1.running = false;
+			Minecraft mc = this.mc;
+			mc.running = false;
 
 			try {
 				this.mcThread.join(1000L);
-			} catch (InterruptedException var3) {
+			} catch (InterruptedException e) {
 				try {
 					this.mc.shutdownMinecraftApplet();
-				} catch (Exception var2) {
-					var2.printStackTrace();
+				} catch (Exception ex) {
+					ex.printStackTrace();
 				}
 			}
 

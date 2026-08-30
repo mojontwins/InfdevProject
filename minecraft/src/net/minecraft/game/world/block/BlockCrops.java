@@ -6,6 +6,11 @@ import net.minecraft.game.item.Item;
 import net.minecraft.game.item.ItemStack;
 import net.minecraft.game.world.World;
 
+/**
+ * Wheat crops growing on tilled soil. The metadata holds the growth stage
+ * 0-7, advanced by a chance scaled with the hydration of the surrounding 3x3
+ * farmland; harvested crops drop seeds, a fully grown one drops wheat.
+ */
 public final class BlockCrops extends BlockFlower {
 	protected BlockCrops(int blockID, int textureIndex) {
 		super(blockID, textureIndex);
@@ -88,6 +93,7 @@ public final class BlockCrops extends BlockFlower {
 
 	@Override
 	public final int idDropped(int metadata, Random random) {
+		// Genuine Infdev debug output; kept verbatim.
 		System.out.println("Get resource: " + metadata);
 		return metadata == 7 ? Item.wheat.shiftedIndex : -1;
 	}

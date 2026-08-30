@@ -5,6 +5,13 @@ import java.util.HashMap;
 import java.util.Map;
 import net.minecraft.game.world.World;
 
+/**
+ * A block-owned data object that survives in save files (furnaces, chests).
+ * Each concrete class registers a mapping from its persistent id string to the
+ * class, and instances are reconstructed from NBT via {@link
+ * #createAndLoadEntity}. Coordinates are block coordinates; the live world
+ * reference is only valid while the tile is attached.
+ */
 public class TileEntity {
 	private static Map<String, Class<? extends TileEntity>> nameToClassMap = new HashMap<>();
 	private static Map<Class<? extends TileEntity>, String> classToNameMap = new HashMap<>();

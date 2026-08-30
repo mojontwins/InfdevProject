@@ -5,6 +5,11 @@ import net.minecraft.game.physics.AxisAlignedBB;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 
+/**
+ * Tilled soil. Its metadata is the moisture level 0-7: nearby water keeps it
+ * hydrated, walking or a solid block overhead reverts it to plain dirt, and a
+ * parched plot with nothing planted also crumbles back to dirt.
+ */
 public final class BlockFarmland extends Block {
 	protected BlockFarmland(int blockID) {
 		super(blockID, Material.ground);

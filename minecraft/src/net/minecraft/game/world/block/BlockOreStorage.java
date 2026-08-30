@@ -2,6 +2,7 @@ package net.minecraft.game.world.block;
 
 import net.minecraft.game.world.material.Material;
 
+/** Storage blocks (gold, steel, diamond): all six faces pull sprites from the row above/below the block's own. */
 public final class BlockOreStorage extends Block {
 	public BlockOreStorage(int blockID, int textureIndex) {
 		super(blockID, Material.iron);

@@ -10,16 +10,22 @@ import java.io.InputStreamReader;
 import java.net.URL;
 import java.util.ArrayList;
 
+/**
+ * Background daemon thread that fetches the resource list from the Minecraft
+ * server, downloads any missing files into the resources folder, and registers
+ * the downloaded sounds/music with the sound manager. {@link #closeMinecraft()}
+ * stops further work, which is used when the client shuts down.
+ */
 public final class ThreadDownloadResources extends Thread {
 	private File resourcesFolder;
 	private Minecraft mc;
 	private boolean closing = false;
 
-	public ThreadDownloadResources(File var1, Minecraft var2) {
-		this.mc = var2;
+	public ThreadDownloadResources(File workingDirectory, Minecraft mc) {
+		this.mc = mc;
 		this.setName("Resource download thread");
 		this.setDaemon(true);
-		this.resourcesFolder = new File(var1, "resources/");
+		this.resourcesFolder = new File(workingDirectory, "resources/");
 		if(!this.resourcesFolder.exists() && !this.resourcesFolder.mkdirs()) {
 			throw new RuntimeException("The working directory could not be created: " + this.resourcesFolder);
 		}
@@ -36,39 +42,36 @@ public final class ThreadDownloadResources extends Thread {
 			}
 			bufferedReader.close();
 			for (int i = 0; i < list.size(); ++i) {
-				final URL url2 = url;
-				final String s = list.get(i);
-				final URL context = url2;
+				final String entry = list.get(i);
+				final URL context = url;
 				Label_0334: {
 					try {
-						final String[] split;
-						final String child = (split = s.split(","))[0];
-						final int int1 = Integer.parseInt(split[1]);
-						Long.parseLong(split[2]);
-						final File file;
-						if (!(file = new File(this.resourcesFolder, child)).exists() || file.length() != int1) {
-							file.getParentFile().mkdirs();
-							this.downloadResource(new URL(context, child.replaceAll(" ", "%20")), file);
+						// Each list entry is "relativePath,targetSize,...".
+						final String[] parts = entry.split(",");
+						final String fileName = parts[0];
+						final int targetSize = Integer.parseInt(parts[1]);
+						Long.parseLong(parts[2]);
+						final File targetFile = new File(this.resourcesFolder, fileName);
+						if (!targetFile.exists() || targetFile.length() != targetSize) {
+							targetFile.getParentFile().mkdirs();
+							this.downloadResource(new URL(context, fileName.replaceAll(" ", "%20")), targetFile);
 							if (this.closing) {
 								break Label_0334;
 							}
 						}
-						final Minecraft mc = this.mc;
-						final String s2 = child;
-						final File file2 = file;
-						final String s3 = s2;
-						final Minecraft minecraft = mc;
-						final int index = s3.indexOf("/");
-						final String substring = s3.substring(0, index);
-						final String substring2 = s3.substring(index + 1);
-						if (substring.equalsIgnoreCase("sound")) {
-							minecraft.sndManager.addSound(substring2, file2);
+						// Split the path as "category/subasset" and register it.
+						final String assetPath = fileName;
+						final int slashIndex = assetPath.indexOf("/");
+						final String category = assetPath.substring(0, slashIndex);
+						final String assetName = assetPath.substring(slashIndex + 1);
+						if (category.equalsIgnoreCase("sound")) {
+							this.mc.sndManager.addSound(assetName, targetFile);
 						}
-						else if (substring.equalsIgnoreCase("newsound")) {
-							minecraft.sndManager.addSound(substring2, file2);
+						else if (category.equalsIgnoreCase("newsound")) {
+							this.mc.sndManager.addSound(assetName, targetFile);
 						}
-						else if (substring.equalsIgnoreCase("music")) {
-							minecraft.sndManager.addMusic(substring2, file2);
+						else if (category.equalsIgnoreCase("music")) {
+							this.mc.sndManager.addMusic(assetName, targetFile);
 						}
 					}
 					catch (Exception ex) {
@@ -85,16 +88,16 @@ public final class ThreadDownloadResources extends Thread {
 		}
 	}
 
-	private void downloadResource(URL var1, File var2) throws IOException {
-		byte[] var3 = new byte[4096];
-		try(DataInputStream var5 = new DataInputStream(var1.openStream()); DataOutputStream var6 = new DataOutputStream(new FileOutputStream(var2))) {
+	private void downloadResource(URL resourceUrl, File targetFile) throws IOException {
+		byte[] buffer = new byte[4096];
+		try(DataInputStream input = new DataInputStream(resourceUrl.openStream()); DataOutputStream output = new DataOutputStream(new FileOutputStream(targetFile))) {
 			do {
-				int var4 = var5.read(var3);
-				if(var4 < 0) {
+				int bytesRead = input.read(buffer);
+				if(bytesRead < 0) {
 					return;
 				}
 
-				var6.write(var3, 0, var4);
+				output.write(buffer, 0, bytesRead);
 			} while(!this.closing);
 		}
 

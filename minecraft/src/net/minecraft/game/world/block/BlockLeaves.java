@@ -3,6 +3,7 @@ package net.minecraft.game.world.block;
 import java.util.Random;
 import net.minecraft.game.world.material.Material;
 
+/** Leaves: one in ten drop a sapling, the rest drop nothing. */
 public final class BlockLeaves extends BlockLeavesBase {
 	protected BlockLeaves(int blockID, int textureIndex) {
 		super(blockID, textureIndex, Material.leaves);

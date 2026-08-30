@@ -14,14 +14,14 @@ import net.minecraft.game.world.terrain.noise.NoiseGeneratorOctaves;
  * layered fractal noise rather than loading it from disk:
  *
  * <ol>
- *   <li><b>Height field</b> — a coarse 5x5x17 grid of noise is sampled and
+ *   <li><b>Height field</b> - a coarse 5x5x17 grid of noise is sampled and
  *       blended into a single height map that encodes the low and high
  *       frequency shape of the land.</li>
- *   <li><b>Terrain fill</b> — the coarse grid is tri-linearly interpolated up
+ *   <li><b>Terrain fill</b> - the coarse grid is tri-linearly interpolated up
  *       to full resolution; positive values become stone and water is left
  *       below sea level, then a surface pass carves grass, sand, gravel and
  *       dirt onto the top of each column.</li>
- *   <li><b>Decoration</b> — {@link #populate} scatters ore veins and trees.</li>
+ *   <li><b>Decoration</b> - {@link #populate} scatters ore veins and trees.</li>
  * </ol>
  *
  * <p>Two throw-away noise generators are constructed in the constructor purely
@@ -78,6 +78,8 @@ public final class ChunkProviderGenerate implements IChunkProvider {
 			heightMap = new double[NOISE_ARRAY_SIZE];
 		}
 
+		// Blend the three octave banks into one coarse 5x5x17 height field. The
+		// storage order (z, x, y) matches the index math in the upsample below.
 		int index = 0;
 		for(int gridZIndex = 0; gridZIndex < GRID_DEPTH; ++gridZIndex) {
 			for(int gridXIndex = 0; gridXIndex < GRID_WIDTH; ++gridXIndex) {
@@ -109,6 +111,11 @@ public final class ChunkProviderGenerate implements IChunkProvider {
 
 		this.noiseArray = heightMap;
 
+		// Tri-linear up-sample of the coarse field to the 16x16x128 block array.
+		// Each tile reads its 2x2x2 grid corner box (n000..n111, the "0/1" suffix
+		// is the x/y/z offset), interpolates vertically first (i000..i101), then
+		// along x (i00/i01), then z, and stamps every cell as stone above the
+		// surface or water below {@link #SEA_LEVEL}.
 		for(int tileX = 0; tileX < 4; ++tileX) {
 			for(int tileZ = 0; tileZ < 4; ++tileZ) {
 				for(int blockY = 0; blockY < 16; ++blockY) {
@@ -157,11 +164,16 @@ public final class ChunkProviderGenerate implements IChunkProvider {
 
 		for(int x = 0; x < 16; ++x) {
 			for(int z = 0; z < 16; ++z) {
+				// Per-column surface decisions use the coarse biome-ish noise: a sand
+				// beach (noise + jitter above 0), a gravel bed (above 3), and a dirt
+				// depth that fades off with yet another noise bend.
 				double worldX = (double) ((chunkX << 4) + x);
 				double worldZ = (double) ((chunkZ << 4) + z);
 				boolean sandBeach = this.noiseGen4.generateNoiseOctaves(worldX * (1.0D / 32.0D), worldZ * (1.0D / 32.0D), 0.0D) + this.rand.nextDouble() * 0.2D > 0.0D;
 				boolean gravelBed = this.noiseGen4.generateNoiseOctaves(worldZ * (1.0D / 32.0D), 109.0134D, worldX * (1.0D / 32.0D)) + this.rand.nextDouble() * 0.2D > 3.0D;
 				int dirtDepth = (int) (this.noiseGen5.noiseGenerator(worldX * (1.0D / 32.0D) * 2.0D, worldZ * (1.0D / 32.0D) * 2.0D) / 3.0D + 3.0D + this.rand.nextDouble() * 0.25D);
+				// Walk the column top-down; blockIndex lands on (x, z, 127) first and
+				// decrements by one cell per step.
 				int blockIndex = x << 11 | z << 7 | 127;
 				int dirtRemaining = -1;
 				int surfaceBlock = Block.grass.blockID;

@@ -9,6 +9,13 @@ import net.minecraft.game.item.recipe.FurnaceRecipes;
 import net.minecraft.game.world.block.Block;
 import net.minecraft.game.world.material.Material;
 
+/**
+ * The furnace's state: a 3-slot inventory (0 input, 1 fuel, 2 output), a burn
+ * timer and a cook timer. Each {@link #updateEntity} tick burns fuel, advances
+ * smelting (200 ticks to finish) and, whenever the burning state flips, swaps
+ * the block between the idle and active furnace ids - carrying the metadata
+ * (facing) and the tile instance across the swap.
+ */
 public class TileEntityFurnace extends TileEntity implements IInventory {
 	private ItemStack[] furnaceItemStacks = new ItemStack[3];
 	private int furnaceBurnTime = 0;
@@ -55,6 +62,7 @@ public class TileEntityFurnace extends TileEntity implements IInventory {
 
 	@Override
 	public final String getInvName() {
+		// Genuine quirk: the furnace reports the chest's name.
 		return "Chest";
 	}
 
@@ -75,6 +83,7 @@ public class TileEntityFurnace extends TileEntity implements IInventory {
 		this.furnaceBurnTime = tag.getShort("BurnTime");
 		this.furnaceCookTime = tag.getShort("CookTime");
 		this.currentItemBurnTime = getItemBurnTime(this.furnaceItemStacks[1]);
+		// Genuine Infdev debug output; kept verbatim.
 		System.out.println("Lit: " + this.furnaceBurnTime + "/" + this.currentItemBurnTime);
 	}
 
@@ -102,10 +111,12 @@ public class TileEntityFurnace extends TileEntity implements IInventory {
 		return 64;
 	}
 
+	/** Flame fill for the GUI progress bar: cook time scaled to 24 units. The {@code scale} argument is ignored. */
 	public final int getCookProgressScaled(int scale) {
 		return this.furnaceCookTime * 24 / 200;
 	}
 
+	/** Burn fill: remaining burn time scaled against the current fuel's burn time. The {@code scale} argument is ignored. */
 	public final int getBurnTimeRemainingScaled(int scale) {
 		return this.furnaceBurnTime * 12 / this.currentItemBurnTime;
 	}

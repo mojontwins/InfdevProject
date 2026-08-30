@@ -3,6 +3,7 @@ package net.minecraft.game.world.block;
 import net.minecraft.game.world.IBlockAccess;
 import net.minecraft.game.world.material.Material;
 
+/** Translucent foliage superclass: non-cube, and identical faces merged at fancy {@code graphicsLevel}. */
 public class BlockLeavesBase extends Block {
 	private boolean graphicsLevel = true;
 

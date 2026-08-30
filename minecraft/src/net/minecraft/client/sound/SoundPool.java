@@ -9,32 +9,36 @@ import java.util.Map;
 import java.util.Random;
 
 public final class SoundPool {
+	// Groups loose sound files by a base name so each registered sound can be chosen at random.
 	private Random rand = new Random();
 	private Map<String, List<SoundPoolEntry>> nameToSoundPoolEntriesMapping = new HashMap<>();
 
-	public final SoundPoolEntry addSound(String var1, File var2) {
+	// Register a sound file; the base name (ignoring the trailing digit used for variants) is the grouping key.
+	public final SoundPoolEntry addSound(String soundName, File file) {
 		try {
-			String var3 = var1;
+			String fullName = soundName;
 
-			for(var1 = var1.substring(0, var1.indexOf(".")); Character.isDigit(var1.charAt(var1.length() - 1)); var1 = var1.substring(0, var1.length() - 1)) {
+			// Strip the trailing digits that identify per-file variants (e.g. "step.grass1" -> "step.grass").
+			for(soundName = soundName.substring(0, soundName.indexOf(".")); Character.isDigit(soundName.charAt(soundName.length() - 1)); soundName = soundName.substring(0, soundName.length() - 1)) {
 			}
 
-			var1 = var1.replaceAll("/", ".");
-			if(!this.nameToSoundPoolEntriesMapping.containsKey(var1)) {
-				this.nameToSoundPoolEntriesMapping.put(var1, new ArrayList<>());
+			soundName = soundName.replaceAll("/", ".");
+			if(!this.nameToSoundPoolEntriesMapping.containsKey(soundName)) {
+				this.nameToSoundPoolEntriesMapping.put(soundName, new ArrayList<>());
 			}
 
-			SoundPoolEntry var5 = new SoundPoolEntry(var3, var2.toURI().toURL());
-			this.nameToSoundPoolEntriesMapping.get(var1).add(var5);
-			return var5;
-		} catch (MalformedURLException var4) {
-			var4.printStackTrace();
-			throw new RuntimeException(var4);
+			SoundPoolEntry entry = new SoundPoolEntry(fullName, file.toURI().toURL());
+			this.nameToSoundPoolEntriesMapping.get(soundName).add(entry);
+			return entry;
+		} catch (MalformedURLException error) {
+			error.printStackTrace();
+			throw new RuntimeException(error);
 		}
 	}
 
-	public final SoundPoolEntry getRandomSoundFromSoundPool(String var1) {
-		List<SoundPoolEntry> var2 = this.nameToSoundPoolEntriesMapping.get(var1);
-		return var2 == null ? null : var2.get(this.rand.nextInt(var2.size()));
+	// Pick a random entry from the given sound's pool of variants.
+	public final SoundPoolEntry getRandomSoundFromSoundPool(String soundName) {
+		List<SoundPoolEntry> entries = this.nameToSoundPoolEntriesMapping.get(soundName);
+		return entries == null ? null : entries.get(this.rand.nextInt(entries.size()));
 	}
 }

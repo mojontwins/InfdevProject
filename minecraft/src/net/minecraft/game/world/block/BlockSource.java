@@ -4,6 +4,11 @@ import java.util.Random;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 
+/**
+ * The hidden water/lava source blocks (ids 52 and 53) the terrain generator
+ * places under lakes: every tick they pour their fluid into any of the four
+ * side neighbours that is currently air.
+ */
 public final class BlockSource extends Block {
 	private int fluid;
 

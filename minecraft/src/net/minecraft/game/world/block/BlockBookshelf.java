@@ -3,6 +3,7 @@ package net.minecraft.game.world.block;
 import java.util.Random;
 import net.minecraft.game.world.material.Material;
 
+/** Bookshelf: wooden base, plain top/bottom, shelves on the four sides; drops nothing. */
 public final class BlockBookshelf extends Block {
 	public BlockBookshelf(int blockID, int textureIndex) {
 		super(blockID, textureIndex, Material.wood);

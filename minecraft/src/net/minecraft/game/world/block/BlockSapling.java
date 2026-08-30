@@ -4,6 +4,7 @@ import java.util.Random;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.terrain.generate.WorldGenBigTree;
 
+/** A sapling: light and time accumulate in its metadata, and at metadata 15 the block turns into a {@link WorldGenBigTree}. */
 public final class BlockSapling extends BlockFlower {
 	protected BlockSapling(int blockID, int textureIndex) {
 		super(blockID, textureIndex);

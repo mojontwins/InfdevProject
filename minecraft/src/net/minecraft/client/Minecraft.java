@@ -54,6 +54,11 @@ import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GLContext;
 import util.MathHelper;
 
+/**
+ * The main Minecraft class: owns the game loop, the display, input and every
+ * major subsystem (world, player, renderer). Implements the classic 2010 loop
+ * of up to 20 logic ticks per second interleaved with one render per frame.
+ */
 public final class Minecraft implements Runnable {
 	public PlayerController playerController = new PlayerControllerSP(this);
 	private boolean fullscreen = false;
@@ -99,7 +104,12 @@ public final class Minecraft implements Runnable {
 	public boolean inGameHasFocus;
 	private long systemTime;
 
-	public Minecraft(Canvas var1, MinecraftApplet var2, int var3, int var4, boolean var5) {
+	/**
+	 * Sets up the core subsystems. {@code canvas} is null when the client runs
+	 * windowed/standalone; {@code applet} belongs to the 2010 applet start path
+	 * and is retained for API compatibility (unused here).
+	 */
+	public Minecraft(Canvas canvas, MinecraftApplet applet, int width, int height, boolean fullscreen) {
 		new ModelBiped(0.0F);
 		this.objectMouseOver = null;
 		this.sndManager = new SoundManager();
@@ -113,76 +123,90 @@ public final class Minecraft implements Runnable {
 		this.prevFrameTime = 0;
 		this.inGameHasFocus = false;
 		this.systemTime = System.currentTimeMillis();
-		this.tempDisplayWidth = var3;
-		this.tempDisplayHeight = var4;
-		this.fullscreen = var5;
+		this.tempDisplayWidth = width;
+		this.tempDisplayHeight = height;
+		this.fullscreen = fullscreen;
+		// 2010 hack: keep this "timer hack thread" sleeping forever so the game thread drives the loop.
 		new ThreadSleepForever(this, "Timer hack thread");
-		this.mcCanvas = var1;
-		this.displayWidth = var3;
-		this.displayHeight = var4;
-		this.fullscreen = var5;
+		this.mcCanvas = canvas;
+		this.displayWidth = width;
+		this.displayHeight = height;
+		this.fullscreen = fullscreen;
 	}
 
-	public final void setServer(String var1, int var2) {
-		this.server = var1;
+	/** Stores the multiplayer server address; the port is unused in this version. */
+	public final void setServer(String server, int port) {
+		this.server = server;
 	}
 
+	/**
+	 * Returns (creating it if needed) the per-user Minecraft data directory,
+	 * placed according to the detected OS convention.
+	 */
 	public final File getAppDir() {
 		if(this.minecraftDir == null) {
-			String var2 = "minecraft";
-			String var1 = System.getProperty("user.home", ".");
-			int[] var10001 = OSMap.osValues;
-			String var3 = System.getProperty("os.name").toLowerCase();
-			File var4;
-			switch(var10001[(var3.contains("win") ? EnumOS.windows : (var3.contains("mac") ? EnumOS.macos : (var3.contains("solaris") ? EnumOS.solaris : (var3.contains("sunos") ? EnumOS.solaris : (var3.contains("linux") ? EnumOS.linux : (var3.contains("unix") ? EnumOS.linux : EnumOS.unknown)))))).ordinal()]) {
+			String folderName = "minecraft";
+			String userHome = System.getProperty("user.home", ".");
+			int[] osValues = OSMap.osValues;
+			String osName = System.getProperty("os.name").toLowerCase();
+			File appDir;
+			switch(osValues[(osName.contains("win") ? EnumOS.windows : (osName.contains("mac") ? EnumOS.macos : (osName.contains("solaris") ? EnumOS.solaris : (osName.contains("sunos") ? EnumOS.solaris : (osName.contains("linux") ? EnumOS.linux : (osName.contains("unix") ? EnumOS.linux : EnumOS.unknown)))))).ordinal()]) {
 			case 1:
 			case 2:
-				var4 = new File(var1, '.' + var2 + '/');
+				// Linux/Solaris: hidden ".minecraft" folder in the home directory.
+				appDir = new File(userHome, '.' + folderName + '/');
 				break;
 			case 3:
-				var3 = System.getenv("APPDATA");
-				if(var3 != null) {
-					var4 = new File(var3, "." + var2 + '/');
+				// Windows: use APPDATA when available, else fall back to home.
+				osName = System.getenv("APPDATA");
+				if(osName != null) {
+					appDir = new File(osName, "." + folderName + '/');
 				} else {
-					var4 = new File(var1, '.' + var2 + '/');
+					appDir = new File(userHome, '.' + folderName + '/');
 				}
 				break;
 			case 4:
-				var4 = new File(var1, "Library/Application Support/" + var2);
+				// macOS: standard "Library/Application Support/minecraft".
+				appDir = new File(userHome, "Library/Application Support/" + folderName);
 				break;
 			default:
-				var4 = new File(var1, var2 + '/');
+				appDir = new File(userHome, folderName + '/');
 			}
 
-			if(!var4.exists() && !var4.mkdirs()) {
-				throw new RuntimeException("The working directory could not be created: " + var4);
+			if(!appDir.exists() && !appDir.mkdirs()) {
+				throw new RuntimeException("The working directory could not be created: " + appDir);
 			}
 
-			this.minecraftDir = var4;
+			this.minecraftDir = appDir;
 		}
 
 		return this.minecraftDir;
 	}
 
-	public final void displayGuiScreen(GuiScreen var1) {
+	/**
+	 * Shows a GUI screen, closing the previous one. A null screen returns to the
+	 * game (or opens the main menu / death screen, depending on world state).
+	 * While a screen is open the mouse is released from the window.
+	 */
+	public final void displayGuiScreen(GuiScreen guiScreen) {
 		if(!(this.currentScreen instanceof GuiErrorScreen)) {
 			if(this.currentScreen != null) {
 				this.currentScreen.onGuiClosed();
 			}
 
-			if(var1 == null && this.theWorld == null) {
-				var1 = new GuiMainMenu();
-			} else if(var1 == null && this.thePlayer.health <= 0) {
-				var1 = new GuiGameOver();
+			if(guiScreen == null && this.theWorld == null) {
+				guiScreen = new GuiMainMenu();
+			} else if(guiScreen == null && this.thePlayer.health <= 0) {
+				guiScreen = new GuiGameOver();
 			}
 
-			this.currentScreen = var1;
-			if(var1 != null) {
+			this.currentScreen = guiScreen;
+			if(guiScreen != null) {
 				this.inputLock();
-				ScaledResolution var2 = new ScaledResolution(this.displayWidth, this.displayHeight);
-				int var3 = var2.getScaledWidth();
-				int var4 = var2.getScaledHeight();
-				var1.setWorldAndResolution(this, var3, var4);
+				ScaledResolution scaledRes = new ScaledResolution(this.displayWidth, this.displayHeight);
+				int scaledWidth = scaledRes.getScaledWidth();
+				int scaledHeight = scaledRes.getScaledHeight();
+				guiScreen.setWorldAndResolution(this, scaledWidth, scaledHeight);
 				this.skipRenderWorld = false;
 			} else {
 				this.setIngameFocus();
@@ -190,12 +214,13 @@ public final class Minecraft implements Runnable {
 		}
 	}
 
+	/** Tears the client down: stops resource downloads, saves the world, closes sound/input/display. */
 	public final void shutdownMinecraftApplet() {
 		try {
 			if(this.downloadResourcesThread != null) {
 				this.downloadResourcesThread.closeMinecraft();
 			}
-		} catch (Exception var5) {
+		} catch (Exception e) {
 		}
 
 		try {
@@ -210,11 +235,16 @@ public final class Minecraft implements Runnable {
 
 	}
 
+	/**
+	 * The game-thread entry point: opens the LWJGL display and GL context, boots
+	 * all subsystems, then runs the classic 2010 loop -- up to 20 world ticks per
+	 * second with one render per frame, plus a once-per-second FPS readout.
+	 */
 	public final void run() {
 		this.running = true;
 
 		try {
-			Minecraft var1 = this;
+			Minecraft mc = this;
 			if(this.mcCanvas != null) {
 				Display.setParent(this.mcCanvas);
 			} else if(this.fullscreen) {
@@ -227,33 +257,35 @@ public final class Minecraft implements Runnable {
 
 			Display.setTitle("Minecraft Minecraft Infdev");
 
-			ContextCapabilities var2;
-			IntBuffer var24;
+			ContextCapabilities capabilities;
+			IntBuffer intBuffer;
 			try {
 				Display.create();
 				System.out.println("LWJGL version: " + Sys.getVersion());
 				System.out.println("GL RENDERER: " + GL11.glGetString(GL11.GL_RENDERER));
 				System.out.println("GL VENDOR: " + GL11.glGetString(GL11.GL_VENDOR));
 				System.out.println("GL VERSION: " + GL11.glGetString(GL11.GL_VERSION));
-				var2 = GLContext.getCapabilities();
-				System.out.println("OpenGL 3.0: " + var2.OpenGL30);
-				System.out.println("OpenGL 3.1: " + var2.OpenGL31);
-				System.out.println("OpenGL 3.2: " + var2.OpenGL32);
-				System.out.println("ARB_compatibility: " + var2.GL_ARB_compatibility);
-				if(var2.OpenGL32) {
-					var24 = ByteBuffer.allocateDirect(64).order(ByteOrder.nativeOrder()).asIntBuffer();
-					GL11.glGetInteger('\u9126', var24);
-					int var25 = var24.get(0);
-					System.out.println("PROFILE MASK: " + Integer.toBinaryString(var25));
-					System.out.println("CORE PROFILE: " + ((var25 & 1) != 0));
-					System.out.println("COMPATIBILITY PROFILE: " + ((var25 & 2) != 0));
+				capabilities = GLContext.getCapabilities();
+				System.out.println("OpenGL 3.0: " + capabilities.OpenGL30);
+				System.out.println("OpenGL 3.1: " + capabilities.OpenGL31);
+				System.out.println("OpenGL 3.2: " + capabilities.OpenGL32);
+				System.out.println("ARB_compatibility: " + capabilities.GL_ARB_compatibility);
+				if(capabilities.OpenGL32) {
+					// Query the GL context profile mask (0x9126) through a scratch int buffer.
+					intBuffer = ByteBuffer.allocateDirect(64).order(ByteOrder.nativeOrder()).asIntBuffer();
+					GL11.glGetInteger('\u9126', intBuffer);
+					int profileMask = intBuffer.get(0);
+					System.out.println("PROFILE MASK: " + Integer.toBinaryString(profileMask));
+					System.out.println("CORE PROFILE: " + ((profileMask & 1) != 0));
+					System.out.println("COMPATIBILITY PROFILE: " + ((profileMask & 2) != 0));
 				}
-			} catch (LWJGLException var17) {
-				var17.printStackTrace();
+			} catch (LWJGLException e) {
+				e.printStackTrace();
 
+				// Retry once after a pause; some drivers need a moment after a first failure.
 				try {
 					Thread.sleep(1000L);
-				} catch (InterruptedException var16) {
+				} catch (InterruptedException ie) {
 				}
 
 				Display.create();
@@ -265,10 +297,11 @@ public final class Minecraft implements Runnable {
 
 			try {
 				Controllers.create();
-			} catch (Exception var15) {
-				var15.printStackTrace();
+			} catch (Exception e) {
+				e.printStackTrace();
 			}
 
+			// Baseline GL state for the 2010 fixed-function pipeline.
 			GL11.glEnable(GL11.GL_TEXTURE_2D);
 			GL11.glShadeModel(GL11.GL_SMOOTH);
 			GL11.glClearDepth(1.0D);
@@ -292,12 +325,14 @@ public final class Minecraft implements Runnable {
 			this.renderEngine.registerTextureFX(new TextureGearsFX(0));
 			this.renderEngine.registerTextureFX(new TextureGearsFX(1));
 			this.fontRenderer = new FontRenderer(this.gameSettings, "/default.png", this.renderEngine);
-			var24 = BufferUtils.createIntBuffer(256);
-			var24.clear().limit(256);
+			// Scratch buffer (256 ints) for texture-index round-trips with GL.
+			intBuffer = BufferUtils.createIntBuffer(256);
+			intBuffer.clear().limit(256);
 			this.renderGlobal = new RenderGlobal(this, this.renderEngine);
 			GL11.glViewport(0, 0, this.displayWidth, this.displayHeight);
 			if(this.server != null && this.session != null) {
-				var2 = null;
+				// Multiplayer startup: go straight into an empty world.
+				capabilities = null;
 				this.changeWorld2((World)null, "");
 			} else if(this.theWorld == null) {
 				this.displayGuiScreen(new GuiMainMenu());
@@ -306,20 +341,20 @@ public final class Minecraft implements Runnable {
 			this.effectRenderer = new EffectRenderer(this.theWorld, this.renderEngine);
 
 			try {
-				var1.downloadResourcesThread = new ThreadDownloadResources(var1.mcDataDir, var1);
-				var1.downloadResourcesThread.start();
-			} catch (Exception var14) {
+				mc.downloadResourcesThread = new ThreadDownloadResources(mc.mcDataDir, mc);
+				mc.downloadResourcesThread.start();
+			} catch (Exception e) {
 			}
 
 			this.ingameGUI = new GuiIngame(this);
-		} catch (Exception var22) {
-			var22.printStackTrace();
-			JOptionPane.showMessageDialog((Component)null, var22.toString(), "Failed to start Minecraft", 0);
+		} catch (Exception e) {
+			e.printStackTrace();
+			JOptionPane.showMessageDialog((Component)null, e.toString(), "Failed to start Minecraft", 0);
 			return;
 		}
 
-		long var23 = System.currentTimeMillis();
-		int var3 = 0;
+		long lastDebugUpdate = System.currentTimeMillis();
+		int frameCount = 0;
 
 		try {
 			while(this.running) {
@@ -329,17 +364,20 @@ public final class Minecraft implements Runnable {
 
 				try {
 					if(this.isGamePaused) {
-						float var4 = this.timer.renderPartialTicks;
+						// While a pause-capable GUI is up, freeze the render step so the
+						// scene (and its partial-tick interpolation) does not jump forward.
+						float partialTicks = this.timer.renderPartialTicks;
 						this.timer.updateTimer();
-						this.timer.renderPartialTicks = var4;
+						this.timer.renderPartialTicks = partialTicks;
 					} else {
 						this.timer.updateTimer();
 					}
 
-					int var26 = 0;
+					int ticksExecuted = 0;
 
 					while(true) {
-						if(var26 >= this.timer.elapsedTicks) {
+						if(ticksExecuted >= this.timer.elapsedTicks) {
+							// All queued world ticks are done: render exactly one frame.
 							if(this.isGamePaused) {
 								this.timer.renderPartialTicks = 1.0F;
 							}
@@ -358,6 +396,7 @@ public final class Minecraft implements Runnable {
 									this.toggleFullscreen();
 								}
 
+								// Window lost focus: yield so other apps get CPU time.
 								Thread.sleep(10L);
 							}
 
@@ -371,40 +410,42 @@ public final class Minecraft implements Runnable {
 								Thread.sleep(5L);
 							}
 
-							++var3;
+							++frameCount;
 							this.isGamePaused = this.currentScreen != null && this.currentScreen.doesGuiPauseGame();
 							break;
 						}
 
 						++this.ticksRan;
 						this.runTick();
-						++var26;
+						++ticksExecuted;
 					}
-				} catch (Exception var18) {
-					this.displayGuiScreen(new GuiErrorScreen("Client error", "The game broke! [" + var18 + "]"));
-					var18.printStackTrace();
+				} catch (Exception e) {
+					this.displayGuiScreen(new GuiErrorScreen("Client error", "The game broke! [" + e + "]"));
+					e.printStackTrace();
 					return;
 				}
 
-				while(System.currentTimeMillis() >= var23 + 1000L) {
-					this.debug = var3 + " fps, " + WorldRenderer.chunksUpdated + " chunk updates";
+				// Refresh the on-screen FPS / chunk-update line once per second.
+				while(System.currentTimeMillis() >= lastDebugUpdate + 1000L) {
+					this.debug = frameCount + " fps, " + WorldRenderer.chunksUpdated + " chunk updates";
 					WorldRenderer.chunksUpdated = 0;
-					var23 += 1000L;
-					var3 = 0;
+					lastDebugUpdate += 1000L;
+					frameCount = 0;
 				}
 			}
 
 			return;
-		} catch (MinecraftError var19) {
+		} catch (MinecraftError e) {
 			return;
-		} catch (Exception var20) {
-			var20.printStackTrace();
+		} catch (Exception e) {
+			e.printStackTrace();
 		} finally {
 			this.shutdownMinecraftApplet();
 		}
 
 	}
 
+	/** Regains in-game focus: grabs the mouse cursor and closes any open GUI. */
 	public final void setIngameFocus() {
 		if(Display.isActive()) {
 			if(!this.inventoryScreen) {
@@ -416,49 +457,58 @@ public final class Minecraft implements Runnable {
 		}
 	}
 
+	/**
+	 * Called when a GUI opens: ungrab the native mouse cursor so menus can be
+	 * used, reset any stuck movement keys, and mark that we left the game view.
+	 */
 	private void inputLock() {
 		if(this.inventoryScreen) {
 			if(this.thePlayer != null) {
-				EntityPlayerSP var1 = this.thePlayer;
-				var1.movementInput.resetKeyState();
+				EntityPlayerSP player = this.thePlayer;
+				player.movementInput.resetKeyState();
 			}
 
 			this.inventoryScreen = false;
 
 			try {
 				Mouse.setNativeCursor((Cursor)null);
-			} catch (LWJGLException var2) {
-				var2.printStackTrace();
+			} catch (LWJGLException e) {
+				e.printStackTrace();
 			}
 		}
 	}
 
+	/** Opens the in-game pause menu (Esc), if no other screen is already up. */
 	public final void displayInGameMenu() {
 		if(this.currentScreen == null) {
 			this.displayGuiScreen(new GuiIngameMenu());
 		}
 	}
 
-	private void clickMouse(int var1) {
-		if(var1 != 0 || this.leftClickCounter <= 0) {
-			if(var1 == 0) {
+	/**
+	 * Processes a mouse button click (0 = left, 1 = right) against whatever the
+	 * crosshair points at: entities are attacked, blocks are mined, and the held
+	 * item is used or placed.
+	 */
+	private void clickMouse(int mouseButton) {
+		if(mouseButton != 0 || this.leftClickCounter <= 0) {
+			if(mouseButton == 0) {
 				this.entityRenderer.itemRenderer.equippedItemRender();
 			}
 
-			ItemStack var2;
-			int var3;
-			World var5;
-			if(var1 == 1) {
-				var2 = this.thePlayer.inventory.getCurrentItem();
-				if(var2 != null) {
-					var3 = var2.stackSize;
-					EntityPlayerSP var7 = this.thePlayer;
-					var5 = this.theWorld;
-					ItemStack var4 = var2.getItem().onItemRightClick(var2, var5, var7);
-					if(var4 != var2 || var4 != null && var4.stackSize != var3) {
-						this.thePlayer.inventory.mainInventory[this.thePlayer.inventory.currentItem] = var4;
+			ItemStack itemStack;
+			World world;
+			if(mouseButton == 1) {
+				itemStack = this.thePlayer.inventory.getCurrentItem();
+				if(itemStack != null) {
+					int stackSize = itemStack.stackSize;
+					EntityPlayerSP player = this.thePlayer;
+					world = this.theWorld;
+					ItemStack resultStack = itemStack.getItem().onItemRightClick(itemStack, world, player);
+					if(resultStack != itemStack || resultStack != null && resultStack.stackSize != stackSize) {
+						this.thePlayer.inventory.mainInventory[this.thePlayer.inventory.currentItem] = resultStack;
 						this.entityRenderer.itemRenderer.resetEquippedProgress();
-						if(var4.stackSize == 0) {
+						if(resultStack.stackSize == 0) {
 							this.thePlayer.inventory.mainInventory[this.thePlayer.inventory.currentItem] = null;
 						}
 					}
@@ -466,26 +516,27 @@ public final class Minecraft implements Runnable {
 			}
 
 			if(this.objectMouseOver == null) {
-				if(var1 == 0 && !(this.playerController instanceof PlayerControllerCreative)) {
+				if(mouseButton == 0 && !(this.playerController instanceof PlayerControllerCreative)) {
+					// Delay the next auto-repeat left click.
 					this.leftClickCounter = 10;
 				}
 
 			} else {
-				ItemStack var9;
+				ItemStack heldItem;
 				if(this.objectMouseOver.typeOfHit == 1) {
-					if(var1 == 0) {
-						Entity var14 = this.objectMouseOver.entityHit;
-						EntityPlayerSP var12 = this.thePlayer;
-						InventoryPlayer var11 = var12.inventory;
-						var9 = var11.getStackInSlot(var11.currentItem);
-						int var17 = var9 != null ? Item.itemsList[var9.itemID].getDamageVsEntity() : 1;
-						if(var17 > 0) {
-							var14.attackEntityFrom(var12, var17);
-var2 = var12.inventory.getCurrentItem();
-						if(var2 != null && var14 instanceof EntityLiving) {
-							Item.itemsList[var2.itemID].hitEntity(var2);
-								if(var2.stackSize <= 0) {
-									var12.displayInventoryGUI();
+					if(mouseButton == 0) {
+						Entity entityHit = this.objectMouseOver.entityHit;
+						EntityPlayerSP player = this.thePlayer;
+						InventoryPlayer inventory = player.inventory;
+						heldItem = inventory.getStackInSlot(inventory.currentItem);
+						int attackDamage = heldItem != null ? Item.itemsList[heldItem.itemID].getDamageVsEntity() : 1;
+						if(attackDamage > 0) {
+							entityHit.attackEntityFrom(player, attackDamage);
+							itemStack = player.inventory.getCurrentItem();
+							if(itemStack != null && entityHit instanceof EntityLiving) {
+								Item.itemsList[itemStack.itemID].hitEntity(itemStack);
+								if(itemStack.stackSize <= 0) {
+									player.displayInventoryGUI();
 								}
 							}
 						}
@@ -493,44 +544,45 @@ var2 = var12.inventory.getCurrentItem();
 						return;
 					}
 				} else if(this.objectMouseOver.typeOfHit == 0) {
-					int var10 = this.objectMouseOver.blockX;
-					var3 = this.objectMouseOver.blockY;
-					int var13 = this.objectMouseOver.blockZ;
-					int var15 = this.objectMouseOver.sideHit;
-					Block var6 = Block.blocksList[this.theWorld.getBlockId(var10, var3, var13)];
-					if(var1 == 0) {
-						this.theWorld.extinguishFire(var10, var3, var13, this.objectMouseOver.sideHit);
-						if(var6 != Block.bedrock) {
-							this.playerController.clickBlock(var10, var3, var13);
+					int blockX = this.objectMouseOver.blockX;
+					int blockY = this.objectMouseOver.blockY;
+					int blockZ = this.objectMouseOver.blockZ;
+					int sideHit = this.objectMouseOver.sideHit;
+					Block block = Block.blocksList[this.theWorld.getBlockId(blockX, blockY, blockZ)];
+					if(mouseButton == 0) {
+						this.theWorld.extinguishFire(blockX, blockY, blockZ, this.objectMouseOver.sideHit);
+						if(block != Block.bedrock) {
+							this.playerController.clickBlock(blockX, blockY, blockZ);
 							return;
 						}
+
 					} else {
-						var9 = this.thePlayer.inventory.getCurrentItem();
-						int var16 = this.theWorld.getBlockId(var10, var3, var13);
-						if(var16 > 0 && Block.blocksList[var16].blockActivated(this.theWorld, var10, var3, var13, this.thePlayer)) {
+						heldItem = this.thePlayer.inventory.getCurrentItem();
+						int blockId = this.theWorld.getBlockId(blockX, blockY, blockZ);
+						if(blockId > 0 && Block.blocksList[blockId].blockActivated(this.theWorld, blockX, blockY, blockZ, this.thePlayer)) {
 							return;
 						}
 
-						if(var9 == null) {
+						if(heldItem == null) {
 							return;
 						}
 
-					var16 = var9.stackSize;
-					int var18 = var15;
-					var5 = this.theWorld;
-					float xWithinFace = (float)(this.objectMouseOver.hitVec.xCoord - (double)var10);
-					float yWithinFace = (float)(this.objectMouseOver.hitVec.yCoord - (double)var3);
-					float zWithinFace = (float)(this.objectMouseOver.hitVec.zCoord - (double)var13);
-					if(var9.getItem().onItemUse(var9, var5, var10, var3, var13, var18, xWithinFace, yWithinFace, zWithinFace)) {
+						int stackSize = heldItem.stackSize;
+						int side = sideHit;
+						world = this.theWorld;
+						float xWithinFace = (float)(this.objectMouseOver.hitVec.xCoord - (double)blockX);
+						float yWithinFace = (float)(this.objectMouseOver.hitVec.yCoord - (double)blockY);
+						float zWithinFace = (float)(this.objectMouseOver.hitVec.zCoord - (double)blockZ);
+						if(heldItem.getItem().onItemUse(heldItem, world, blockX, blockY, blockZ, side, xWithinFace, yWithinFace, zWithinFace)) {
 							this.entityRenderer.itemRenderer.equippedItemRender();
 						}
 
-						if(var9.stackSize == 0) {
+						if(heldItem.stackSize == 0) {
 							this.thePlayer.inventory.mainInventory[this.thePlayer.inventory.currentItem] = null;
 							return;
 						}
 
-						if(var9.stackSize != var16) {
+						if(heldItem.stackSize != stackSize) {
 							this.entityRenderer.itemRenderer.resetEquippedProgress2();
 						}
 					}
@@ -540,6 +592,7 @@ var2 = var12.inventory.getCurrentItem();
 		}
 	}
 
+	/** Switches between windowed and fullscreen, rebuilding the display and re-focusing. */
 	public final void toggleFullscreen() {
 		try {
 			this.fullscreen = !this.fullscreen;
@@ -563,6 +616,7 @@ var2 = var12.inventory.getCurrentItem();
 			this.inputLock();
 			Display.setFullscreen(this.fullscreen);
 			Display.update();
+			// Let the mode switch settle before re-grabbing input.
 			Thread.sleep(1000L);
 			if(this.fullscreen) {
 				this.setIngameFocus();
@@ -574,23 +628,29 @@ var2 = var12.inventory.getCurrentItem();
 			}
 
 			System.out.println("Size: " + this.displayWidth + ", " + this.displayHeight);
-		} catch (Exception var2) {
-			var2.printStackTrace();
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
 	}
 
-	private void resize(int var1, int var2) {
-		this.displayWidth = var1;
-		this.displayHeight = var2;
+	/** Re-scales any open GUI after a canvas or display resize. */
+	private void resize(int width, int height) {
+		this.displayWidth = width;
+		this.displayHeight = height;
 		if(this.currentScreen != null) {
-			ScaledResolution var3 = new ScaledResolution(var1, var2);
-			var2 = var3.getScaledWidth();
-			var1 = var3.getScaledHeight();
-			this.currentScreen.setWorldAndResolution(this, var2, var1);
+			ScaledResolution scaledRes = new ScaledResolution(width, height);
+			int scaledWidth = scaledRes.getScaledWidth();
+			int scaledHeight = scaledRes.getScaledHeight();
+			this.currentScreen.setWorldAndResolution(this, scaledWidth, scaledHeight);
 		}
 
 	}
 
+	/**
+	 * Advances the game one logic tick (1/20 second): GUI updates, input polling,
+	 * then world/entity ticking and cloud/effect updates. Reads pending mouse and
+	 * keyboard events straight from the LWJGL event queue.
+	 */
 	private void runTick() {
 		this.ingameGUI.updateTick();
 		if(!this.isGamePaused && this.theWorld != null) {
@@ -607,13 +667,11 @@ var2 = var12.inventory.getCurrentItem();
 		}
 
 		if(this.currentScreen == null || this.currentScreen.allowUserInput) {
-			label286:
+			inputDone:
 			while(true) {
 				while(true) {
 					while(true) {
-						long var1;
-						int var2;
-						int var5;
+						long elapsedSinceTick;
 						do {
 							if(!Mouse.next()) {
 								if(this.leftClickCounter > 0) {
@@ -623,9 +681,9 @@ var2 = var12.inventory.getCurrentItem();
 								while(true) {
 									while(true) {
 										do {
-											boolean var3;
 											if(!Keyboard.next()) {
 												if(this.currentScreen == null) {
+													// Auto-repeat held mouse buttons (at ~1/4 second intervals).
 													if(Mouse.isButtonDown(0) && (float)(this.ticksRan - this.prevFrameTime) >= this.timer.ticksPerSecond / 4.0F && this.inventoryScreen) {
 														this.clickMouse(0);
 														this.prevFrameTime = this.ticksRan;
@@ -637,27 +695,26 @@ var2 = var12.inventory.getCurrentItem();
 													}
 												}
 
-var3 = this.currentScreen == null && Mouse.isButtonDown(0) && this.inventoryScreen;
-											if(!this.playerController.isInTestMode && this.leftClickCounter <= 0) {
-													if(var3 && this.objectMouseOver != null && this.objectMouseOver.typeOfHit == 0) {
-														var2 = this.objectMouseOver.blockX;
-														int var9 = this.objectMouseOver.blockY;
-														int var4 = this.objectMouseOver.blockZ;
-														this.playerController.sendBlockRemoving(var2, var9, var4, this.objectMouseOver.sideHit);
-														this.effectRenderer.addBlockHitEffects(var2, var9, var4, this.objectMouseOver.sideHit);
+												// Left button held: keep digging the targeted block.
+												boolean breakingBlock = this.currentScreen == null && Mouse.isButtonDown(0) && this.inventoryScreen;
+												if(!this.playerController.isInTestMode && this.leftClickCounter <= 0) {
+													if(breakingBlock && this.objectMouseOver != null && this.objectMouseOver.typeOfHit == 0) {
+														int blockX = this.objectMouseOver.blockX;
+														int blockY = this.objectMouseOver.blockY;
+														int blockZ = this.objectMouseOver.blockZ;
+														this.playerController.sendBlockRemoving(blockX, blockY, blockZ, this.objectMouseOver.sideHit);
+														this.effectRenderer.addBlockHitEffects(blockX, blockY, blockZ, this.objectMouseOver.sideHit);
 													} else {
 														this.playerController.resetBlockRemoving();
 													}
 												}
-												break label286;
+												break inputDone;
 											}
 
-											EntityPlayerSP var10000 = this.thePlayer;
-											int var10001 = Keyboard.getEventKey();
-											var3 = Keyboard.getEventKeyState();
-											var2 = var10001;
-											EntityPlayerSP var7 = var10000;
-											var7.movementInput.checkKeyForMovementInput(var2, var3);
+											EntityPlayerSP player = this.thePlayer;
+											int keyCode = Keyboard.getEventKey();
+											boolean keyDown = Keyboard.getEventKeyState();
+											player.movementInput.checkKeyForMovementInput(keyCode, keyDown);
 										} while(!Keyboard.getEventKeyState());
 
 										if(Keyboard.getEventKey() == Keyboard.KEY_F11) {
@@ -676,6 +733,7 @@ var3 = this.currentScreen == null && Mouse.isButtonDown(0) && this.inventoryScre
 												}
 
 												if(Keyboard.getEventKey() == Keyboard.KEY_F5) {
+													// Toggle third-person view and mirror the focus flag.
 													this.gameSettings.thirdPersonView = !this.gameSettings.thirdPersonView;
 													this.inGameHasFocus = !this.inGameHasFocus;
 												}
@@ -689,13 +747,15 @@ var3 = this.currentScreen == null && Mouse.isButtonDown(0) && this.inventoryScre
 												}
 											}
 
-											for(var5 = 0; var5 < 9; ++var5) {
-												if(Keyboard.getEventKey() == var5 + 2) {
-													this.thePlayer.inventory.currentItem = var5;
+											// Hotbar slots 1-9 map to key codes 2-10.
+											for(int slotIndex = 0; slotIndex < 9; ++slotIndex) {
+												if(Keyboard.getEventKey() == slotIndex + 2) {
+													this.thePlayer.inventory.currentItem = slotIndex;
 												}
 											}
 
 											if(Keyboard.getEventKey() == this.gameSettings.keyBindToggleFog.keyCode) {
+												// Shift reverses the render-distance cycling direction.
 												this.gameSettings.setOptionFloatValue(4, !Keyboard.isKeyDown(Keyboard.KEY_LSHIFT) && !Keyboard.isKeyDown(Keyboard.KEY_RSHIFT) ? 1 : -1);
 											}
 										}
@@ -703,31 +763,34 @@ var3 = this.currentScreen == null && Mouse.isButtonDown(0) && this.inventoryScre
 								}
 							}
 
-							var1 = System.currentTimeMillis() - this.systemTime;
-						} while(var1 > 200L);
+							// Drain mouse events only while they arrive within 200 ms of this tick.
+							elapsedSinceTick = System.currentTimeMillis() - this.systemTime;
+						} while(elapsedSinceTick > 200L);
 
-						var5 = Mouse.getEventDWheel();
-						if(var5 != 0) {
-							var2 = var5;
-							InventoryPlayer var6 = this.thePlayer.inventory;
-							if(var5 > 0) {
-								var2 = 1;
+						// Mouse wheel: move the hotbar selection, wrapping 0-8.
+						int wheelDelta = Mouse.getEventDWheel();
+						if(wheelDelta != 0) {
+							int wheelDirection = wheelDelta;
+							InventoryPlayer inventory = this.thePlayer.inventory;
+							if(wheelDelta > 0) {
+								wheelDirection = 1;
 							}
 
-							if(var2 < 0) {
-								var2 = -1;
+							if(wheelDirection < 0) {
+								wheelDirection = -1;
 							}
 
-							for(var6.currentItem -= var2; var6.currentItem < 0; var6.currentItem += 9) {
+							for(inventory.currentItem -= wheelDirection; inventory.currentItem < 0; inventory.currentItem += 9) {
 							}
 
-							while(var6.currentItem >= 9) {
-								var6.currentItem -= 9;
+							while(inventory.currentItem >= 9) {
+								inventory.currentItem -= 9;
 							}
 						}
 
 						if(this.currentScreen == null) {
 							if(!this.inventoryScreen && Mouse.getEventButtonState()) {
+								// Clicked a previously-unfocused window: grab the cursor.
 								this.setIngameFocus();
 							} else {
 								if(Mouse.getEventButton() == 0 && Mouse.getEventButtonState()) {
@@ -740,21 +803,22 @@ var3 = this.currentScreen == null && Mouse.isButtonDown(0) && this.inventoryScre
 									this.prevFrameTime = this.ticksRan;
 								}
 
+								// Middle click: hand out a simplified variant of the targeted block.
 								if(Mouse.getEventButton() == 2 && Mouse.getEventButtonState() && this.objectMouseOver != null) {
-									var2 = this.theWorld.getBlockId(this.objectMouseOver.blockX, this.objectMouseOver.blockY, this.objectMouseOver.blockZ);
-									if(var2 == Block.grass.blockID) {
-										var2 = Block.dirt.blockID;
+									int blockId = this.theWorld.getBlockId(this.objectMouseOver.blockX, this.objectMouseOver.blockY, this.objectMouseOver.blockZ);
+									if(blockId == Block.grass.blockID) {
+										blockId = Block.dirt.blockID;
 									}
 
-									if(var2 == Block.stairDouble.blockID) {
-										var2 = Block.stairSingle.blockID;
+									if(blockId == Block.stairDouble.blockID) {
+										blockId = Block.stairSingle.blockID;
 									}
 
-									if(var2 == Block.bedrock.blockID) {
-										var2 = Block.stone.blockID;
+									if(blockId == Block.bedrock.blockID) {
+										blockId = Block.stone.blockID;
 									}
 
-									this.thePlayer.inventory.getFirstEmptyStack(var2);
+									this.thePlayer.inventory.getFirstEmptyStack(blockId);
 								}
 							}
 						} else if(this.currentScreen != null) {
@@ -770,14 +834,15 @@ var3 = this.currentScreen == null && Mouse.isButtonDown(0) && this.inventoryScre
 		}
 
 		if(this.currentScreen != null) {
-			GuiScreen var8 = this.currentScreen;
+			// Let the open GUI consume the remaining queued input, then step it.
+			GuiScreen screen = this.currentScreen;
 
 			while(Mouse.next()) {
-				var8.handleMouseInput();
+				screen.handleMouseInput();
 			}
 
 			while(Keyboard.next()) {
-				var8.handleKeyboardInput();
+				screen.handleKeyboardInput();
 			}
 
 			if(this.currentScreen != null) {
@@ -815,84 +880,94 @@ var3 = this.currentScreen == null && Mouse.isButtonDown(0) && this.inventoryScre
 		this.systemTime = System.currentTimeMillis();
 	}
 
-	public final void startWorld(String var1) {
+	/** Loads (or generates) the named world, walking through the loading screens. */
+	public final void startWorld(String worldName) {
 		this.changeWorld2((World)null, "");
 		System.gc();
-		World var3 = new World(new File(this.getAppDir(), "saves"), var1);
-		if(var3.isNewWorld) {
-			this.changeWorld2(var3, "Generating level");
+		World world = new World(new File(this.getAppDir(), "saves"), worldName);
+		if(world.isNewWorld) {
+			this.changeWorld2(world, "Generating level");
 		} else {
-			this.changeWorld2(var3, "Loading level");
+			this.changeWorld2(world, "Loading level");
 		}
 
 		this.loadingScreen.setText("Preparing lights");
-		int var4 = 0;
+		int progress = 0;
 
-		while(var3.lightUpdatesNeeded() > 0) {
-			this.loadingScreen.setProgress(var4++ % 100);
-			var3.updatingLighting();
+		// Busy-wait the initial chunk lighting, repainting the progress bar.
+		while(world.lightUpdatesNeeded() > 0) {
+			this.loadingScreen.setProgress(progress++ % 100);
+			world.updatingLighting();
 		}
 
 	}
 
-	public final void closeWorld(World var1) {
+	/** Unloads the current world (the parameter is unused in this version). */
+	public final void closeWorld(World world) {
 		this.changeWorld2((World)null, "");
 	}
 
-	private void changeWorld2(World var1, String var2) {
+	/**
+	 * Replaces the active world: saves the previous one, (re)builds the local
+	 * player if needed, wires up renderer/effects/controller and spawns the player.
+	 */
+	private void changeWorld2(World world, String loadingMessage) {
 		if(this.theWorld != null) {
 			this.theWorld.saveWorldIndirectly();
 		}
 
-		this.theWorld = var1;
-		if(var1 != null) {
+		this.theWorld = world;
+		if(world != null) {
 			this.thePlayer = null;
-			var1.playerEntity = this.thePlayer;
-			this.changeWorld1(var2);
+			world.playerEntity = this.thePlayer;
+			this.changeWorld1(loadingMessage);
 			if(this.thePlayer == null) {
-				this.thePlayer = new EntityPlayerSP(this, var1, this.session);
+				this.thePlayer = new EntityPlayerSP(this, world, this.session);
 				this.thePlayer.preparePlayerToSpawn();
 			}
 
 			this.thePlayer.movementInput = new MovementInputFromOptions(this.gameSettings);
 			if(this.renderGlobal != null) {
-				this.renderGlobal.changeWorld(var1);
+				this.renderGlobal.changeWorld(world);
 			}
 
 			if(this.effectRenderer != null) {
-				this.effectRenderer.clearEffects(var1);
+				this.effectRenderer.clearEffects(world);
 			}
 
 			this.playerController.onRespawn(this.thePlayer);
-			var1.playerEntity = this.thePlayer;
-			var1.spawnPlayer();
+			world.playerEntity = this.thePlayer;
+			world.spawnPlayer();
 		}
 
 		System.gc();
 		this.systemTime = 0L;
 	}
 
-	private void changeWorld1(String var1) {
-		this.loadingScreen.setTitle(var1);
+	/** Warms up the chunks around the player's position, showing a loading screen. */
+	private void changeWorld1(String loadingMessage) {
+		this.loadingScreen.setTitle(loadingMessage);
 		this.loadingScreen.setText("Preparing chunks");
 
-		for(int var5 = -196; var5 <= 196; var5 += 16) {
-			this.loadingScreen.setProgress((var5 + 196) * 100 / 392);
-			int var2 = this.theWorld.spawnX;
-			int var3 = this.theWorld.spawnZ;
+		// Touching blocks forces chunk generation across the ~12 chunk radius.
+		for(int chunkX = -196; chunkX <= 196; chunkX += 16) {
+			this.loadingScreen.setProgress((chunkX + 196) * 100 / 392);
+			int centerX = this.theWorld.spawnX;
+			int centerZ = this.theWorld.spawnZ;
 			if(this.theWorld.playerEntity != null) {
-				var2 = (int)this.theWorld.playerEntity.posX;
-				var3 = (int)this.theWorld.playerEntity.posZ;
+				centerX = (int)this.theWorld.playerEntity.posX;
+				centerZ = (int)this.theWorld.playerEntity.posZ;
 			}
 
-			for(int var4 = -196; var4 <= 196; var4 += 16) {
-				this.theWorld.getBlockId(var2 + var5, 64, var3 + var4);
+			for(int chunkZ = -196; chunkZ <= 196; chunkZ += 16) {
+				this.theWorld.getBlockId(centerX + chunkX, 64, centerZ + chunkZ);
 			}
 		}
 
 		this.theWorld.dropOldChunks();
 	}
 
+	/** Respawns after death: kills the old player entity, recreates it and reloads chunks. */
 	public final void respawn() {
 		if(this.thePlayer != null && this.theWorld != null) {
 			World.setEntityDead(this.thePlayer);

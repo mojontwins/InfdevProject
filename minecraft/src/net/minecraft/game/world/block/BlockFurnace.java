@@ -8,6 +8,12 @@ import net.minecraft.game.world.block.tileentity.TileEntity;
 import net.minecraft.game.world.block.tileentity.TileEntityFurnace;
 import net.minecraft.game.world.material.Material;
 
+/**
+ * Furnace: a container block offered in an idle and an active variant. It faces
+ * the first open direction around it on placement; while burning, the active
+ * sprite is swapped in by {@link TileEntityFurnace} and smoke/flame particles
+ * puff out of the front.
+ */
 public final class BlockFurnace extends BlockContainer {
 	private final boolean isActive;
 

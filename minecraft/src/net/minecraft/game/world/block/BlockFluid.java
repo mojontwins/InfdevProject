@@ -6,6 +6,16 @@ import net.minecraft.game.world.IBlockAccess;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
 
+/**
+ * Base of water and lava. The block id space is split in two roles per liquid:
+ * a <em>moving</em> id (placed, actively spreading) and a <em>still</em> id
+ * (settled, quiet). Flow itself is driven by {@link #update}: it first runs
+ * downhill in a do/while until the liquid can no longer move down, then calls
+ * {@link #flow} on the four sides, and finally settles into the still id when
+ * nothing moved. {@link #shouldSideBeRendered} and the splash/steam particles
+ * only treat *other* liquids as opaque, so the faces between water and lava
+ * render.
+ */
 public class BlockFluid extends Block {
 	protected int stillId;
 	protected int movingId;
@@ -46,10 +56,14 @@ public class BlockFluid extends Block {
 
 	public boolean update(World world, int x, int y, int z, int level) {
 		boolean flowing = false;
+		// The downstream material is probed through the fluid-solid idiom each pass;
+		// the read itself is inert (a genuine axiom of the original flow code).
 		world.getBlockMaterial(x, y - 1, z).liquidSolidCheck();
 
 		boolean movedDown;
 		do {
+			// Run the cascade downward. Lava stops after the first vertical step, so
+			// it only creeps sideways.
 			--y;
 			if(!this.canFlow(world, x, y, z)) {
 				break;
@@ -90,6 +104,8 @@ public class BlockFluid extends Block {
 			return false;
 		} else {
 			if(this.blockMaterial == Material.water) {
+				// Water refuses to flow within two blocks of a sponge (the era's
+				// anti-flooding device, though the absorption itself never shipped).
 				for(int scanX = x - 2; scanX <= x + 2; ++scanX) {
 					for(int scanY = y - 2; scanY <= y + 2; ++scanY) {
 						for(int scanZ = z - 2; scanZ <= z + 2; ++scanZ) {
@@ -121,6 +137,8 @@ public class BlockFluid extends Block {
 			if(setBlock) {
 				world.scheduleBlockUpdate(x, y, z, this.movingId);
 			}
+			// Note: always reports "did not flow", so in {@link #update} only the
+			// downward cascade ever drives the still/schedule decision.
 			return false;
 		}
 	}
@@ -179,6 +197,8 @@ public class BlockFluid extends Block {
 
 	@Override
 	public final void randomDisplayTick(World world, int x, int y, int z, Random random) {
+		// The original never fires (nextInt(128) can never be -1); the sfx branch
+		// is preserved verbatim as a historical curio.
 		if(random.nextInt(128) == -1 && world.getBlockMaterial(x, y + 1, z).getIsSolid()) {
 			if(this.blockMaterial == Material.lava) {
 				world.playSoundEffect((double)((float)x + 0.5F), (double)((float)y + 0.5F), (double)((float)z + 0.5F), "liquid.lava", random.nextFloat() * 0.25F + 12.0F / 16.0F, random.nextFloat() * 0.5F + 0.3F);

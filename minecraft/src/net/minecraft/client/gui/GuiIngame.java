@@ -6,12 +6,12 @@ import java.util.Random;
 import net.minecraft.client.ChatLine;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.RenderHelper;
-import net.minecraft.client.player.EntityPlayerSP;
 import net.minecraft.client.render.entity.RenderItem;
 import net.minecraft.game.entity.player.InventoryPlayer;
 import net.minecraft.game.item.ItemStack;
 import org.lwjgl.opengl.GL11;
 
+/** The in-game HUD overlay: draws the hotbar, hearts/armour, air, chat messages and debug info. */
 public final class GuiIngame extends Gui {
 	private static RenderItem itemRenderer = new RenderItem();
 	private List<ChatLine> chatMessageList = new ArrayList<>();
@@ -19,100 +19,106 @@ public final class GuiIngame extends Gui {
 	private Minecraft mc;
 	private int updateCounter = 0;
 
-	public GuiIngame(Minecraft var1) {
-		this.mc = var1;
+	public GuiIngame(Minecraft minecraft) {
+		this.mc = minecraft;
 	}
 
-	public final void renderGameOverlay(float var1) {
-		ScaledResolution var2 = new ScaledResolution(this.mc.displayWidth, this.mc.displayHeight);
-		int var3 = var2.getScaledWidth();
-		int var19 = var2.getScaledHeight();
-		FontRenderer var4 = this.mc.fontRenderer;
+	/** Renders the entire heads-up display for the given partial-tick time. */
+	public final void renderGameOverlay(float partialTicks) {
+		ScaledResolution scaledResolution = new ScaledResolution(this.mc.displayWidth, this.mc.displayHeight);
+		int scaledWidth = scaledResolution.getScaledWidth();
+		int scaledHeight = scaledResolution.getScaledHeight();
+		FontRenderer fontRenderer = this.mc.fontRenderer;
 		this.mc.entityRenderer.setupOverlayRendering();
 		GL11.glBindTexture(GL11.GL_TEXTURE_2D, this.mc.renderEngine.getTexture("/gui/gui.png"));
 		GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
 		GL11.glEnable(GL11.GL_BLEND);
-		InventoryPlayer var5 = this.mc.thePlayer.inventory;
+		InventoryPlayer inventory = this.mc.thePlayer.inventory;
 		this.zLevel = -90.0F;
-		this.drawTexturedModalRect(var3 / 2 - 91, var19 - 22, 0, 0, 182, 22);
-		this.drawTexturedModalRect(var3 / 2 - 91 - 1 + var5.currentItem * 20, var19 - 22 - 1, 0, 22, 24, 22);
+		// Draw the hotbar background and the selection frame around the current item.
+		this.drawTexturedModalRect(scaledWidth / 2 - 91, scaledHeight - 22, 0, 0, 182, 22);
+		this.drawTexturedModalRect(scaledWidth / 2 - 91 - 1 + inventory.currentItem * 20, scaledHeight - 22 - 1, 0, 22, 24, 22);
 		GL11.glBindTexture(GL11.GL_TEXTURE_2D, this.mc.renderEngine.getTexture("/gui/icons.png"));
 		GL11.glEnable(GL11.GL_BLEND);
 		GL11.glBlendFunc(GL11.GL_ONE_MINUS_DST_COLOR, GL11.GL_ONE_MINUS_SRC_COLOR);
-		this.drawTexturedModalRect(var3 / 2 - 7, var19 / 2 - 7, 0, 0, 16, 16);
+		// Draw the crosshair in the centre of the screen.
+		this.drawTexturedModalRect(scaledWidth / 2 - 7, scaledHeight / 2 - 7, 0, 0, 16, 16);
 		GL11.glDisable(GL11.GL_BLEND);
-		boolean var20 = this.mc.thePlayer.heartsLife / 3 % 2 == 1;
+		boolean blinkHearts = this.mc.thePlayer.heartsLife / 3 % 2 == 1;
 		if(this.mc.thePlayer.heartsLife < 10) {
-			var20 = false;
+			blinkHearts = false;
 		}
 
-		int var6 = this.mc.thePlayer.health;
-		int var7 = this.mc.thePlayer.prevHealth;
+		int health = this.mc.thePlayer.health;
+		int prevHealth = this.mc.thePlayer.prevHealth;
+		// Seed the random so the "low health" wobble is deterministic per frame.
 		this.rand.setSeed((long)(this.updateCounter * 312871));
-		int var10;
-		int var12;
+		int armourBarIndex;
+		int heartIndex;
 		if(this.mc.playerController.shouldDrawHUD()) {
-			EntityPlayerSP var8 = this.mc.thePlayer;
-			var10 = var8.inventory.getTotalArmorValue();
-
-			int var11;
-			int var13;
-			for(var11 = 0; var11 < 10; ++var11) {
-				var12 = var19 - 32;
-				if(var10 > 0) {
-					var13 = var3 / 2 + 91 - (var11 << 3) - 9;
-					if((var11 << 1) + 1 < var10) {
-						this.drawTexturedModalRect(var13, var12, 34, 9, 9, 9);
+			int armorValue = this.mc.thePlayer.inventory.getTotalArmorValue();
+			int heartY;
+			int slotIndex;
+			for(slotIndex = 0; slotIndex < 10; ++slotIndex) {
+				heartY = scaledHeight - 32;
+				// Draw one of the three armour icons depending on how much armour
+				// this heart's "half" falls within.
+				if(armorValue > 0) {
+					armourBarIndex = scaledWidth / 2 + 91 - (slotIndex << 3) - 9;
+					if((slotIndex << 1) + 1 < armorValue) {
+						this.drawTexturedModalRect(armourBarIndex, heartY, 34, 9, 9, 9);
 					}
 
-					if((var11 << 1) + 1 == var10) {
-						this.drawTexturedModalRect(var13, var12, 25, 9, 9, 9);
+					if((slotIndex << 1) + 1 == armorValue) {
+						this.drawTexturedModalRect(armourBarIndex, heartY, 25, 9, 9, 9);
 					}
 
-					if((var11 << 1) + 1 > var10) {
-						this.drawTexturedModalRect(var13, var12, 16, 9, 9, 9);
-					}
-				}
-
-				byte var26 = 0;
-				if(var20) {
-					var26 = 1;
-				}
-
-				int var14 = var3 / 2 - 91 + (var11 << 3);
-				if(var6 <= 4) {
-					var12 += this.rand.nextInt(2);
-				}
-
-				this.drawTexturedModalRect(var14, var12, 16 + var26 * 9, 0, 9, 9);
-				if(var20) {
-					if((var11 << 1) + 1 < var7) {
-						this.drawTexturedModalRect(var14, var12, 70, 0, 9, 9);
-					}
-
-					if((var11 << 1) + 1 == var7) {
-						this.drawTexturedModalRect(var14, var12, 79, 0, 9, 9);
+					if((slotIndex << 1) + 1 > armorValue) {
+						this.drawTexturedModalRect(armourBarIndex, heartY, 16, 9, 9, 9);
 					}
 				}
 
-				if((var11 << 1) + 1 < var6) {
-					this.drawTexturedModalRect(var14, var12, 52, 0, 9, 9);
+				byte heartTexture = 0;
+				if(blinkHearts) {
+					heartTexture = 1;
 				}
 
-				if((var11 << 1) + 1 == var6) {
-					this.drawTexturedModalRect(var14, var12, 61, 0, 9, 9);
+				int heartX = scaledWidth / 2 - 91 + (slotIndex << 3);
+				if(health <= 4) {
+					heartY += this.rand.nextInt(2);
+				}
+
+				// Draw the empty/background heart, then the falling damage overlay and the filled heart.
+				this.drawTexturedModalRect(heartX, heartY, 16 + heartTexture * 9, 0, 9, 9);
+				if(blinkHearts) {
+					if((slotIndex << 1) + 1 < prevHealth) {
+						this.drawTexturedModalRect(heartX, heartY, 70, 0, 9, 9);
+					}
+
+					if((slotIndex << 1) + 1 == prevHealth) {
+						this.drawTexturedModalRect(heartX, heartY, 79, 0, 9, 9);
+					}
+				}
+
+				if((slotIndex << 1) + 1 < health) {
+					this.drawTexturedModalRect(heartX, heartY, 52, 0, 9, 9);
+				}
+
+				if((slotIndex << 1) + 1 == health) {
+					this.drawTexturedModalRect(heartX, heartY, 61, 0, 9, 9);
 				}
 			}
 
 			if(this.mc.thePlayer.isInsideOfMaterial()) {
-				var11 = (int)Math.ceil((double)(this.mc.thePlayer.air - 2) * 10.0D / 300.0D);
-				var12 = (int)Math.ceil((double)this.mc.thePlayer.air * 10.0D / 300.0D) - var11;
+				// Draw the air bubbles while the player is underwater: full then empty.
+				slotIndex = (int)Math.ceil((double)(this.mc.thePlayer.air - 2) * 10.0D / 300.0D);
+				heartY = (int)Math.ceil((double)this.mc.thePlayer.air * 10.0D / 300.0D) - slotIndex;
 
-				for(var13 = 0; var13 < var11 + var12; ++var13) {
-					if(var13 < var11) {
-						this.drawTexturedModalRect(var3 / 2 - 91 + (var13 << 3), var19 - 32 - 9, 16, 18, 9, 9);
+				for(armourBarIndex = 0; armourBarIndex < slotIndex + heartY; ++armourBarIndex) {
+					if(armourBarIndex < slotIndex) {
+						this.drawTexturedModalRect(scaledWidth / 2 - 91 + (armourBarIndex << 3), scaledHeight - 32 - 9, 16, 18, 9, 9);
 					} else {
-						this.drawTexturedModalRect(var3 / 2 - 91 + (var13 << 3), var19 - 32 - 9, 25, 18, 9, 9);
+						this.drawTexturedModalRect(scaledWidth / 2 - 91 + (armourBarIndex << 3), scaledHeight - 32 - 9, 25, 18, 9, 9);
 					}
 				}
 			}
@@ -125,65 +131,65 @@ public final class GuiIngame extends Gui {
 		RenderHelper.enableStandardItemLighting();
 		GL11.glPopMatrix();
 
-		for(var10 = 0; var10 < 9; ++var10) {
-			int var26 = var3 / 2 - 90 + var10 * 20 + 2;
-			int var21 = var19 - 16 - 3;
+		// Draw each hotbar item, applying the "swing" scaling animation when used.
+		for(armourBarIndex = 0; armourBarIndex < 9; ++armourBarIndex) {
+			int itemX = scaledWidth / 2 - 90 + armourBarIndex * 20 + 2;
+			int itemY = scaledHeight - 16 - 3;
 
-			ItemStack var22 = this.mc.thePlayer.inventory.mainInventory[var10];
-			if(var22 != null) {
-				float var9 = (float)var22.animationsToGo - var1;
-				if(var9 > 0.0F) {
+			ItemStack stack = this.mc.thePlayer.inventory.mainInventory[armourBarIndex];
+			if(stack != null) {
+				float swingProgress = (float)stack.animationsToGo - partialTicks;
+				if(swingProgress > 0.0F) {
 					GL11.glPushMatrix();
-					float var27 = 1.0F + var9 / 5.0F;
-					GL11.glTranslatef((float)(var26 + 8), (float)(var21 + 12), 0.0F);
-					GL11.glScalef(1.0F / var27, (var27 + 1.0F) / 2.0F, 1.0F);
-					GL11.glTranslatef((float)(-(var26 + 8)), (float)(-(var21 + 12)), 0.0F);
+					float scale = 1.0F + swingProgress / 5.0F;
+					GL11.glTranslatef((float)(itemX + 8), (float)(itemY + 12), 0.0F);
+					GL11.glScalef(1.0F / scale, (scale + 1.0F) / 2.0F, 1.0F);
+					GL11.glTranslatef((float)(-(itemX + 8)), (float)(-(itemY + 12)), 0.0F);
 				}
 
-				itemRenderer.renderItemIntoGUI(this.mc.renderEngine, var22, var26, var21);
-				if(var9 > 0.0F) {
+				itemRenderer.renderItemIntoGUI(this.mc.renderEngine, stack, itemX, itemY);
+				if(swingProgress > 0.0F) {
 					GL11.glPopMatrix();
 				}
 
-				itemRenderer.renderItemOverlayIntoGUI(this.mc.fontRenderer, var22, var26, var21);
+				itemRenderer.renderItemOverlayIntoGUI(this.mc.fontRenderer, stack, itemX, itemY);
 			}
 		}
 
 		RenderHelper.disableStandardItemLighting();
 		GL11.glDisable(GL11.GL_NORMALIZE);
 		if(this.mc.gameSettings.showFPS) {
-			var4.drawStringWithShadow("Minecraft Infdev (" + this.mc.debug + ")", 2, 2, 16777215);
-			Minecraft var23 = this.mc;
-			var4.drawStringWithShadow(var23.renderGlobal.getDebugInfoRenders(), 2, 12, 16777215);
-			var23 = this.mc;
-			var4.drawStringWithShadow(var23.renderGlobal.getDebugInfoEntities(), 2, 22, 16777215);
-			var23 = this.mc;
-			var4.drawStringWithShadow("P: " + var23.effectRenderer.getStatistics() + ". T: " + var23.theWorld.getDebugLoadedEntities(), 2, 32, 16777215);
-			long var24 = Runtime.getRuntime().maxMemory();
-			long var27 = Runtime.getRuntime().totalMemory();
-			long var28 = Runtime.getRuntime().freeMemory();
-			long var16 = var24 - var28;
-			String var18 = "Free memory: " + var16 * 100L / var24 + "% of " + var24 / 1024L / 1024L + "MB";
-			drawString(var4, var18, var3 - var4.getStringWidth(var18) - 2, 2, 14737632);
-			var18 = "Allocated memory: " + var27 * 100L / var24 + "% (" + var27 / 1024L / 1024L + "MB)";
-			drawString(var4, var18, var3 - var4.getStringWidth(var18) - 2, 12, 14737632);
+			fontRenderer.drawStringWithShadow("Minecraft Infdev (" + this.mc.debug + ")", 2, 2, 16777215);
+			fontRenderer.drawStringWithShadow(this.mc.renderGlobal.getDebugInfoRenders(), 2, 12, 16777215);
+			fontRenderer.drawStringWithShadow(this.mc.renderGlobal.getDebugInfoEntities(), 2, 22, 16777215);
+			fontRenderer.drawStringWithShadow("P: " + this.mc.effectRenderer.getStatistics() + ". T: " + this.mc.theWorld.getDebugLoadedEntities(), 2, 32, 16777215);
+			long maxMemory = Runtime.getRuntime().maxMemory();
+			long totalMemory = Runtime.getRuntime().totalMemory();
+			long freeMemory = Runtime.getRuntime().freeMemory();
+			long usedMemory = maxMemory - freeMemory;
+			String freeText = "Free memory: " + usedMemory * 100L / maxMemory + "% of " + maxMemory / 1024L / 1024L + "MB";
+			drawString(fontRenderer, freeText, scaledWidth - fontRenderer.getStringWidth(freeText) - 2, 2, 14737632);
+			freeText = "Allocated memory: " + totalMemory * 100L / maxMemory + "% (" + totalMemory / 1024L / 1024L + "MB)";
+			drawString(fontRenderer, freeText, scaledWidth - fontRenderer.getStringWidth(freeText) - 2, 12, 14737632);
 		} else {
-			var4.drawStringWithShadow("Minecraft Infdev", 2, 2, 16777215);
+			fontRenderer.drawStringWithShadow("Minecraft Infdev", 2, 2, 16777215);
 		}
 
-		for(var12 = 0; var12 < this.chatMessageList.size() && var12 < 10; ++var12) {
-			if(this.chatMessageList.get(var12).updateCounter < 200) {
-				var4.drawStringWithShadow(this.chatMessageList.get(var12).message, 2, var19 - 8 - var12 * 9 - 20, 16777215);
+		// Draw up to the 10 most recent chat lines near the bottom of the screen.
+		for(heartIndex = 0; heartIndex < this.chatMessageList.size() && heartIndex < 10; ++heartIndex) {
+			if(this.chatMessageList.get(heartIndex).updateCounter < 200) {
+				fontRenderer.drawStringWithShadow(this.chatMessageList.get(heartIndex).message, 2, scaledHeight - 8 - heartIndex * 9 - 20, 16777215);
 			}
 		}
 
 	}
 
+	/** Advances the tick/update counter and ages each chat message. */
 	public final void updateTick() {
 		++this.updateCounter;
 
-		for(int var1 = 0; var1 < this.chatMessageList.size(); ++var1) {
-			++this.chatMessageList.get(var1).updateCounter;
+		for(int index = 0; index < this.chatMessageList.size(); ++index) {
+			++this.chatMessageList.get(index).updateCounter;
 		}
 
 	}

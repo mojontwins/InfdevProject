@@ -4,6 +4,10 @@ import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.tileentity.TileEntity;
 import net.minecraft.game.world.material.Material;
 
+/**
+ * Base of every block that owns a {@link TileEntity}: the tile is created on
+ * {@code onBlockAdded} and removed again on {@code onBlockRemoval}.
+ */
 public abstract class BlockContainer extends Block {
 	protected BlockContainer(int blockID, Material material) {
 		super(blockID, material);
