@@ -5,12 +5,14 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 import net.minecraft.client.LoadingScreenRenderer;
 import net.minecraft.game.entity.Entity;
+import net.minecraft.game.entity.EntityLiving;
+import net.minecraft.game.entity.animal.EntityAnimal;
+import net.minecraft.game.entity.monster.EntityMonster;
 import net.minecraft.game.physics.AxisAlignedBB;
 import net.minecraft.game.physics.MovingObjectPosition;
 import net.minecraft.game.physics.Vec3D;
@@ -28,6 +30,12 @@ public class World implements IBlockAccess {
 	private List<Entity> loadedEntityList;
 	private List<NextTickListEntry> unloadedEntityList;
 	public List<TileEntity> loadedTileEntityList;
+	/** Cached count of {@link EntityMonster} instances in {@link #loadedEntityList}.
+	 *  Maintained incrementally at every entity-list mutation site so the
+	 *  {@link MobSpawner} can read it in O(1) without scanning the list. */
+	private int monsterCount;
+	/** Cached count of {@link EntityAnimal} instances in {@link #loadedEntityList}. */
+	private int animalCount;
 	public long worldTime;
 	private long skyColor;
 	private long fogColor;
@@ -702,6 +710,7 @@ public class World implements IBlockAccess {
 		} else {
 			this.getChunkFromChunkCoords(var2, var3).addEntity(var1);
 			this.loadedEntityList.add(var1);
+			this.updateEntityCountOnAdd(var1);
 
 			for(var2 = 0; var2 < this.worldAccesses.size(); ++var2) {
 				this.worldAccesses.get(var2).obtainEntitySkin(var1);
@@ -880,6 +889,7 @@ public class World implements IBlockAccess {
 				}
 
 				this.loadedEntityList.remove(var1--);
+				this.updateEntityCountOnRemove(var2);
 
 				for(var5 = 0; var5 < this.worldAccesses.size(); ++var5) {
 					this.worldAccesses.get(var5).releaseEntitySkin(var2);
@@ -983,134 +993,19 @@ public class World implements IBlockAccess {
 		return false;
 	}
 
-	public final void createExplosion(Entity var1, double var2, double var4, double var6, float var8) {
-		new Explosion();
-		float var3 = var8;
-		double var15 = var6;
-		double var13 = var4;
-		double var11 = var2;
-		Entity var67 = var1;
-		World var66 = this;
-		this.playSoundEffect(var2, var4, var6, "random.explode", 4.0F, (1.0F + (this.rand.nextFloat() - this.rand.nextFloat()) * 0.2F) * 0.7F);
-		HashSet<ChunkPosition> var68 = new HashSet<>();
-
-		int var7;
-		double var32;
-		double var34;
-		double var36;
-		int var69;
-		int var70;
-		for(var69 = 0; var69 < 16; ++var69) {
-			for(var7 = 0; var7 < 16; ++var7) {
-				for(var70 = 0; var70 < 16; ++var70) {
-					if(var69 == 0 || var69 == 15 || var7 == 0 || var7 == 15 || var70 == 0 || var70 == 15) {
-						double var23 = (double)((float)var69 / 15.0F * 2.0F - 1.0F);
-						double var25 = (double)((float)var7 / 15.0F * 2.0F - 1.0F);
-						double var27 = (double)((float)var70 / 15.0F * 2.0F - 1.0F);
-						double var29 = Math.sqrt(var23 * var23 + var25 * var25 + var27 * var27);
-						var23 /= var29;
-						var25 /= var29;
-						var27 /= var29;
-						float var31 = var3 * (0.7F + var66.rand.nextFloat() * 0.6F);
-						var32 = var11;
-						var34 = var13;
-
-						for(var36 = var15; var31 > 0.0F; var31 -= 0.22500001F) {
-							int var39 = MathHelper.floor_double(var32);
-							int var40 = MathHelper.floor_double(var34);
-							int var41 = MathHelper.floor_double(var36);
-							int var42 = var66.getBlockId(var39, var40, var41);
-							if(var42 > 0) {
-								var31 -= (Block.blocksList[var42].getExplosionResistance() + 0.3F) * 0.3F;
-							}
-
-							if(var31 > 0.0F) {
-								var68.add(new ChunkPosition(var39, var40, var41));
-							}
-
-							var32 += var23 * (double)0.3F;
-							var34 += var25 * (double)0.3F;
-							var36 += var27 * (double)0.3F;
-						}
-					}
-				}
-			}
-		}
-
-		var3 *= 2.0F;
-		var69 = MathHelper.floor_double(var11 - (double)var3 - 1.0D);
-		var7 = MathHelper.floor_double(var11 + (double)var3 + 1.0D);
-		var70 = MathHelper.floor_double(var13 - (double)var3 - 1.0D);
-		int var71 = MathHelper.floor_double(var13 + (double)var3 + 1.0D);
-		int var24 = MathHelper.floor_double(var15 - (double)var3 - 1.0D);
-		int var72 = MathHelper.floor_double(var15 + (double)var3 + 1.0D);
-		List<Entity> var26 = var66.getEntitiesWithinAABBExcludingEntity(var1, new AxisAlignedBB((double)var69, (double)var70, (double)var24, (double)var7, (double)var71, (double)var72));
-		Vec3D var73 = new Vec3D(var11, var13, var15);
-
-		double var38;
-		double var65;
-		double var81;
-		for(int var28 = 0; var28 < var26.size(); ++var28) {
-			Entity var75 = var26.get(var28);
-			double var59 = var75.posX - var11;
-			double var61 = var75.posY - var13;
-			double var63 = var75.posZ - var15;
-			double var30 = (double)MathHelper.sqrt_double(var59 * var59 + var61 * var61 + var63 * var63) / (double)var3;
-			if(var30 <= 1.0D) {
-				var32 = var75.posX - var11;
-				var34 = var75.posY - var13;
-				var36 = var75.posZ - var15;
-				var38 = (double)MathHelper.sqrt_double(var32 * var32 + var34 * var34 + var36 * var36);
-				var32 /= var38;
-				var34 /= var38;
-				var36 /= var38;
-				var81 = (double)var66.getBlockDensity(var73, var75.boundingBox);
-				var65 = (1.0D - var30) * var81;
-				var75.attackEntityFrom(var67, (int)((var65 * var65 + var65) / 2.0D * 8.0D * (double)var3 + 1.0D));
-				var75.motionX += var32 * var65;
-				var75.motionY += var34 * var65;
-				var75.motionZ += var36 * var65;
-			}
-		}
-
-		var3 = var8;
-		ArrayList<ChunkPosition> var74 = new ArrayList<>();
-		var74.addAll(var68);
-
-		for(int var76 = var74.size() - 1; var76 >= 0; --var76) {
-			ChunkPosition var77 = var74.get(var76);
-			int var78 = var77.x;
-			int var79 = var77.y;
-			int var33 = var77.z;
-			int var80 = var66.getBlockId(var78, var79, var33);
-
-			for(int var35 = 0; var35 <= 0; ++var35) {
-				var36 = (double)((float)var78 + var66.rand.nextFloat());
-				var38 = (double)((float)var79 + var66.rand.nextFloat());
-				var81 = (double)((float)var33 + var66.rand.nextFloat());
-				var65 = var36 - var11;
-				double var44 = var38 - var13;
-				double var46 = var81 - var15;
-				double var48 = (double)MathHelper.sqrt_double(var65 * var65 + var44 * var44 + var46 * var46);
-				var65 /= var48;
-				var44 /= var48;
-				var46 /= var48;
-				double var50 = 0.5D / (var48 / (double)var3 + 0.1D);
-				var50 *= (double)(var66.rand.nextFloat() * var66.rand.nextFloat() + 0.3F);
-				var65 *= var50;
-				var44 *= var50;
-				var46 *= var50;
-				var66.spawnParticle("explode", (var36 + var11) / 2.0D, (var38 + var13) / 2.0D, (var81 + var15) / 2.0D, var65, var44, var46);
-				var66.spawnParticle("smoke", var36, var38, var81, var65, var44, var46);
-			}
-
-			if(var80 > 0) {
-				Block.blocksList[var80].dropBlockAsItemWithChance(var66, var78, var79, var33, var66.getBlockMetadata(var78, var79, var33), 0.3F);
-				var66.setBlockWithNotify(var78, var79, var33, 0);
-				Block.blocksList[var80].onBlockDestroyedByExplosion(var66, var78, var79, var33);
-			}
-		}
-
+	/**
+	 * Creates and executes an explosion at the specified location.
+	 * 
+	 * @param entity The entity causing the explosion (may be null for world-generated explosions)
+	 * @param x X coordinate of explosion center
+	 * @param y Y coordinate of explosion center
+	 * @param z Z coordinate of explosion center
+	 * @param size Explosion radius/size
+	 */
+	public final void createExplosion(Entity entity, double x, double y, double z, float size) {
+		Explosion explosion = new Explosion(this, entity, x, y, z, size);
+		explosion.explode();
+		explosion.applyEffects();
 	}
 
 	public final float getBlockDensity(Vec3D var1, AxisAlignedBB var2) {
@@ -1388,6 +1283,61 @@ public class World implements IBlockAccess {
 
 	}
 
+	/**
+	 * Bumps the monster/animal cached counters after a single entity is added to
+	 * {@link #loadedEntityList}. Called by {@link #spawnEntityInWorld} and by the
+	 * bulk-add path ({@link #addLoadedEntities}).
+	 */
+	private void updateEntityCountOnAdd(Entity entity) {
+		if(entity instanceof EntityMonster) {
+			this.monsterCount++;
+		} else if(entity instanceof EntityAnimal) {
+			this.animalCount++;
+		}
+	}
+
+	/**
+	 * Bumps the monster/animal cached counters after a single entity is removed from
+	 * {@link #loadedEntityList}. Called by {@link #updateEntities}.
+	 */
+	private void updateEntityCountOnRemove(Entity entity) {
+		if(entity instanceof EntityMonster) {
+			this.monsterCount--;
+		} else if(entity instanceof EntityAnimal) {
+			this.animalCount--;
+		}
+	}
+
+	/**
+	 * Returns the cached count of live {@link EntityMonster} subclasses in the world.
+	 * O(1) — the value is maintained incrementally at every entity-list mutation site.
+	 */
+	public final int getMonsterCount() {
+		return this.monsterCount;
+	}
+
+	/**
+	 * Returns the cached count of live {@link EntityAnimal} subclasses in the world.
+	 * O(1) — the value is maintained incrementally at every entity-list mutation site.
+	 */
+	public final int getAnimalCount() {
+		return this.animalCount;
+	}
+
+	/**
+	 * Returns a cached entity count suitable for use by {@link MobSpawner}.
+	 * Dispatches to {@link #getMonsterCount} or {@link #getAnimalCount} based on
+	 * the supplied class — avoids a full-list scan per spawner tick.
+	 */
+	public final int getCachedEntityCount(Class<? extends EntityLiving> entityClass) {
+		if(EntityMonster.class.isAssignableFrom(entityClass)) {
+			return this.monsterCount;
+		} else if(EntityAnimal.class.isAssignableFrom(entityClass)) {
+			return this.animalCount;
+		}
+		return this.countEntities(entityClass);
+	}
+
 	public final int countEntities(Class<? extends Entity> var1) {
 		int var2 = 0;
 
@@ -1403,6 +1353,7 @@ public class World implements IBlockAccess {
 
 	public final void addLoadedEntities(List<Entity> var1) {
 		this.loadedEntityList.addAll(var1);
+		var1.forEach(this::updateEntityCountOnAdd);
 
 		for(int var2 = 0; var2 < this.worldAccesses.size(); ++var2) {
 			IWorldAccess var3 = this.worldAccesses.get(var2);
@@ -1416,6 +1367,7 @@ public class World implements IBlockAccess {
 
 	public final void unloadEntities(List<Entity> var1) {
 		this.loadedEntityList.removeAll(var1);
+		var1.forEach(this::updateEntityCountOnRemove);
 
 		for(int var2 = 0; var2 < this.worldAccesses.size(); ++var2) {
 			IWorldAccess var3 = this.worldAccesses.get(var2);

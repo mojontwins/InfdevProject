@@ -18,7 +18,7 @@ public final class MobSpawner {
 	}
 
 	public final void onUpdate(World var1) {
-		int var2 = var1.countEntities(this.entityType);
+		int var2 = var1.getCachedEntityCount(this.entityType);
 		if(var2 < this.maxSpawns) {
 			this.performSpawning(var1, 1, var1.playerEntity, (IProgressUpdate)null);
 		}

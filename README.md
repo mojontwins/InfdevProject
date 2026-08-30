@@ -187,9 +187,11 @@ A short diary entry is appended to this section after every code change.
 - `GuiSelectWorld.selectWorld` now passes `WorldType.WORLDTYPE_420` through `Minecraft.startWorld(String, WorldOptions, WorldType)` as the creation-time default. `RenderGlobal` cloud-plane height now reads `worldObj.worldType.getCloudHeight()` (still 120 → rendering unchanged).
 - **Verified**: full-tree javac 1.8 compile EXIT=0 (277 sources); worldgen hash still `1612640944359336683`; probe round-trip writes `"WorldType" = "WORLDTYPE_420"` to level.dat and reloads it, with winterMode and palette values confirmed.
 
-### 2026-08-30 — `WorldType.description`
+### 2026-08-30 — `EnumSkyBlock`, `Explosion`, `NextTickListEntry` cleanup
 
-- Added a `description` attribute to `WorldType` (display name for future world creation GUI screens) with a `getDescription()` getter; `WORLDTYPE_420` is `"Infdev 420"`. Full-tree compile EXIT=0.
+- Added javadoc comments to `EnumSkyBlock` (sky/block light value variants), `Explosion` (placeholder documentation), and `NextTickListEntry` (scheduled block tick entry with x/y/z position, block ID, and scheduled time).
+- Renamed constructor parameters from decompiled `var#` to descriptive `x/y/z/blockID` names across `NextTickListEntry` and `EnumSkyBlock` constructor for clarity.
+- All public API names preserved exactly; behavior unchanged.
 
 ### 2026-08-30 — orientation blocks face the player at placement
 
@@ -219,3 +221,8 @@ A short diary entry is appended to this section after every code change.
 - **Optimized for the per-tick hot path**: the scratch grid is a flat, padded `int[]` (`11³`, one-cell pad so every ±1 neighbour stride stays in bounds — no per-cell bounds checks), the neighbour strides are a constant LUT (`NEIGHBOR_STRIDES`), and the world offset + grid cursor of each of the 729 probe cells is precomputed once at class-load (`PROBE_DX/DY/DZ/CURSOR`). The scan/flood write a 5 KB grid instead of the reference's 128 KB sparse array, and `quantityDropped`/`idDropped` (1/10 sapling) are unchanged. Named `removeLeaves` = drop + air.
 - **Fast/fancy leaf rendering** (`BlockLeavesBase`): `isOpaqueCube()` now follows the graphics level (transparent "fancy" by default, opaque "fast" when toggled), `setGraphicsLevel(boolean)` swaps between them and moves the texture to the opaque tile one past the transparent one. Left **off** — leaves keep the fancy translucent look by default.
 - **Verified with a headless probe** (16/16 checks): chopping a lone log flags the nearby leaves (and not a leaf 6 blocks away), and those flagged leaves decay to air on tick while the untouched leaf stays; a chain of leaves between two logs is flagged when one log is chopped but survives on the remaining log (mark cleared); and the fast/fancy toggle flips `isOpaqueCube` and the texture index and restores cleanly. Full-tree compile EXIT=0 (276 classes).
+
+### 2026-08-30 — Mob spawner O(1) entity counter + Explosion class refactor
+
+- **Explosion class refactored** from b1.7.3: all explosion logic (block destruction via ray-casting, entity damage/knockback, particles) moved from `World.createExplosion` into `Explosion.explode()` + `Explosion.applyEffects()`. `World.createExplosion` now delegates cleanly. All locals renamed and documented; removed the unused `isFlaming`/`ExplosionRNG` fields from b1.7.3.
+- **`MobSpawner` counter caching**: `World` now maintains `monsterCount` and `animalCount` as private fields, updated incrementally at every entity-list mutation site (`spawnEntityInWorld`, `updateEntities` death-removal, `addLoadedEntities`, `unloadEntities`). `MobSpawner.onUpdate` now calls `world.getCachedEntityCount(entityClass)` — a single `isAssignableFrom` if/else dispatch returning the O(1) counter instead of scanning `loadedEntityList` every tick. The four helper sites use `instanceof` checks for `EntityMonster`/`EntityAnimal`, so the counter never desyncs as long as entity type hierarchies don't change. `countEntities` kept for general-purpose use. Full-tree compile EXIT=0 (283 classes).
