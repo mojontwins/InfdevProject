@@ -284,7 +284,11 @@ public class World implements IBlockAccess {
 	}
 
 	public final void setBlockMetadataWithNotify(int var1, int var2, int var3, int var4) {
-		this.setBlockMetadata(var1, var2, var3, var4);
+		if(this.setBlockMetadata(var1, var2, var3, var4)) {
+			this.markBlockNeedsUpdate(var1, var2, var3);
+			int blockID = this.getBlockId(var1, var2, var3);
+			this.notifyBlocksOfNeighborChange(var1, var2, var3, blockID);
+		}
 	}
 
 	private boolean setBlockMetadata(int var1, int var2, int var3, int var4) {
@@ -298,6 +302,29 @@ public class World implements IBlockAccess {
 			var3 &= 15;
 			var5.setBlockMetadata(var1, var2, var3, var4);
 			return true;
+		}
+	}
+
+	/** Sets a block id and its metadata in one silent write (no render update, no neighbour notifications). */
+	public final boolean setBlockAndMetadata(int x, int y, int z, int blockID, int metadata) {
+		if(y < 0) {
+			return false;
+		} else if(y >= 128) {
+			return false;
+		} else {
+			Chunk chunk = this.getChunkFromChunkCoords(x >> 4, z >> 4);
+			return chunk.setBlockIDWithMetadata(x & 15, y, z & 15, blockID, metadata);
+		}
+	}
+
+	/** Sets a block id and its metadata, then re-renders the cell and tells its neighbours. */
+	public final boolean setBlockAndMetadataWithNotify(int x, int y, int z, int blockID, int metadata) {
+		if(this.setBlockAndMetadata(x, y, z, blockID, metadata)) {
+			this.markBlockNeedsUpdate(x, y, z);
+			this.notifyBlocksOfNeighborChange(x, y, z, blockID);
+			return true;
+		} else {
+			return false;
 		}
 	}
 
@@ -320,25 +347,20 @@ public class World implements IBlockAccess {
 		}
 	}
 
+	/** Flags a single cell's renderer for rebuild (used whenever a block's state visibly changes). */
+	public final void markBlockNeedsUpdate(int x, int y, int z) {
+		this.markBlocksDirty(x, y, z, x, y, z);
+	}
+
 	public final void markBlocksDirtyVertical(int var1, int var2, int var3, int var4) {
-		int var5;
-		if(var3 > var4) {
-			var5 = var4;
-			var4 = var3;
-			var3 = var5;
+		this.markBlocksDirty(var1, var3, var2, var1, var4, var2);
+	}
+
+	/** Flags every cell inside the given box for renderer rebuild. */
+	public final void markBlocksDirty(int x1, int y1, int z1, int x2, int y2, int z2) {
+		for(int i = 0; i < this.worldAccesses.size(); ++i) {
+			this.worldAccesses.get(i).markBlockRangeNeedsUpdate(x1, y1, z1, x2, y2, z2);
 		}
-
-		int var7 = var2;
-		int var6 = var4;
-		var5 = var1;
-		var4 = var2;
-		var2 = var1;
-		World var9 = this;
-
-		for(int var8 = 0; var8 < var9.worldAccesses.size(); ++var8) {
-			var9.worldAccesses.get(var8).markBlockRangeNeedsUpdate(var2, var3, var4, var5, var6, var7);
-		}
-
 	}
 
 	public final void swap(int var1, int var2, int var3, int var4, int var5, int var6) {

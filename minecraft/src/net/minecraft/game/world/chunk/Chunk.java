@@ -299,6 +299,19 @@ public final class Chunk {
 		return this.data.get(x, y, z);
 	}
 
+	/**
+	 * Writes a block id and its metadata in a single step. {@link #setBlockID}
+	 * zeroes the metadata nibble, so the flow system cannot use it and then
+	 * re-set the nibble separately without an intermediate air frame — this
+	 * combined write keeps both planes coherent while still running the full
+	 * height/skylight bookkeeping of the plain id set.
+	 */
+	public final boolean setBlockIDWithMetadata(int x, int y, int z, int blockID, int metadata) {
+		boolean changed = this.setBlockID(x, y, z, blockID);
+		this.setBlockMetadata(x, y, z, metadata);
+		return changed;
+	}
+
 	public final void setBlockMetadata(int x, int y, int z, int metadata) {
 		this.isModified = true;
 		this.data.set(x, y, z, metadata);
