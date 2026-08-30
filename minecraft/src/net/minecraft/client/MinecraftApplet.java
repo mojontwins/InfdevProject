@@ -35,8 +35,8 @@ public class MinecraftApplet extends Applet {
 		// open a display without divide-by-zero in the renderer.
 		int width = this.getWidth();
 		int height = this.getHeight();
-		if(width <= 0) width = 854;
-		if(height <= 0) height = 480;
+		if(width <= 0) width = 1280;
+		if(height <= 0) height = 720;
 
 		this.mc = new Minecraft(this.mcCanvas, this, width, height, fullscreen);
 		String host = null;
