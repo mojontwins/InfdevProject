@@ -1,6 +1,7 @@
 package net.minecraft.game.world.block;
 
 import java.util.Random;
+import net.minecraft.game.entity.Entity;
 import net.minecraft.game.entity.misc.EntityItem;
 import net.minecraft.game.entity.player.EntityPlayer;
 import net.minecraft.game.entity.player.InventoryPlayer;
@@ -433,6 +434,29 @@ public class Block {
 
 	public void onBlockPlaced(World world, int x, int y, int z, int side, float xWithinFace, float yWithinFace, float zWithinFace) {
 		this.onBlockPlaced(world, x, y, z, side);
+	}
+
+	/**
+	 * The horizontal face (side index 2..5) a freshly placed orientation block
+	 * should draw its front on so it faces the player, i.e. the side pointing
+	 * back at the nearest player's position: +X -> 5, -X -> 4, +Z -> 3, -Z -> 2.
+	 * The choice is taken from the player's position relative to the block, not
+	 * from the player's viewing direction, and never consults the surrounding
+	 * blocks. Falls back to the default +Z facing when no player exists yet.
+	 */
+	protected static final int getPlayerFacing(World world, int x, int y, int z) {
+		Entity player = world.playerEntity;
+		if(player == null) {
+			return 3;
+		}
+
+		double offsetX = player.posX - ((double)x + 0.5D);
+		double offsetZ = player.posZ - ((double)z + 0.5D);
+		if(Math.abs(offsetX) >= Math.abs(offsetZ)) {
+			return offsetX > 0.0D ? 5 : 4;
+		} else {
+			return offsetZ > 0.0D ? 3 : 2;
+		}
 	}
 
 	static {

@@ -13,12 +13,15 @@ import net.minecraft.game.world.block.tileentity.TileEntityChest;
 import net.minecraft.game.world.material.Material;
 
 /**
- * Chest: a container whose sprite is chosen per side from the surrounding
- * blocks so adjacent chests read as one connected double chest. The big
- * {@link #getBlockTexture} face-picking logic handles the two placement axes,
- * the doubled halves and the facing door; a blocked top or a disallowed
- * neighbour count (more than one chest or a chest already doubled) keeps the
- * GUI shut. Spilled contents are flung out with a random burst on removal.
+ * Chest: a container whose sprite is chosen per side so adjacent chests read as
+ * one connected double chest. A lone chest faces the player who placed it - the
+ * facing is fixed in the block metadata at {@link #onBlockPlaced} time and read
+ * back by {@link #getBlockTexture}. The big face-picking logic handles the two
+ * placement axes, the doubled halves (which ignore the stored facing and derive
+ * their door alignment from the corner walls instead) and the door side; a
+ * blocked top or a disallowed neighbour count (more than one chest or a chest
+ * already doubled) keeps the GUI shut. Spilled contents are flung out with a
+ * random burst on removal.
  */
 public final class BlockChest extends BlockContainer {
 	private Random random = new Random();
@@ -39,18 +42,12 @@ public final class BlockChest extends BlockContainer {
 			int neighborPosX = blockAccess.getBlockId(x + 1, y, z);
 			if(neighborNegZ != this.blockID && neighborPosZ != this.blockID) {
 				if(neighborNegX != this.blockID && neighborPosX != this.blockID) {
-					byte facing = 3;
-					if(Block.opaqueCubeLookup[neighborNegZ] && !Block.opaqueCubeLookup[neighborPosZ]) {
+					// A lone chest: its front points at the side stored when it
+					// was placed (metadata 2..5); anything else (a legacy save)
+					// falls back to the historical +Z default.
+					int facing = blockAccess.getBlockMetadata(x, y, z);
+					if(facing < 2 || facing > 5) {
 						facing = 3;
-					}
-					if(Block.opaqueCubeLookup[neighborPosZ] && !Block.opaqueCubeLookup[neighborNegZ]) {
-						facing = 2;
-					}
-					if(Block.opaqueCubeLookup[neighborNegX] && !Block.opaqueCubeLookup[neighborPosX]) {
-						facing = 5;
-					}
-					if(Block.opaqueCubeLookup[neighborPosX] && !Block.opaqueCubeLookup[neighborNegX]) {
-						facing = 4;
 					}
 					return side == facing ? this.blockIndexInTexture + 1 : this.blockIndexInTexture;
 				} else if(side != 4 && side != 5) {
@@ -101,6 +98,17 @@ public final class BlockChest extends BlockContainer {
 	@Override
 	public final int getBlockTextureFromSide(int side) {
 		return side == 1 ? this.blockIndexInTexture - 1 : (side == 0 ? this.blockIndexInTexture - 1 : (side == 3 ? this.blockIndexInTexture + 1 : this.blockIndexInTexture));
+	}
+
+	/**
+	 * A lone chest faces the player who placed it (the facing is stored in the
+	 * block metadata by {@link ItemBlock} during placement). A chest placed
+	 * next to an existing one is part of a double chest and simply carries the
+	 * facing along - the connected halves ignore it in {@link #getBlockTexture}.
+	 */
+	@Override
+	public final void onBlockPlaced(World world, int x, int y, int z, int side, float xWithinFace, float yWithinFace, float zWithinFace) {
+		world.setBlockMetadataWithNotify(x, y, z, getPlayerFacing(world, x, y, z));
 	}
 
 	@Override

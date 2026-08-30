@@ -21,7 +21,6 @@ import net.minecraft.game.world.chunk.ChunkProviderLoadOrGenerate;
 import net.minecraft.game.world.chunk.IChunkProvider;
 import net.minecraft.game.world.material.Material;
 import net.minecraft.game.world.path.Pathfinder;
-import net.minecraft.game.world.terrain.ChunkProviderGenerate;
 import util.MathHelper;
 
 public class World implements IBlockAccess {
@@ -53,6 +52,10 @@ public class World implements IBlockAccess {
 	private long randomSeed;
 	private NBTTagCompound nbtCompoundPlayer;
 	public long sizeOnDisk;
+	/** The world generation options, created at world creation and persisted in level.dat. */
+	public WorldOptions worldOptions;
+	/** The world type, chosen at world creation and read back from level.dat when loading. */
+	public WorldType worldType;
 	private static final int MAX_LIGHTING_BOXES_PER_CALL = 100000;
 	private static final int MAX_LIGHTING_QUEUE_SIZE = 1000000;
 	private static final int LIGHTING_QUEUE_DRAIN_SIZE = 500000;
@@ -99,18 +102,23 @@ public class World implements IBlockAccess {
 	}
 
 	public World(File var1, String var2) {
-		this(var1, var2, (new Random()).nextLong());
+		this(var1, var2, (new Random()).nextLong(), new WorldOptions(), WorldType.WORLDTYPE_420);
 	}
 
-	private World(File var1, String var2, long var3) {
+	public World(File var1, String var2, WorldOptions var3) {
+		this(var1, var2, (new Random()).nextLong(), var3, WorldType.WORLDTYPE_420);
+	}
+
+	public World(File var1, String var2, WorldOptions var3, WorldType worldType) {
+		this(var1, var2, (new Random()).nextLong(), var3, worldType);
+	}
+
+	private World(File var1, String var2, long var3, WorldOptions worldOptions, WorldType worldType) {
 		this.lightingToUpdate = new ArrayList<>();
 		this.loadedEntityList = new ArrayList<>();
 		this.unloadedEntityList = new LinkedList<>();
 		this.loadedTileEntityList = new ArrayList<>();
 		this.worldTime = 0L;
-		this.skyColor = 10079487L;
-		this.fogColor = 11587839L;
-		this.cloudColor = 16777215L;
 		this.skylightSubtracted = 0;
 		this.updateLCG = (new Random()).nextInt();
 		this.DIST_HASH_MAGIC = 1013904223;
@@ -120,6 +128,8 @@ public class World implements IBlockAccess {
 		this.worldAccesses = new ArrayList<>();
 		this.randomSeed = 0L;
 		this.sizeOnDisk = 0L;
+		this.worldOptions = worldOptions;
+		this.worldType = worldType;
 		var1.mkdirs();
 		this.saveDirectory = new File(var1, var2);
 		this.saveDirectory.mkdirs();
@@ -135,6 +145,11 @@ public class World implements IBlockAccess {
 				this.spawnZ = var6.getInteger("SpawnZ");
 				this.worldTime = var6.getLong("Time");
 				this.sizeOnDisk = var6.getLong("SizeOnDisk");
+				this.worldOptions.readFromNBT(var6);
+				WorldType savedWorldType = WorldType.fromId(var6.getString("WorldType"));
+				if(savedWorldType != null) {
+					this.worldType = savedWorldType;
+				}
 				this.nbtCompoundPlayer = var6.getCompoundTag("Player");
 			} catch (Exception var5) {
 				var5.printStackTrace();
@@ -148,7 +163,14 @@ public class World implements IBlockAccess {
 			this.spawnZ = 0;
 		}
 
-		this.chunkProvider = new ChunkProviderLoadOrGenerate(this, this.saveDirectory, new ChunkProviderGenerate(this, this.randomSeed));
+		// The world type sets the atmosphere palette: a loaded world keeps the
+		// palette of the type saved in its level.dat, a new world uses the one
+		// passed in (defaulting to WORLDTYPE_420 above).
+		this.skyColor = this.worldType.getSkyColor();
+		this.fogColor = this.worldType.getFogColor();
+		this.cloudColor = this.worldType.getCloudColor();
+
+		this.chunkProvider = new ChunkProviderLoadOrGenerate(this, this.saveDirectory, this.worldType.createChunkProvider(this, this.randomSeed, this.worldOptions));
 		this.saveWorld(false);
 	}
 
@@ -175,6 +197,8 @@ public class World implements IBlockAccess {
 		var3.setLong("Time", this.worldTime);
 		var3.setLong("SizeOnDisk", this.sizeOnDisk);
 		var3.setLong("LastPlayed", System.currentTimeMillis());
+		var3.setString("WorldType", this.worldType.getId());
+		this.worldOptions.writeToNBT(var3);
 		NBTTagCompound var4;
 		if(this.playerEntity != null) {
 			var4 = new NBTTagCompound();

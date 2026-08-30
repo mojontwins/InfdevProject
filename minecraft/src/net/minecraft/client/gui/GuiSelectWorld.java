@@ -3,6 +3,8 @@ package net.minecraft.client.gui;
 import com.mojang.nbt.NBTTagCompound;
 import java.io.File;
 import net.minecraft.game.world.World;
+import net.minecraft.game.world.WorldOptions;
+import net.minecraft.game.world.WorldType;
 
 /** The world selection screen, listing the five save slots and letting the player load or delete worlds. */
 public class GuiSelectWorld extends GuiScreen {
@@ -61,12 +63,19 @@ public class GuiSelectWorld extends GuiScreen {
 		}
 	}
 
-	/** Starts the given world, guarding against double selection. */
+	/**
+	 * Starts the given world, guarding against double selection. A fresh
+	 * {@link WorldOptions} (every flag at its default, all false for now) is
+	 * handed to the new world; when the slot already holds a world the
+	 * constructor later re-reads the saved options and {@link WorldType} from
+	 * level.dat. The default {@code WORLDTYPE_420} is the creation-time world
+	 * type until a selection screen exists.
+	 */
 	public void selectWorld(int slotNumber) {
 		this.mc.displayGuiScreen((GuiScreen)null);
 		if(!this.selected) {
 			this.selected = true;
-			this.mc.startWorld("World" + slotNumber);
+			this.mc.startWorld("World" + slotNumber, new WorldOptions(), WorldType.WORLDTYPE_420);
 			this.mc.displayGuiScreen((GuiScreen)null);
 		}
 	}

@@ -587,7 +587,7 @@ public final class RenderGlobal implements IWorldAccess {
 		int cloudTileZ = MathHelper.floor_double(cloudCenterZ / 2048.0D);
 		cloudCenterX -= (double)(cloudTileX << 11);
 		cloudCenterZ -= (double)(cloudTileZ << 11);
-		float cloudHeight = 120.0F - playerHeight + 0.33F;
+		float cloudHeight = (float)this.worldObj.worldType.getCloudHeight() - playerHeight + 0.33F;
 		float cloudOffsetU = (float)(cloudCenterX * 4.8828125E-4D);
 		float cloudOffsetV = (float)(cloudCenterZ * 4.8828125E-4D);
 		tessellator.startDrawingQuads();

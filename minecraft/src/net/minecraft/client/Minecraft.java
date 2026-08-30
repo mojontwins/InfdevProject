@@ -39,6 +39,8 @@ import net.minecraft.game.item.Item;
 import net.minecraft.game.item.ItemStack;
 import net.minecraft.game.physics.MovingObjectPosition;
 import net.minecraft.game.world.World;
+import net.minecraft.game.world.WorldOptions;
+import net.minecraft.game.world.WorldType;
 import net.minecraft.game.world.block.Block;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
@@ -881,10 +883,10 @@ public final class Minecraft implements Runnable {
 	}
 
 	/** Loads (or generates) the named world, walking through the loading screens. */
-	public final void startWorld(String worldName) {
+	public final void startWorld(String worldName, WorldOptions worldOptions, WorldType worldType) {
 		this.changeWorld2((World)null, "");
 		System.gc();
-		World world = new World(new File(this.getAppDir(), "saves"), worldName);
+		World world = new World(new File(this.getAppDir(), "saves"), worldName, worldOptions, worldType);
 		if(world.isNewWorld) {
 			this.changeWorld2(world, "Generating level");
 		} else {

@@ -9,10 +9,11 @@ import net.minecraft.game.world.block.tileentity.TileEntityFurnace;
 import net.minecraft.game.world.material.Material;
 
 /**
- * Furnace: a container block offered in an idle and an active variant. It faces
- * the first open direction around it on placement; while burning, the active
- * sprite is swapped in by {@link TileEntityFurnace} and smoke/flame particles
- * puff out of the front.
+ * Furnace: a container block offered in an idle and an active variant. On
+ * placement it faces the player who placed it - the front sprite and the
+ * burning smoke/flame particles always point at them, regardless of the
+ * surroundings. While burning, the active sprite is swapped in by
+ * {@link TileEntityFurnace} and smoke/flame particles puff out of the front.
  */
 public final class BlockFurnace extends BlockContainer {
 	private final boolean isActive;
@@ -23,31 +24,15 @@ public final class BlockFurnace extends BlockContainer {
 		this.blockIndexInTexture = 45;
 	}
 
+	/**
+	 * The furnace orientation is only meaningful at placement: the facing is
+	 * stored in the block metadata so it survives reloads unchanged. Placement
+	 * runs through {@link #onBlockPlaced}, which {@link ItemBlock} calls right
+	 * after the block is set - the base no-op is not needed here.
+	 */
 	@Override
-	public final void onBlockAdded(World world, int x, int y, int z) {
-		super.onBlockAdded(world, x, y, z);
-		setDefaultDirection(world, x, y, z);
-	}
-
-	private static void setDefaultDirection(World world, int x, int y, int z) {
-		int neighborNegZ = world.getBlockId(x, y, z - 1);
-		int neighborPosZ = world.getBlockId(x, y, z + 1);
-		int neighborNegX = world.getBlockId(x - 1, y, z);
-		int neighborPosX = world.getBlockId(x + 1, y, z);
-		byte facing = 3;
-		if(Block.opaqueCubeLookup[neighborNegZ] && !Block.opaqueCubeLookup[neighborPosZ]) {
-			facing = 3;
-		}
-		if(Block.opaqueCubeLookup[neighborPosZ] && !Block.opaqueCubeLookup[neighborNegZ]) {
-			facing = 2;
-		}
-		if(Block.opaqueCubeLookup[neighborNegX] && !Block.opaqueCubeLookup[neighborPosX]) {
-			facing = 5;
-		}
-		if(Block.opaqueCubeLookup[neighborPosX] && !Block.opaqueCubeLookup[neighborNegX]) {
-			facing = 4;
-		}
-		world.setBlockMetadataWithNotify(x, y, z, facing);
+	public final void onBlockPlaced(World world, int x, int y, int z, int side, float xWithinFace, float yWithinFace, float zWithinFace) {
+		world.setBlockMetadataWithNotify(x, y, z, getPlayerFacing(world, x, y, z));
 	}
 
 	@Override

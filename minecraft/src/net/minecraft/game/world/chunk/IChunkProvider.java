@@ -3,7 +3,7 @@ package net.minecraft.game.world.chunk;
 /**
  * A source of {@link Chunk} data. Minecraft's chunk pipeline is a thin chain of these providers:
  * a loading provider ({@link ChunkProviderLoadOrGenerate}) sits on top of a generating provider
- * ({@code ChunkProviderGenerate}), which itself can hand populating/decoration duty to lower
+ * ({@code ChunkProviderGenerate420}), which itself can hand populating/decoration duty to lower
  * providers. Each layer satisfies the interface by either serving what it has or delegating down.
  */
 public interface IChunkProvider {
