@@ -2,6 +2,8 @@ package net.minecraft.client;
 
 import java.awt.BorderLayout;
 import java.awt.Frame;
+import java.awt.GraphicsEnvironment;
+import java.awt.Rectangle;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.HashMap;
@@ -89,35 +91,51 @@ public final class Start {
 		applet.init();
 		applet.start();
 
+		// Reflectively overwrite Minecraft.minecraftDir with the requested dir.
+		// Done in this thread before the game thread starts, so Minecraft.run()
+		// sees the value when it calls getAppDir() (or not, if it has already
+		// cached minecraftDir).
+		final Minecraft mc;
+		try {
+			Field mcField = MinecraftApplet.class.getDeclaredField("mc");
+			mcField.setAccessible(true);
+			mc = (Minecraft) mcField.get(applet);
+			Field dirField = Minecraft.class.getDeclaredField("minecraftDir");
+			dirField.setAccessible(true);
+			dirField.set(mc, new File(gameDir));
+		} catch (Exception ex) {
+			System.err.println("Could not override minecraftDir: " + ex);
+			throw new RuntimeException(ex);
+		}
+
 		// Wrap the applet in a visible Frame so the Canvas becomes displayable.
 		// Without this, Display.setParent(canvas) inside Minecraft.run() fails with
 		// "Parent.isDisplayable() must be true" because the Canvas was never
 		// added to a displayable component hierarchy.
+		// Read display dimensions from the Minecraft instance (already set to
+		// 854x480 by MinecraftApplet.init() when running outside a browser).
+		int gameWidth = mc.displayWidth > 0 ? mc.displayWidth : 854;
+		int gameHeight = mc.displayHeight > 0 ? mc.displayHeight : 480;
+
 		Frame frame = new Frame("Minecraft Minecraft Infdev");
 		frame.setLayout(new BorderLayout());
 		frame.add(applet, "Center");
-		frame.pack();
+		frame.setSize(gameWidth, gameHeight);
+		frame.setResizable(true);
+
+		// Centre the frame on the primary screen.
+		Rectangle screenBounds = GraphicsEnvironment.getLocalGraphicsEnvironment()
+			.getDefaultScreenDevice().getDefaultConfiguration().getBounds();
+		frame.setLocation(
+			screenBounds.x + (screenBounds.width - gameWidth) / 2,
+			screenBounds.y + (screenBounds.height - gameHeight) / 2
+		);
 		frame.setVisible(true);
 
 		// Close the frame when the JVM exits (e.g. game window closed).
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
 			frame.dispose();
 		}, "AWT-shutdown"));
-
-		// Reflectively overwrite Minecraft.minecraftDir with the requested dir.
-		// Done in this thread before the game thread starts, so Minecraft.run()
-		// sees the value when it calls getAppDir() (or not, if it has already
-		// cached minecraftDir).
-		try {
-			Field mcField = MinecraftApplet.class.getDeclaredField("mc");
-			mcField.setAccessible(true);
-			Minecraft mc = (Minecraft) mcField.get(applet);
-			Field dirField = Minecraft.class.getDeclaredField("minecraftDir");
-			dirField.setAccessible(true);
-			dirField.set(mc, new File(gameDir));
-		} catch (Exception ex) {
-			System.err.println("Could not override minecraftDir: " + ex);
-		}
 
 		// Spawn the game thread. The applet's start() already does this in
 		// browser mode, but start() is also called by the browser lifecycle
