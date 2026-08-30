@@ -675,6 +675,9 @@ public class World implements IBlockAccess {
 	}
 
 	public final void playSoundAtEntity(Entity var1, String var2, float var3, float var4) {
+		if(this.playerEntity == null) {
+			return;
+		}
 		for(int var5 = 0; var5 < this.worldAccesses.size(); ++var5) {
 			float var6 = 16.0F;
 			if(var3 > 1.0F) {
@@ -689,6 +692,9 @@ public class World implements IBlockAccess {
 	}
 
 	public final void playSoundEffect(double var1, double var3, double var5, String var7, float var8, float var9) {
+		if(this.playerEntity == null) {
+			return;
+		}
 		try {
 			for(int var10 = 0; var10 < this.worldAccesses.size(); ++var10) {
 				float var11 = 16.0F;
@@ -877,7 +883,10 @@ public class World implements IBlockAccess {
 				var2.lastTickPosZ = var2.posZ;
 				var2.prevRotationYaw = var2.rotationYaw;
 				var2.prevRotationPitch = var2.rotationPitch;
-				var2.onUpdate();
+				try {
+					var2.onUpdate();
+				} catch(Exception var10000) {
+				}
 				int var6 = MathHelper.floor_double(var2.posX / 16.0D);
 				int var7 = MathHelper.floor_double(var2.posY / 16.0D);
 				int var8 = MathHelper.floor_double(var2.posZ / 16.0D);

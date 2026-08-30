@@ -82,6 +82,9 @@ public final class NBTTagList extends NBTBase {
 	}
 
 	public final NBTBase tagAt(int index) {
+		if(index < 0 || index >= this.tagList.size()) {
+			throw new IndexOutOfBoundsException("Index: " + index + ", Size: " + this.tagList.size());
+		}
 		return this.tagList.get(index);
 	}
 

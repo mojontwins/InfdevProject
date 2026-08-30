@@ -26,6 +26,7 @@ public class EntitySkeleton extends EntityMonster {
 			double deltaX = target.posX - this.posX;
 			double deltaZ = target.posZ - this.posZ;
 			if(this.attackTime == 0) {
+				System.out.println ("About to shoot arrow");
 				EntityArrow arrow = new EntityArrow(this.worldObj, this);
 				arrow.posY += (double)1.4F;
 				double deltaY = target.posY - (double)0.2F - arrow.posY;

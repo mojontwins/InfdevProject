@@ -76,6 +76,14 @@ public final class SoundManager {
 		this.soundPoolMusic.addSound(soundName, file);
 	}
 
+	/**
+	 * Returns whether the given sound name has at least one entry registered.
+	 * Used by the resource download thread to detect missing sounds.
+	 */
+	public final boolean hasSound(String soundName) {
+		return this.soundPoolSounds.hasSound(soundName);
+	}
+
 	// Place the 3D audio listener at the (interpolated) position/orientation of an entity.
 	public final void setListener(EntityLiving entity, float partialTick) {
 		if(this.loaded && this.options.sound) {

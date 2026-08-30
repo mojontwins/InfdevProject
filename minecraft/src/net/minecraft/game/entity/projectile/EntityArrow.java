@@ -23,6 +23,7 @@ import util.MathHelper;
  * it to collect it as an item again.
  */
 public class EntityArrow extends Entity {
+	private static final boolean ARROW_DEBUG = false;
 	private int xTile = -1;
 	private int yTile = -1;
 	private int zTile = -1;
@@ -75,6 +76,9 @@ public class EntityArrow extends Entity {
 	}
 
 	public final void onUpdate() {
+		if(this.worldObj == null) {
+			return;
+		}
 		super.onUpdate();
 		if (this.arrowShake > 0) {
 			--this.arrowShake;
@@ -99,6 +103,10 @@ public class EntityArrow extends Entity {
 			this.ticksInAir = 0;
 		} else {
 			++this.ticksInAir;
+		}
+
+		if(ARROW_DEBUG && this.ticksInAir > 200 && this.ticksInAir % 60 == 0) {
+			System.err.println("[EntityArrow] stuck in air for " + this.ticksInAir + " ticks at " + this.posX + ", " + this.posY + ", " + this.posZ);
 		}
 
 		Vec3D arrowPos = new Vec3D(this.posX, this.posY, this.posZ);

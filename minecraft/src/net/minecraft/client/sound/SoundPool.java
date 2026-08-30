@@ -3,42 +3,62 @@ package net.minecraft.client.sound;
 import java.io.File;
 import java.net.MalformedURLException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
 
 public final class SoundPool {
-	// Groups loose sound files by a base name so each registered sound can be chosen at random.
 	private Random rand = new Random();
-	private Map<String, List<SoundPoolEntry>> nameToSoundPoolEntriesMapping = new HashMap<>();
+	private final Map<String, List<SoundPoolEntry>> nameToSoundPoolEntriesMapping = new ConcurrentHashMap<>();
 
-	// Register a sound file; the base name (ignoring the trailing digit used for variants) is the grouping key.
 	public final SoundPoolEntry addSound(String soundName, File file) {
+		String fullName = soundName;
+
+		for(soundName = soundName.substring(0, soundName.indexOf(".")); Character.isDigit(soundName.charAt(soundName.length() - 1)); soundName = soundName.substring(0, soundName.length() - 1)) {
+		}
+
+		soundName = soundName.replaceAll("/", ".");
+		List<SoundPoolEntry> entries = this.nameToSoundPoolEntriesMapping.get(soundName);
+		if(entries == null) {
+			entries = new ArrayList<>();
+			List<SoundPoolEntry> existing = this.nameToSoundPoolEntriesMapping.putIfAbsent(soundName, entries);
+			if(existing != null) {
+				entries = existing;
+			}
+		}
+
 		try {
-			String fullName = soundName;
-
-			// Strip the trailing digits that identify per-file variants (e.g. "step.grass1" -> "step.grass").
-			for(soundName = soundName.substring(0, soundName.indexOf(".")); Character.isDigit(soundName.charAt(soundName.length() - 1)); soundName = soundName.substring(0, soundName.length() - 1)) {
-			}
-
-			soundName = soundName.replaceAll("/", ".");
-			if(!this.nameToSoundPoolEntriesMapping.containsKey(soundName)) {
-				this.nameToSoundPoolEntriesMapping.put(soundName, new ArrayList<>());
-			}
-
 			SoundPoolEntry entry = new SoundPoolEntry(fullName, file.toURI().toURL());
-			this.nameToSoundPoolEntriesMapping.get(soundName).add(entry);
+			synchronized(entries) {
+				entries.add(entry);
+			}
 			return entry;
-		} catch (MalformedURLException error) {
+		} catch(MalformedURLException error) {
 			error.printStackTrace();
-			throw new RuntimeException(error);
+			return null;
 		}
 	}
 
-	// Pick a random entry from the given sound's pool of variants.
 	public final SoundPoolEntry getRandomSoundFromSoundPool(String soundName) {
 		List<SoundPoolEntry> entries = this.nameToSoundPoolEntriesMapping.get(soundName);
-		return entries == null ? null : entries.get(this.rand.nextInt(entries.size()));
+		if(entries == null) {
+			return null;
+		}
+		synchronized(entries) {
+			if(entries.isEmpty()) {
+				return null;
+			}
+			return entries.get(this.rand.nextInt(entries.size()));
+		}
+	}
+
+	/**
+	 * Returns whether a sound name is registered (regardless of how many
+	 * entries it has). Used by the resource download thread to detect
+	 * which sounds are missing locally so it can attempt to download them.
+	 */
+	public final boolean hasSound(String soundName) {
+		return this.nameToSoundPoolEntriesMapping.containsKey(soundName);
 	}
 }
