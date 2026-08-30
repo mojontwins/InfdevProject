@@ -8,5 +8,8 @@
 !/minecraft
 
 # Ignore everything inside minecraft/ except the working sources.
+# Explicitly allow IDE configs and launcher scripts that are part of the project.
 /minecraft/*
 !/minecraft/src
+!/minecraft/Client.launch
+!/minecraft/Start.bat
