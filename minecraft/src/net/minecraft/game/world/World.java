@@ -12,7 +12,13 @@ import net.minecraft.client.LoadingScreenRenderer;
 import net.minecraft.game.entity.Entity;
 import net.minecraft.game.entity.EntityLiving;
 import net.minecraft.game.entity.animal.EntityAnimal;
+import net.minecraft.game.entity.animal.EntityPig;
+import net.minecraft.game.entity.animal.EntitySheep;
+import net.minecraft.game.entity.monster.EntityCreeper;
 import net.minecraft.game.entity.monster.EntityMonster;
+import net.minecraft.game.entity.monster.EntitySkeleton;
+import net.minecraft.game.entity.monster.EntitySpider;
+import net.minecraft.game.entity.monster.EntityZombie;
 import net.minecraft.game.physics.AxisAlignedBB;
 import net.minecraft.game.physics.MovingObjectPosition;
 import net.minecraft.game.physics.Vec3D;
@@ -36,6 +42,10 @@ public class World implements IBlockAccess {
 	private int monsterCount;
 	/** Cached count of {@link EntityAnimal} instances in {@link #loadedEntityList}. */
 	private int animalCount;
+	/** Spawns hostile mobs (max 100). Tick-driven from {@link #tick()}. */
+	private MobSpawner monsterSpawner;
+	/** Spawns passive mobs (max 50). Tick-driven from {@link #tick()}. */
+	private MobSpawner animalSpawner;
 	public long worldTime;
 	private long skyColor;
 	private long fogColor;
@@ -132,6 +142,10 @@ public class World implements IBlockAccess {
 		this.DIST_HASH_MAGIC = 1013904223;
 		this.pathFinder = new Pathfinder(this);
 		this.rand = new Random();
+		this.monsterSpawner = new MobSpawner(this, 100, EntityMonster.class,
+				new Class<?>[]{EntityZombie.class, EntitySkeleton.class, EntityCreeper.class, EntitySpider.class});
+		this.animalSpawner = new MobSpawner(this, 50, EntityAnimal.class,
+				new Class<?>[]{EntitySheep.class, EntityPig.class});
 		this.isNewWorld = false;
 		this.worldAccesses = new ArrayList<>();
 		this.randomSeed = 0L;
@@ -1161,6 +1175,9 @@ public class World implements IBlockAccess {
 		if(!this.loadedEntityList.contains(this.playerEntity)) {
 			this.spawnEntityInWorld(this.playerEntity);
 		}
+
+		this.monsterSpawner.tick();
+		this.animalSpawner.tick();
 
 		float var1 = 1.0F;
 		var1 = this.getCelestialAngle(1.0F);

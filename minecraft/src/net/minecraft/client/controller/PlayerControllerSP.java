@@ -3,22 +3,13 @@ package net.minecraft.client.controller;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.EntityPlayerSP;
 import net.minecraft.client.sound.SoundManager;
-import net.minecraft.game.entity.animal.EntityAnimal;
-import net.minecraft.game.entity.animal.EntityPig;
-import net.minecraft.game.entity.animal.EntitySheep;
-import net.minecraft.game.entity.monster.EntityCreeper;
-import net.minecraft.game.entity.monster.EntityMonster;
-import net.minecraft.game.entity.monster.EntitySkeleton;
-import net.minecraft.game.entity.monster.EntitySpider;
-import net.minecraft.game.entity.monster.EntityZombie;
 import net.minecraft.game.item.Item;
 import net.minecraft.game.item.ItemStack;
-import net.minecraft.game.world.MobSpawner;
 import net.minecraft.game.world.block.Block;
 import net.minecraft.game.world.block.StepSound;
 
 public final class PlayerControllerSP extends PlayerController {
-	// Single-player controller: adds block-breaking progress, damage repair, and mob/animal spawning.
+	// Single-player controller: adds block-breaking progress, damage repair.
 	private int curBlockX = -1;
 	private int curBlockY = -1;
 	private int curBlockZ = -1;
@@ -26,8 +17,6 @@ public final class PlayerControllerSP extends PlayerController {
 	private float prevBlockDamage = 0.0F;
 	private float blockDestroySoundCounter = 0.0F;
 	private int blockHitWait = 0;
-	private MobSpawner monsterSpawner = new MobSpawner(100, EntityMonster.class, new Class<?>[]{EntityZombie.class, EntitySkeleton.class, EntityCreeper.class, EntitySpider.class});
-	private MobSpawner animalSpawner = new MobSpawner(50, EntityAnimal.class, new Class<?>[]{EntitySheep.class, EntityPig.class});
 
 	public PlayerControllerSP(Minecraft mc) {
 		super(mc);
@@ -132,7 +121,5 @@ public final class PlayerControllerSP extends PlayerController {
 
 	public final void onUpdate() {
 		this.prevBlockDamage = this.curBlockDamage;
-		this.monsterSpawner.onUpdate(this.mc.theWorld);
-		this.animalSpawner.onUpdate(this.mc.theWorld);
 	}
 }
