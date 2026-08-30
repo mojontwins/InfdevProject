@@ -1,5 +1,7 @@
 package net.minecraft.client;
 
+import java.awt.BorderLayout;
+import java.awt.Frame;
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.HashMap;
@@ -86,6 +88,21 @@ public final class Start {
 		final MinecraftApplet applet = new MinecraftApplet();
 		applet.init();
 		applet.start();
+
+		// Wrap the applet in a visible Frame so the Canvas becomes displayable.
+		// Without this, Display.setParent(canvas) inside Minecraft.run() fails with
+		// "Parent.isDisplayable() must be true" because the Canvas was never
+		// added to a displayable component hierarchy.
+		Frame frame = new Frame("Minecraft Minecraft Infdev");
+		frame.setLayout(new BorderLayout());
+		frame.add(applet, "Center");
+		frame.pack();
+		frame.setVisible(true);
+
+		// Close the frame when the JVM exits (e.g. game window closed).
+		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+			frame.dispose();
+		}, "AWT-shutdown"));
 
 		// Reflectively overwrite Minecraft.minecraftDir with the requested dir.
 		// Done in this thread before the game thread starts, so Minecraft.run()
