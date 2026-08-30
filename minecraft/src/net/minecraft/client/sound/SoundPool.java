@@ -15,7 +15,11 @@ public final class SoundPool {
 	public final SoundPoolEntry addSound(String soundName, File file) {
 		String fullName = soundName;
 
-		for(soundName = soundName.substring(0, soundName.indexOf(".")); Character.isDigit(soundName.charAt(soundName.length() - 1)); soundName = soundName.substring(0, soundName.length() - 1)) {
+		int dot = soundName.indexOf('.');
+		if(dot >= 0) {
+			soundName = soundName.substring(0, dot);
+		}
+		for(; !soundName.isEmpty() && Character.isDigit(soundName.charAt(soundName.length() - 1)); soundName = soundName.substring(0, soundName.length() - 1)) {
 		}
 
 		soundName = soundName.replaceAll("/", ".");

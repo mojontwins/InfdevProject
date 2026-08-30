@@ -29,7 +29,16 @@ public class MinecraftApplet extends Applet {
 			fullscreen = fullscreenParam.equalsIgnoreCase("true");
 		}
 
-		this.mc = new Minecraft(this.mcCanvas, this, this.getWidth(), this.getHeight(), fullscreen);
+		// When the applet is constructed outside a browser (via Start.main),
+		// getWidth() / getHeight() both return 0 because no layout has been
+		// performed. Fall back to a sensible default so the game thread can
+		// open a display without divide-by-zero in the renderer.
+		int width = this.getWidth();
+		int height = this.getHeight();
+		if(width <= 0) width = 854;
+		if(height <= 0) height = 480;
+
+		this.mc = new Minecraft(this.mcCanvas, this, width, height, fullscreen);
 		String host = null;
 		try {
 			if(this.getDocumentBase() != null) {
