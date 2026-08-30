@@ -49,7 +49,7 @@ import java.util.Map;
  */
 public final class Start {
 	private static final String[] KNOWN_FLAGS = {
-		"username", "session", "uuid", "version", "gameDir", "assetsDir",
+		"username", "sessionid", "session", "uuid", "version", "gameDir", "assetsDir",
 		"assetIndex", "accessToken", "userProperties", "userType",
 		"versionType", "skinProxy", "fullscreen", "server", "port",
 		"loadmap_user", "loadmap_id"
@@ -76,10 +76,16 @@ public final class Start {
 
 		// Promote every recognised flag into a system property so that
 		// MinecraftApplet.init() can read them through getAppletParam().
+		// The applet reads "sessionid" (not "session"), so we alias the
+		// common --session flag to the expected name.
 		for(String flag : KNOWN_FLAGS) {
 			String value = parsed.get(flag);
 			if(value != null) {
-				System.setProperty("net.minecraft." + flag, value);
+				String name = flag;
+				if("session".equals(flag)) {
+					name = "sessionid";
+				}
+				System.setProperty("net.minecraft." + name, value);
 			}
 		}
 
