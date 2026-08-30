@@ -157,7 +157,6 @@ public final class ThreadDownloadResources extends Thread {
 			conn.setRequestProperty("User-Agent", "Minecraft/Infdev 20100420");
 			int response = conn.getResponseCode();
 			if(response == HttpURLConnection.HTTP_OK) {
-				int contentLength = conn.getContentLength();
 				byte[] buffer = new byte[8192];
 				int total = 0;
 				try (InputStream in = conn.getInputStream()) {

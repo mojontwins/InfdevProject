@@ -164,14 +164,8 @@ public class EntityLiving extends Entity {
 		double travelledZ = this.posZ - this.prevPosZ;
 		float distanceTravelled = MathHelper.sqrt_double(travelledX * travelledX + travelledZ * travelledZ);
 		float travelYaw = this.renderYawOffset;
-		float headMovement = 0.0F;
 		if(distanceTravelled > 0.05F) {
-			headMovement = 1.0F;
 			travelYaw = (float)Math.atan2(travelledZ, travelledX) * 180.0F / (float)Math.PI - 90.0F;
-		}
-
-		if(!this.onGround) {
-			headMovement = 0.0F;
 		}
 
 		float yawTwist = wrapAngleTo180(travelYaw - this.renderYawOffset);

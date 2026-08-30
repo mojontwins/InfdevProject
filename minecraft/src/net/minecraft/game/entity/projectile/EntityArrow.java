@@ -9,7 +9,6 @@ import net.minecraft.game.entity.EntityLiving;
 import net.minecraft.game.entity.player.EntityPlayer;
 import net.minecraft.game.item.Item;
 import net.minecraft.game.item.ItemStack;
-import net.minecraft.game.physics.AxisAlignedBB;
 import net.minecraft.game.physics.MovingObjectPosition;
 import net.minecraft.game.physics.Vec3D;
 import net.minecraft.game.world.World;
@@ -103,10 +102,6 @@ public class EntityArrow extends Entity {
 			this.ticksInAir = 0;
 		} else {
 			++this.ticksInAir;
-		}
-
-		if(ARROW_DEBUG && this.ticksInAir > 200 && this.ticksInAir % 60 == 0) {
-			System.err.println("[EntityArrow] stuck in air for " + this.ticksInAir + " ticks at " + this.posX + ", " + this.posY + ", " + this.posZ);
 		}
 
 		Vec3D arrowPos = new Vec3D(this.posX, this.posY, this.posZ);

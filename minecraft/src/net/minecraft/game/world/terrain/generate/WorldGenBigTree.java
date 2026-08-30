@@ -242,10 +242,8 @@ public final class WorldGenBigTree extends WorldGenerator {
 				for(int leafY = leafNodeY; leafY < leafNodeY + this.leafDistanceLimit; ++leafY) {
 					int layer = leafY - leafNodeY;
 					float leafRadius = layer >= 0 && layer < this.leafDistanceLimit ? (layer != 0 && layer != this.leafDistanceLimit - 1 ? 3.0F : 2.0F) : -1.0F;
-					int discRadius = (int) ((double) leafRadius + 0.618D);
-					byte axisX = otherCoordPairs[1];
-					byte axisZ = otherCoordPairs[4];
-					int[] centre = new int[]{leafNodeX, leafY, leafNodeZ};
+				int discRadius = (int) ((double) leafRadius + 0.618D);
+				int[] centre = new int[]{leafNodeX, leafY, leafNodeZ};
 					int[] pos = new int[]{0, 0, 0};
 					pos[1] = centre[1];
 

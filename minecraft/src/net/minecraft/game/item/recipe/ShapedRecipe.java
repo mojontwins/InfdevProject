@@ -76,7 +76,7 @@ public final class ShapedRecipe implements IRecipe {
 						required = this.ingredientGrid[patternX + patternY * this.width];
 					}
 				}
-				if (!this.stacksMatch(inventoryCrafting.getStackInRowAndColumn(matrixColumn, matrixRow), required)) {
+				if (!ShapedRecipe.stacksMatch(inventoryCrafting.getStackInRowAndColumn(matrixColumn, matrixRow), required)) {
 					return false;
 				}
 			}
