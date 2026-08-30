@@ -402,10 +402,18 @@ public final class Minecraft implements Runnable {
 								Thread.sleep(10L);
 							}
 
-							if(this.mcCanvas != null && !this.fullscreen && (this.mcCanvas.getWidth() != this.displayWidth || this.mcCanvas.getHeight() != this.displayHeight)) {
-								this.displayWidth = this.mcCanvas.getWidth();
-								this.displayHeight = this.mcCanvas.getHeight();
-								this.resize(this.displayWidth, this.displayHeight);
+							if(this.mcCanvas != null && !this.fullscreen) {
+								int canvasWidth = this.mcCanvas.getWidth();
+								int canvasHeight = this.mcCanvas.getHeight();
+								// Guard against canvas reporting 0 (it can happen
+								// briefly during AWT layout, or permanently when
+								// running headless). Don't clobber the real size.
+								if(canvasWidth > 0 && canvasHeight > 0
+									&& (canvasWidth != this.displayWidth || canvasHeight != this.displayHeight)) {
+									this.displayWidth = canvasWidth;
+									this.displayHeight = canvasHeight;
+									this.resize(this.displayWidth, this.displayHeight);
+								}
 							}
 
 							if(this.gameSettings.limitFramerate) {
