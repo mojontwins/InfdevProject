@@ -262,3 +262,12 @@ et.minecraft.client.Start (replaces org.mcphackers.launchwrapper.Launch in conf/
 et.minecraft.client.Start with the same args the launchwrapper used to receive). Commented-out JVM-args block shows how to enable the betacraft proxy.
 - Compile EXIT=0 (285 classes, including Start.class, Start.class, MinecraftApplet.class, ThreadDownloadResources.class). Verified end-to-end: Start.main() -> pplet.init() -> startMainThread() -> Minecraft.run() -> Display.create() reaches the LWJGL init stage cleanly (the only failure in a headless environment is Parent.isDisplayable(), expected when no display is available).
 
+
+### 2026-08-30 — Distance-based entity culling with timer advancement
+
+- **Distance culling in World.levelEntities()**: entities farther than sqrt(ENTITY_VIEW_DISTANCE_SQ) ≈ 45 blocks from the player now skip onUpdate(). This saves the most expensive per-tick work — EntityCreature's 200 random block samples and A* pathfinding — for distant mobs. The check is a single squared-distance comparison (6 flops per entity, negligible overhead).
+- **Timer advancement for distant entities**: to keep despawn timers accurate, 	icksExisted++ is always incremented and, for EntityItem, ge++ is also advanced. Dropped items still despawn at 6000 ticks even when far from the player.
+- **ENTITY_VIEW_DISTANCE_SQ = 2048.0D** is a public static final in World, so the radius can be tuned without code changes. Tile entities (furnaces, chests) are always ticked regardless of distance.
+- **loadedEntityList.removeAll() remains O(N²)**: the emoveAll(entities) call in World.unloadEntities() is unchanged — a future improvement would mark distant entities dead and defer removal to the next levelEntities() pass, eliminating the quadratic scan.
+- New chunk_and_entities.md in the project root documents the full chunk lifecycle (two-layer provider pipeline, the 1024-slot ring cache, eviction via hash collision), the entity management system (loadedEntityList, per-chunk entity buckets, levelEntities() tick loop), the distance-culling design, and the chunk→entity cleanup connection.
+- Compile EXIT=0 (286 classes); pushed to master.

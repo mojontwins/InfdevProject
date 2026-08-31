@@ -11,6 +11,7 @@ import java.util.Random;
 import net.minecraft.client.LoadingScreenRenderer;
 import net.minecraft.game.entity.Entity;
 import net.minecraft.game.entity.EntityLiving;
+import net.minecraft.game.entity.misc.EntityItem;
 import net.minecraft.game.entity.animal.EntityAnimal;
 import net.minecraft.game.entity.animal.EntityPig;
 import net.minecraft.game.entity.animal.EntitySheep;
@@ -77,6 +78,8 @@ public class World implements IBlockAccess {
 	private static final int MAX_LIGHTING_BOXES_PER_CALL = 100000;
 	private static final int MAX_LIGHTING_QUEUE_SIZE = 1000000;
 	private static final int LIGHTING_QUEUE_DRAIN_SIZE = 500000;
+	/** Squared distance beyond which entity onUpdate() is skipped. Timers (ticksExisted, age) still advance. */
+	public static final double ENTITY_VIEW_DISTANCE_SQ = 2048.0D;
 
 	public static NBTTagCompound getWorldNBTTag(File savesDirectory, String worldName) {
 		File savesFolder = new File(savesDirectory, "saves");
@@ -923,18 +926,49 @@ public class World implements IBlockAccess {
 	}
 
 	/**
-	 * Per-tick entity update pass. For every live entity, runs its onUpdate
-	 * and, if the entity moved to a different chunk, migrates it from the old
-	 * chunk's list to the new one. Dead entities are removed from the world.
+	 * Per-tick entity update pass. For every live entity:
+	 * <ol>
+	 *   <li>skip the full update when the entity is farther than
+	 *       {@link #ENTITY_VIEW_DISTANCE_SQ} from the player, but still
+	 *       advance {@code ticksExisted} and, for dropped items, {@code age}
+	 *       so despawn timers stay accurate;</li>
+	 *   <li>otherwise run {@code onUpdate()} and, if the entity crossed into a
+	 *       different chunk, migrate it to that chunk's entity list.</li>
+	 * </ol>
 	 *
 	 * <p>onUpdate() is wrapped in a silent try/catch so a single misbehaving
 	 * entity cannot freeze the entire tick loop.
 	 */
 	public final void levelEntities() {
+		Entity player = this.playerEntity;
+		double px = player != null ? player.posX : 0.0D;
+		double py = player != null ? player.posY : 0.0D;
+		double pz = player != null ? player.posZ : 0.0D;
+		boolean hasPlayer = player != null;
+
 		for(int i = 0; i < this.loadedEntityList.size(); ++i) {
 			Entity entity = this.loadedEntityList.get(i);
 
 			if(!entity.isDead) {
+				double dx = 0.0D;
+				double dy = 0.0D;
+				double dz = 0.0D;
+				if(hasPlayer) {
+					dx = entity.posX - px;
+					dy = entity.posY - py;
+					dz = entity.posZ - pz;
+				}
+				double distSq = dx * dx + dy * dy + dz * dz;
+
+				if(distSq > ENTITY_VIEW_DISTANCE_SQ) {
+					// Far from the player: advance only the despawn/lifetime timers.
+					entity.ticksExisted++;
+					if (entity instanceof EntityItem) {
+						((EntityItem) entity).age++;
+					}
+					continue;
+				}
+
 				// Capture the chunk coords before the update so we can detect a chunk-crossing.
 				int oldChunkX = MathHelper.floor_double(entity.posX / 16.0D);
 				int oldChunkY = MathHelper.floor_double(entity.posY / 16.0D);
