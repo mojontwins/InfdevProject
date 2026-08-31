@@ -7,10 +7,6 @@ plumbing**, not to add real biome variety. Only one biome exists today
 (`BiomeGenInfdev`), and everything is wired so that adding real biomes later
 means adding subclasses, not restructuring.
 
-> Note on naming: this document uses the actual class name `ChunkProviderGenerate420`
-> (the class the user sometimes calls `ChunkProviderGenerateInfdev420`). The public
-> name is preserved per `AGENTS.md`.
-
 ---
 
 ## 1. The two abstractions
