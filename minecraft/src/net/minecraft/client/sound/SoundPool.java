@@ -33,7 +33,7 @@ public final class SoundPool {
 		}
 
 		try {
-			SoundPoolEntry entry = new SoundPoolEntry(fullName, file.toURI().toURL());
+			SoundPoolEntry entry = new SoundPoolEntry(soundName, file.toURI().toURL());
 			synchronized(entries) {
 				entries.add(entry);
 			}
