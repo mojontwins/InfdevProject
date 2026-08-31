@@ -262,8 +262,6 @@ first re-save.
 
 ## What is intentionally out of scope
 
-- **Subchunk class:** extracting a `Subchunk` class that owns blocks, lights,
-  entities, and renderer is a v2 polish.  v1 keeps three independent arrays.
 - **Server / headless build:** the refactor keeps `net.minecraft.game.world`
   free of `net.minecraft.client.render` dependencies.  This constraint remains.
 - **World generation above y = 127:** terrain generation continues to produce
@@ -272,3 +270,48 @@ first re-save.
 - **Chunk unloading optimisation:** subchunks that are entirely air could skip
   their renderer and entity bucket allocation.  This is a future win on top of
   the lazy allocation already described.
+
+---
+
+## Appendix: `SubChunkStorage` class — pros and cons
+
+A true `SubChunkStorage` class would own the base-Y offset and all four
+data arrays for one 16×16×16 slab:
+
+```java
+class SubChunkStorage {
+    int baseY;                              // world y of subchunk bottom
+    byte[] blocks;                          // 4096 bytes
+    NibbleArray data;                       // 2048 bytes (block metadata)
+    NibbleArray skyLight;                   // 2048 bytes
+    NibbleArray blockLight;                 // 2048 bytes
+    boolean isEmpty;                        // all blocks are air (computed)
+}
+```
+
+### Pros
+
+| # | Point |
+|---|-------|
+| 1 | **Cache locality.** Processing a full subchunk (all 4 096 block lookups during a render rebuild or light propagation walk) touches one object with four contiguous arrays. With separate `blocks[][][]` / `skyLightMap[][]` / etc., the hot inner loop must pointer-chase across three separate jagged-array dimensions. |
+| 2 | **Single serialization unit.** `writeChunkNBTData` iterates the subchunk list and calls one method per subchunk. The NBT list of byte arrays maps 1:1 to the subchunk list — no separate `SubchunkMask` needed if we use a `null` entry to mean "absent". |
+| 3 | **`baseY` simplifies coordinate math.** Every accessor method (`getBlockId`, `setBlockId`, etc.) on the subchunk receives only the local `(x, yLocal, z)` — world-y is always implicit via `baseY`. The `Chunk` level only needs `y >> 4` to pick the right subchunk and `y & 15` to pass to the subchunk. The alternative — passing full world `(x, y, z)` into `Chunk` and re-extracting the parts at each layer — is fine but slightly noisier. |
+| 4 | **Empty subchunk singleton.** A `SubChunkStorage` where `blocks == EMPTY_BYTES` can be replaced with a shared `EMPTY` singleton. Any read from it returns `0` (air) instantly; writes allocate a real instance. This makes the `null` check in `Chunk.getBlockId` a `== EMPTY` check — same cost, more semantically meaningful. |
+| 5 | **Single place for the all-air check.** `isEmpty` is computed once when the subchunk is first created (or lazily on first fill) and stored on the object. The renderer can read it directly rather than scanning the block array. Future: dirt-cheap `skipRenderPass` for subchunks with no opaque blocks. |
+| 6 | **Extensibility.** Adding per-subchunk flags (e.g. `hasOpaqueBlocks`, `requiresLightingUpdate`, `isDirty`) attaches cleanly to the class without touching `Chunk`'s field layout. |
+| 7 | **Natural boundary for future changes.** If a later version wants 3D noise per subchunk, or per-subchunk heightmaps, or compression, the class is the obvious home. |
+| 8 | **Simpler `Chunk` code.** `Chunk` becomes a thin container — one `SubChunkStorage[16]` array plus metadata (`heightMap`, `biomes`, etc.). All block/light logic lives on the subchunk. `Chunk`'s methods shrink to two lines: index into the array, delegate to the subchunk. |
+
+### Cons
+
+| # | Point |
+|---|-------|
+| 1 | **Bigger initial refactor.** `Chunk` must be rewritten to delegate instead of holding the arrays directly. In the v1 plan (three independent arrays inside `Chunk`), `Chunk` grows three new dimensions and the arrays stay in-place. With `SubChunkStorage`, `Chunk` loses the arrays and gains a list of subchunk objects — more code to write and more ground to cover in a single step. |
+| 2 | **Indirection on every block access.** The hot path — `Chunk.getBlockId` → subchunk array → `SubChunkStorage.getBlockId` — is one extra dereference. On a machine with shallow branch prediction and warm L1 cache this is negligible, but the renderer's inner `y` loop (`WorldRenderer.updateRenderer` line 160) calls `chunk.getBlockId` 16 × 16 × 16 × visibleChunks times per frame. A method-call overhead × 4096 per subchunk per frame is measurable. Mitigation: make `SubChunkStorage` a `final` class with `final` fields; the JIT can devirtualise and inline aggressively. |
+| 3 | **NBT format coupling.** If `SubChunkStorage` owns its serialization, changing the internal layout of a subchunk (e.g. adding compression, or a future `NibbleArray` replacement) forces a `Height` / format version bump. With separate flat arrays in `Chunk`, adding a `SubchunkMask` to the `Chunk` level is the only required change. |
+| 4 | **Two-level null check.** v1 plan: `if (subchunks[idx] == null) allocate()`. With `SubChunkStorage`: `if (subchunk.isEmpty)` for the singleton, or `if (subchunk == EMPTY)` for a singleton approach. Both are cheap, but the semantics differ from `null == no subchunk`. The empty-singleton approach requires `SubChunkStorage` to be immutable after construction — any write to an `EMPTY` subchunk must allocate a new real instance. |
+| 5 | **`Chunk`–`SubChunkStorage` circular dependency risk.** If `SubChunkStorage` ever needs to call back into `Chunk` (e.g. for light propagation that spans subchunk boundaries), the circular dependency must be resolved carefully. In the v1 plan all light propagation is on `Chunk` anyway, so there is no risk. |
+
+### Recommendation
+
+**Do it in v2, not v1.** The `SubChunkStorage` class is the cleaner long-term design, but v1's three independent arrays minimises churn and gets the 256-height feature working with the smallest possible diff. Once the subchunk model is proven in production, extract `SubChunkStorage` as a clean extraction refactor — the kind of class that naturally emerges from the three parallel arrays already being 16-aligned. The v1 plan is specifically designed so that this extraction is a mechanical transformation, not a redesign.
