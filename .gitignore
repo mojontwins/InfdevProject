@@ -8,6 +8,7 @@
 !/minecraft
 !/chunk_and_entities.md
 !/biome_system.md
+!/256_blocks_high.md
 
 # Ignore everything inside minecraft/ except the working sources.
 # Explicitly allow IDE configs and launcher scripts that are part of the project.
