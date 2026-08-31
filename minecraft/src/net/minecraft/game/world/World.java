@@ -5,7 +5,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 import net.minecraft.client.LoadingScreenRenderer;
@@ -35,7 +34,8 @@ import util.MathHelper;
 public class World implements IBlockAccess {
 	private List<MetadataChunkBlock> lightingToUpdate;
 	private List<Entity> loadedEntityList;
-	private List<NextTickListEntry> unloadedEntityList;
+	/** Schedules and fires delayed block ticks (fire, water/lava flow, ...). */
+	private BlockTickScheduler blockTickScheduler;
 	public List<TileEntity> loadedTileEntityList;
 	/** Cached count of {@link EntityMonster} instances in {@link #loadedEntityList}.
 	 *  Maintained incrementally at every entity-list mutation site so the
@@ -136,7 +136,7 @@ public class World implements IBlockAccess {
 	private World(File workingDirectory, String worldName, long randomSeed, WorldOptions worldOptions, WorldType worldType) {
 		this.lightingToUpdate = new ArrayList<>();
 		this.loadedEntityList = new ArrayList<>();
-		this.unloadedEntityList = new LinkedList<>();
+		this.blockTickScheduler = new BlockTickScheduler(this);
 		this.loadedTileEntityList = new ArrayList<>();
 		this.worldTime = 0L;
 		this.skylightSubtracted = 0;
@@ -862,12 +862,7 @@ public class World implements IBlockAccess {
 	 * {@link Block#tickRate()} defines how many ticks to wait.
 	 */
 	public final void scheduleBlockUpdate(int x, int y, int z, int blockID) {
-		NextTickListEntry entry = new NextTickListEntry(x, y, z, blockID);
-		if(blockID > 0) {
-			int delay = Block.blocksList[blockID].tickRate();
-			entry.scheduledTime = delay;
-		}
-		this.unloadedEntityList.add(entry);
+		this.blockTickScheduler.scheduleBlockUpdate(x, y, z, blockID);
 	}
 
 	/**
@@ -1271,22 +1266,7 @@ public class World implements IBlockAccess {
 			this.saveWorld(false);
 		}
 
-		int ticksToProcess = this.unloadedEntityList.size();
-		if(ticksToProcess > 200) {
-			ticksToProcess = 200;
-		}
-		for(int i = 0; i < ticksToProcess; ++i) {
-			NextTickListEntry entry = this.unloadedEntityList.remove(0);
-			if(entry.scheduledTime > 0) {
-				--entry.scheduledTime;
-				this.unloadedEntityList.add(entry);
-			} else if(this.blockExists(entry.xCoord, entry.yCoord, entry.zCoord)) {
-				int currentBlockID = this.getBlockId(entry.xCoord, entry.yCoord, entry.zCoord);
-				if(currentBlockID == entry.blockID && currentBlockID > 0) {
-					Block.blocksList[currentBlockID].updateTick(this, entry.xCoord, entry.yCoord, entry.zCoord, this.rand);
-				}
-			}
-		}
+		this.blockTickScheduler.updateTicks();
 
 		this.updateBlocksAndPlayCaveSounds();
 	}
