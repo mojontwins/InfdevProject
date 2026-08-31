@@ -143,15 +143,28 @@ public final class Start {
 		frame.addWindowListener(new WindowAdapter() {
 			@Override
 			public void windowClosing(WindowEvent e) {
-				mc.shutdownMinecraftApplet();
-				System.exit(0);
+				// Shut the game down on a worker thread, not the AWT EDT.
+				// Applet.shutdown() flips Minecraft.running so the game loop
+				// unwinds itself (its finally calls shutdownMinecraftApplet()
+				// to save the world and tear down the display), then joins it
+				// briefly before System.exit() halts the JVM. We must not call
+				// shutdownMinecraftApplet() on the EDT here, and we must not
+				// let System.exit() run any AWT-touching shutdown hook (see
+				// below) -- both would deadlock against the EDT during the
+				// concurrent LWJGL teardown, leaving a white unclosable window.
+				new Thread(() -> {
+					applet.shutdown();
+					System.exit(0);
+				}, "Minecraft-shutdown").start();
 			}
 		});
 
-		// Close the frame when the JVM exits (e.g. game window closed).
-		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-			frame.dispose();
-		}, "AWT-shutdown"));
+		// NOTE: we deliberately do NOT install a shutdown hook that disposes the
+		// frame. At JVM exit the AWT EDT and the LWJGL display are being torn
+		// down concurrently, and frame.dispose() from a shutdown hook performs an
+		// invokeAndWait() back onto the EDT that can never return -- deadlocking
+		// System.exit and leaving a white, unclosable window. The OS reclaims the
+		// window automatically once the JVM halts.
 
 		// Spawn the game thread. The applet's start() already does this in
 		// browser mode, but start() is also called by the browser lifecycle

@@ -281,3 +281,11 @@ et.minecraft.client.Start with the same args the launchwrapper used to receive).
 - **World.unloadEntities()** (chunk eviction path): replaced loadedEntityList.removeAll(entities) (O(M×N)) with a mark-dead approach — sets isDead = true on each entity, defers removal from loadedEntityList to the existing levelEntities() cleanup loop. Renderer textures still released immediately via worldAccesses loop.
 - chunk_and_entities.md updated with the new migration design, the mark-dead chunk eviction flow, and updated performance notes.
 - Full-tree compile EXIT=0 (286 classes); pushed to master.
+
+### 2026-08-31 - Fix white/unclosable window on close (X button)
+
+- Root cause of "window goes white and doesn't close on X, task manager required": a JVM-exit deadlock between the AWT EDT and the LWJGL display teardown. The old Start.java installs a shutdown hook (AWT-shutdown) that calls frame.dispose(). At exit, that hook performs an EventQueue.invokeAndWait() back onto the AWT EDT - which is itself stuck tearing down the LWJGL canvas (WComponentPeer.hide). System.exit() then blocks forever waiting for that hook, leaving a white, unclosable window and a live process.
+- Start.java windowClosing now runs applet.shutdown() on a dedicated worker thread (never the EDT): it flips Minecraft.running so the game loop unwinds itself through its finally -> shutdownMinecraftApplet() (saves world, closes sound/input/display), then System.exit(0) halts the JVM cleanly.
+- Removed the frame.dispose() shutdown hook entirely - it was the deadlock. The OS reclaims the window when the JVM halts.
+- Start.bat classpath fixed: bin now comes first (so freshly-compiled .class files shadow stale ones in jars\deobfuscated.jar) and the library jars are listed explicitly because the * wildcard does not expand on Windows java.
+- Verified end-to-end with a WM_CLOSE window message: process now exits cleanly and the log shows the graceful "Stopping! -> SoundSystem shutting down" path (previously it hung after that point).
