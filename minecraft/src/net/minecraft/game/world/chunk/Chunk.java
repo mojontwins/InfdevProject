@@ -68,6 +68,8 @@ public final class Chunk {
 	private NibbleArray skyLightMap;
 	private NibbleArray blockLightMap;
 	private byte[] heightMap;
+	/** The 16&times;16 grid of biome ids (one byte per (x, z) column), indexed z-major. */
+	private byte[] biomes = new byte[SECTION_SIZE * SECTION_SIZE];
 	private int lowestBlockHeight;
 	public final int xPosition;
 	public final int zPosition;
@@ -102,6 +104,17 @@ public final class Chunk {
 	/** Height of the highest light-opaque block in the given column (x, z are chunk-local). */
 	public final int getHeightValue(int x, int z) {
 		return this.heightMap[z << HEIGHTMAP_Z_SHIFT | x] & 255;
+	}
+
+	/** The stored biome id of the given chunk-local column (x, z). */
+	public final int getBiomeID(int x, int z) {
+		return this.biomes[z << HEIGHTMAP_Z_SHIFT | x] & 255;
+	}
+
+	/** Records the biome id of the given chunk-local column (x, z). */
+	public final void setBiome(int x, int z, int id) {
+		this.biomes[z << HEIGHTMAP_Z_SHIFT | x] = (byte)id;
+		this.isModified = true;
 	}
 
 	/**
@@ -367,6 +380,7 @@ public final class Chunk {
 		nbtTag.setByteArray("SkyLight", this.skyLightMap.data);
 		nbtTag.setByteArray("BlockLight", this.blockLightMap.data);
 		nbtTag.setByteArray("HeightMap", this.heightMap);
+		nbtTag.setByteArray("Biomes", this.biomes);
 		nbtTag.setBoolean("TerrainPopulated", this.isTerrainPopulated);
 		this.hasEntities = false;
 		NBTTagList entityList = new NBTTagList();
@@ -414,6 +428,16 @@ public final class Chunk {
 
 		if(!chunk.blockLightMap.isValid()) {
 			chunk.blockLightMap = new NibbleArray(chunk.blocks.length);
+		}
+
+		// Old save files have no "Biomes" tag: getByteArray returns an empty
+		// (shared) array in that case. Fall back to a fresh zero-filled grid,
+		// whose every cell is biome id 0 (the default world biome).
+		byte[] savedBiomes = nbtTag.getByteArray("Biomes");
+		if(savedBiomes.length == SECTION_SIZE * SECTION_SIZE) {
+			chunk.biomes = savedBiomes;
+		} else {
+			chunk.biomes = new byte[SECTION_SIZE * SECTION_SIZE];
 		}
 
 		chunk.hasEntities = false;

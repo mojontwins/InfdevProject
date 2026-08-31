@@ -29,7 +29,8 @@ public final class ThreadDownloadResources extends Thread {
 	private static final int MIN_FILE_SIZE = 512;
 	private static final int CONNECT_TIMEOUT_MS = 5000;
 	private static final int READ_TIMEOUT_MS = 10000;
-	private static final String SOUND_URL_BASE = "https://meta.omniarchive.uk/c/inf-20100420/20100212/";
+	//private static final String SOUND_URL_BASE = "https://meta.omniarchive.uk/c/inf-20100420/20100212/";
+	private static final String SOUND_URL_BASE = "http://s3.amazonaws.com/MinecraftResources/";
 
 	private final File resourcesFolder;
 	private final Minecraft mc;
@@ -71,15 +72,15 @@ public final class ThreadDownloadResources extends Thread {
 					continue;
 				}
 				String category = relativePath.substring(0, slashIdx);
-				String assetName = relativePath.substring(slashIdx + 1);
-				int dotIdx = assetName.lastIndexOf('.');
+				String assetPath = relativePath.substring(slashIdx + 1);
+				int dotIdx = assetPath.lastIndexOf('.');
 				if(dotIdx > 0) {
-					assetName = assetName.substring(0, dotIdx);
+					assetPath = assetPath.substring(0, dotIdx);
 				}
 				if(category.equalsIgnoreCase("sound") || category.equalsIgnoreCase("newsound")) {
-					this.mc.sndManager.addSound(assetName, entry);
+					this.mc.sndManager.addSound(assetPath, entry);
 				} else if(category.equalsIgnoreCase("music")) {
-					this.mc.sndManager.addMusic(assetName, entry);
+					this.mc.sndManager.addMusic(assetPath, entry);
 				}
 			}
 		}
@@ -145,6 +146,7 @@ public final class ThreadDownloadResources extends Thread {
 			} catch (NumberFormatException ignored) {
 			}
 			proxy = new Proxy(Proxy.Type.HTTP, new InetSocketAddress(proxyHost, port));
+			System.out.println ("proxyHost: " + proxyHost + ", proxyPort: " + proxyPort + ", Proxy object " + proxy);
 		}
 
 		String urlStr = SOUND_URL_BASE + remotePath;

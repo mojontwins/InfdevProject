@@ -1,12 +1,11 @@
 package net.minecraft.game.world.terrain;
 
-import java.util.stream.IntStream;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.WorldOptions;
+import net.minecraft.game.world.biome.BiomeGenerator;
 import net.minecraft.game.world.block.Block;
+import net.minecraft.game.world.chunk.Chunk;
 import net.minecraft.game.world.chunk.IChunkProvider;
-import net.minecraft.game.world.terrain.generate.WorldGenBigTree;
-import net.minecraft.game.world.terrain.generate.WorldGenMinable;
 import net.minecraft.game.world.terrain.noise.NoiseGeneratorOctaves;
 
 /**
@@ -23,9 +22,11 @@ import net.minecraft.game.world.terrain.noise.NoiseGeneratorOctaves;
  *       full 16x16x128 block array, stamping stone above the surface and still
  *       water below {@link #SEA_LEVEL}.</li>
  *   <li>{@link #replaceBlocks} runs the per-column surface pass, carving
- *       grass, dirt, sand and gravel according to the beach/bed noise.</li>
- *   <li>{@link #populate} drops the ore veins and trees; the chunk pipeline
- *       calls it once the chunk's neighbourhood is generated.</li>
+ *       grass, dirt, sand and gravel according to the beach/bed noise, and
+ *       delegates each column's stamping to the column's {@link BiomeGenerator}.</li>
+ *   <li>{@link #populate} resolves the chunk's center biome and asks it to drop
+ *       the ore veins and trees; the chunk pipeline calls it once the chunk's
+ *       neighbourhood is generated.</li>
  * </ul>
  *
  * <p>The construction order of the noise generators is load-bearing: each
@@ -185,14 +186,16 @@ public final class ChunkProviderGenerate420 extends ChunkProviderGenerate {
 	}
 
 	/**
-	 * Walks every column top-down and replaces the surface of the plain stone
-	 * volume with the world's surface layer. The beach/bed noise is sampled per
-	 * column (sand and gravel), a dirt depth fades off with a further noise
-	 * bend, and the column is capped with grass above water, sand on the beach
-	 * line or bare stone under water.
+	 * Walks every column and delegates the surface replacement to the column's
+	 * {@link BiomeGenerator}. This provider still owns the per-column terrain
+	 * noise (beach, gravel bed and dirt depth — read from {@link #noiseGen4} and
+	 * {@link #noiseGen5}, constructed in a load-bearing order), and passes those
+	 * values into the biome's {@code replaceBlocksForBiomeColumn} so the biome
+	 * never owns the noise generators. Which biome fills each column comes from
+	 * the chunk's already-stored biome grid.
 	 */
 	@Override
-	protected final void replaceBlocks(int chunkX, int chunkZ, byte[] blocks) {
+	protected final void replaceBlocks(int chunkX, int chunkZ, byte[] blocks, Chunk chunk) {
 		for(int x = 0; x < 16; ++x) {
 			for(int z = 0; z < 16; ++z) {
 				// Per-column surface decisions use the coarse biome-ish noise: a
@@ -203,68 +206,21 @@ public final class ChunkProviderGenerate420 extends ChunkProviderGenerate {
 				boolean sandBeach = this.noiseGen4.generateNoiseOctaves(worldX * (1.0D / 32.0D), worldZ * (1.0D / 32.0D), 0.0D) + this.rand.nextDouble() * 0.2D > 0.0D;
 				boolean gravelBed = this.noiseGen4.generateNoiseOctaves(worldZ * (1.0D / 32.0D), 109.0134D, worldX * (1.0D / 32.0D)) + this.rand.nextDouble() * 0.2D > 3.0D;
 				int dirtDepth = (int) (this.noiseGen5.noiseGenerator(worldX * (1.0D / 32.0D) * 2.0D, worldZ * (1.0D / 32.0D) * 2.0D) / 3.0D + 3.0D + this.rand.nextDouble() * 0.25D);
-				// Walk the column top-down; blockIndex lands on (x, z, 127)
-				// first and decrements by one cell per step.
-				int blockIndex = x << 11 | z << 7 | 127;
-				int dirtRemaining = -1;
-				int surfaceBlock = Block.grass.blockID;
-				int groundBlock = Block.dirt.blockID;
 
-				for(int y = 127; y >= 0; --y) {
-					if(blocks[blockIndex] == 0) {
-						dirtRemaining = -1;
-					} else if(blocks[blockIndex] == Block.stone.blockID) {
-						if(dirtRemaining == -1) {
-							if(dirtDepth <= 0) {
-								surfaceBlock = 0;
-								groundBlock = (byte) Block.stone.blockID;
-							} else if(y >= 60 && y <= 65) {
-								surfaceBlock = Block.grass.blockID;
-								groundBlock = Block.dirt.blockID;
-								if(gravelBed) {
-									surfaceBlock = 0;
-								}
-
-								if(gravelBed) {
-									groundBlock = Block.gravel.blockID;
-								}
-
-								if(sandBeach) {
-									surfaceBlock = Block.sand.blockID;
-								}
-
-								if(sandBeach) {
-									groundBlock = Block.sand.blockID;
-								}
-							}
-
-							if(y < SEA_LEVEL && surfaceBlock == 0) {
-								surfaceBlock = Block.waterStill.blockID;
-							}
-
-							dirtRemaining = dirtDepth;
-							if(y >= 63) {
-								blocks[blockIndex] = (byte) surfaceBlock;
-							} else {
-								blocks[blockIndex] = (byte) groundBlock;
-							}
-						} else if(dirtRemaining > 0) {
-							--dirtRemaining;
-							blocks[blockIndex] = (byte) groundBlock;
-						}
-					}
-
-					--blockIndex;
-				}
+				BiomeGenerator biome = this.worldObj.worldType.getBiomeProvider().getBiomeFromID(chunk.getBiomeID(x, z));
+				biome.replaceBlocksForBiomeColumn(this.worldObj, this.rand, chunkX, chunkZ, x, z, blocks, SEA_LEVEL, sandBeach, gravelBed, dirtDepth);
 			}
 		}
 	}
 
 	/**
-	 * Decoration stage: four ore passes (coal generously, iron a third as much,
-	 * gold and diamond only when the chunk-local chance hits) followed by the
-	 * tree line derived from the mob-spawn noise. Re-seeds the chunk RNG first
-	 * so decoration is reproducible per chunk.
+	 * Decoration stage. Re-seeds the chunk RNG first so decoration is
+	 * reproducible per chunk, resolves the {@link BiomeGenerator} at the chunk's
+	 * center column (baseX + 8, baseZ + 8) and delegates to its two decoration
+	 * phases: {@link BiomeGenerator#populateOres} (ore veins) and then
+	 * {@link BiomeGenerator#decorate} (trees and anything else). The tree-count
+	 * noise is read from the provider-owned {@link #mobSpawnerNoise} and passed
+	 * into the biome so the biome stays noise-generator-free.
 	 */
 	@Override
 	public final void populate(IChunkProvider chunkProvider, int chunkX, int chunkZ) {
@@ -272,46 +228,10 @@ public final class ChunkProviderGenerate420 extends ChunkProviderGenerate {
 		int baseX = chunkX << 4;
 		int baseZ = chunkZ << 4;
 
-		// The ore passes run as stream repeats; each placeOreVein call consumes
-		// the shared Random in the same order as the original build.
-		WorldGenMinable coalVein = new WorldGenMinable(Block.oreCoal.blockID);
-		WorldGenMinable ironVein = new WorldGenMinable(Block.oreIron.blockID);
-		IntStream.range(0, 20).forEach(i -> placeOreVein(coalVein, 128, baseX, baseZ));
-		IntStream.range(0, 10).forEach(i -> placeOreVein(ironVein, 64, baseX, baseZ));
+		BiomeGenerator center = this.worldObj.worldType.getBiomeProvider().getBiome(baseX + 8, baseZ + 8);
+		center.populateOres(this.worldObj, this.rand, baseX, baseZ);
 
-		WorldGenMinable goldVein = new WorldGenMinable(Block.oreGold.blockID);
-		WorldGenMinable diamondVein = new WorldGenMinable(Block.oreDiamond.blockID);
-		if(this.rand.nextInt(2) == 0) {
-			placeOreVein(goldVein, 32, baseX, baseZ);
-		}
-
-		if(this.rand.nextInt(8) == 0) {
-			placeOreVein(diamondVein, 16, baseX, baseZ);
-		}
-
-		int treeCount = (int) (this.mobSpawnerNoise.noiseGenerator((double) baseX * 0.05D, (double) baseZ * 0.05D) - this.rand.nextDouble());
-		if(treeCount < 0) {
-			treeCount = 0;
-		}
-
-		WorldGenBigTree bigTree = new WorldGenBigTree();
-		if(this.rand.nextInt(100) == 0) {
-			++treeCount;
-		}
-
-		IntStream.range(0, treeCount).forEach(i -> {
-			int treeX = baseX + this.rand.nextInt(16) + 8;
-			int treeZ = baseZ + this.rand.nextInt(16) + 8;
-			bigTree.setScale(1.0D, 1.0D, 1.0D);
-			bigTree.generate(this.worldObj, this.rand, treeX, this.worldObj.getHeightValue(treeX, treeZ), treeZ);
-		});
-	}
-
-	/** Drops a single ore vein at a random cell of the chunk's base coordinates. */
-	private final void placeOreVein(WorldGenMinable vein, int yUpperBound, int baseX, int baseZ) {
-		int x = baseX + this.rand.nextInt(16);
-		int y = this.rand.nextInt(yUpperBound);
-		int z = baseZ + this.rand.nextInt(16);
-		vein.generate(this.worldObj, this.rand, x, y, z);
+		double treeNoise = this.mobSpawnerNoise.noiseGenerator(baseX * 0.05D, baseZ * 0.05D);
+		center.decorate(this.worldObj, this.rand, baseX, baseZ, treeNoise);
 	}
 }

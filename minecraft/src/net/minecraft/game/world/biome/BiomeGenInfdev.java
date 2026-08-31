@@ -1,0 +1,172 @@
+package net.minecraft.game.world.biome;
+
+import java.util.Random;
+import java.util.stream.IntStream;
+import net.minecraft.game.world.World;
+import net.minecraft.game.world.block.Block;
+import net.minecraft.game.world.terrain.generate.WorldGenBigTree;
+import net.minecraft.game.world.terrain.generate.WorldGenMinable;
+
+/**
+ * The only {@link BiomeGenerator} of this stage, and the one that embodies the
+ * version's default terrain behaviour. Everything it does is byte-for-byte the
+ * surface and decoration logic that used to live inline in
+ * {@code ChunkProviderGenerate420.replaceBlocks} and {@code ...}.populate:
+ *
+ * <ul>
+ *   <li>{@link #replaceBlocksForBiomeColumn} stamps the per-column surface
+ *       (grass over dirt above sea level, sand beaches, gravel beds, bare stone
+ *       or still water underwater), using the beach/gravel/dirt values the
+ *       chunk provider computes and passes in.</li>
+ *   <li>{@link #populateOres} drops the four ore passes (coal generously, iron
+ *       a third as much, gold and diamond only on a chunk-local chance).</li>
+ *   <li>{@link #decorate} places the tree line derived from the tree-count
+ *       noise the provider passes in.</li>
+ * </ul>
+ *
+ * <p>{@code topBlock} / {@code fillerBlock} keep the canonical grass-over-dirt
+ * defaults, and {@link #getBiomeID} is 0 (the single registered biome id).
+ */
+public final class BiomeGenInfdev extends BiomeGenerator {
+	/** Shared instance — the biome is stateless and there is only one of it. */
+	public static final BiomeGenInfdev INSTANCE = new BiomeGenInfdev();
+
+	/** The single biome id stored in chunk biome arrays. */
+	private static final int BIOME_ID = 0;
+
+	private BiomeGenInfdev() {
+	}
+
+	@Override
+	public final int getBiomeID() {
+		return BIOME_ID;
+	}
+
+	/**
+	 * Replaces the surface of one column. This is the exact top-down walk that
+	 * used to live in {@code ChunkProviderGenerate420.replaceBlocks}: it finds
+	 * the first stone cell below the air, decides the surface/filler blocks
+	 * from the passed-in depth/beach/gravel state, and buries {@code dirtDepth}
+	 * filler blocks beneath the cap.
+	 */
+	@Override
+	public final void replaceBlocksForBiomeColumn(
+			World world, Random rand,
+			int chunkX, int chunkZ, int x, int z,
+			byte[] blocks, int seaLevel,
+			boolean sandBeach, boolean gravelBed, int dirtDepth) {
+		// Start the column walk at the top cell (x, z, 127) and step down one
+		// cell at a time; each subsequent blockIndex is one cell lower.
+		int blockIndex = x << 11 | z << 7 | 127;
+		int dirtRemaining = -1;
+		int surfaceBlock = this.topBlock();
+		int groundBlock = this.fillerBlock();
+
+		for(int y = 127; y >= 0; --y) {
+			if(blocks[blockIndex] == 0) {
+				dirtRemaining = -1;
+			} else if(blocks[blockIndex] == Block.stone.blockID) {
+				if(dirtRemaining == -1) {
+					if(dirtDepth <= 0) {
+						surfaceBlock = 0;
+						groundBlock = Block.stone.blockID;
+					} else if(y >= 60 && y <= 65) {
+						surfaceBlock = this.topBlock();
+						groundBlock = this.fillerBlock();
+						if(gravelBed) {
+							surfaceBlock = 0;
+						}
+
+						if(gravelBed) {
+							groundBlock = Block.gravel.blockID;
+						}
+
+						if(sandBeach) {
+							surfaceBlock = Block.sand.blockID;
+						}
+
+						if(sandBeach) {
+							groundBlock = Block.sand.blockID;
+						}
+					}
+
+					if(y < seaLevel && surfaceBlock == 0) {
+						surfaceBlock = Block.waterStill.blockID;
+					}
+
+					dirtRemaining = dirtDepth;
+					if(y >= 63) {
+						blocks[blockIndex] = (byte)surfaceBlock;
+					} else {
+						blocks[blockIndex] = (byte)groundBlock;
+					}
+				} else if(dirtRemaining > 0) {
+					--dirtRemaining;
+					blocks[blockIndex] = (byte)groundBlock;
+				}
+			}
+
+			--blockIndex;
+		}
+	}
+
+	/**
+	 * Decoration stage, ore portion: four ore passes (coal generously, iron a
+	 * third as much, gold and diamond only when the chunk-local chance hits).
+	 * The chunk provider has already re-seeded {@code rand} so the draw order
+	 * here is reproducible per chunk.
+	 */
+	@Override
+	public final void populateOres(World world, Random rand, int baseX, int baseZ) {
+		WorldGenMinable coalVein = new WorldGenMinable(Block.oreCoal.blockID);
+		WorldGenMinable ironVein = new WorldGenMinable(Block.oreIron.blockID);
+		IntStream.range(0, 20).forEach(i -> placeOreVein(world, rand, coalVein, 128, baseX, baseZ));
+		IntStream.range(0, 10).forEach(i -> placeOreVein(world, rand, ironVein, 64, baseX, baseZ));
+
+		WorldGenMinable goldVein = new WorldGenMinable(Block.oreGold.blockID);
+		WorldGenMinable diamondVein = new WorldGenMinable(Block.oreDiamond.blockID);
+		if(rand.nextInt(2) == 0) {
+			placeOreVein(world, rand, goldVein, 32, baseX, baseZ);
+		}
+
+		if(rand.nextInt(8) == 0) {
+			placeOreVein(world, rand, diamondVein, 16, baseX, baseZ);
+		}
+	}
+
+	/**
+	 * Decoration stage, non-ore portion: the tree line. {@code treeNoise} is the
+	 * provider-computed tree-count noise for this chunk's origin, so the biome
+	 * does not own the noise generator. The seed for {@code rand} was already
+	 * fixed by the provider and the ore draw above has run, so the RNG draw
+	 * order matches the original build exactly.
+	 */
+	@Override
+	public final void decorate(World world, Random rand, int baseX, int baseZ, double treeNoise) {
+		int treeCount = (int)(treeNoise - rand.nextDouble());
+		if(treeCount < 0) {
+			treeCount = 0;
+		}
+
+		WorldGenBigTree bigTree = new WorldGenBigTree();
+		if(rand.nextInt(100) == 0) {
+			++treeCount;
+		}
+
+		int count = treeCount;
+		for(int i = 0; i < count; ++i) {
+			int treeX = baseX + rand.nextInt(16) + 8;
+			int treeZ = baseZ + rand.nextInt(16) + 8;
+			bigTree.setScale(1.0D, 1.0D, 1.0D);
+			bigTree.generate(world, rand, treeX, world.getHeightValue(treeX, treeZ), treeZ);
+		}
+	}
+
+	/** Drops a single ore vein at a random cell of the chunk's base coordinates. */
+	private final void placeOreVein(World world, Random rand, WorldGenMinable vein, int yUpperBound, int baseX, int baseZ) {
+		int x = baseX + rand.nextInt(16);
+		int y = rand.nextInt(yUpperBound);
+		int z = baseZ + rand.nextInt(16);
+		vein.generate(world, rand, x, y, z);
+	}
+}

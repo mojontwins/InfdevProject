@@ -1,211 +1,210 @@
-# Biome System Design (Infdev 20100420)
+# Biome System Reference (Infdev 20100420)
 
-This document describes how the engine will be prepared to support biomes in the
-future. Nothing here is implemented yet — it is the design to review and refine
-before any code is written. The goal of this stage is to **establish the
-plumbing**, not to add real biome variety. Only one biome exists today
-(`BiomeGenInfdev`), and everything is wired so that adding real biomes later
-means adding subclasses, not restructuring.
+This document describes the biome plumbing as implemented. It is **not** a
+design proposal — it is a reference for readers and future work. The goal of this
+stage was to establish the plumbing so that real biomes can be added later by
+*adding subclasses*, not by restructuring. Today exactly one biome exists
+(`BiomeGenInfdev`) and the world behaves exactly as before the refactor.
+
+> Class naming: the codebase spells the concrete generator `ChunkProviderGenerate420`
+> (not `...Infdev420`).
 
 ---
 
-## 1. The two abstractions
+## 1. Overview
 
-The design splits terrain variation into two cooperating pieces, mirroring how
+Terrain variation is split between two cooperating abstractions, mirroring how
 later Minecraft versions separated "which biome is here" from "what a biome
-looks like".
+looks like":
 
-### 1.1 `BiomeProvider` (abstract)
+- **`BiomeProvider`** — answers *"which biome is at a position?"* It owns no
+  terrain state; it only hands out `BiomeGenerator`s by world position.
+- **`BiomeGenerator`** — answers *"what terrain does this biome make?"* It owns
+  the surface replacement and decoration behaviour for one biome.
 
-Answers the question **"which biome is at a position?"** It has no terrain
-state of its own.
+Data flow during chunk generation:
+
+```
+provideChunk(chunkX, chunkZ)
+  1. biomeProvider.getBiomes(x0, z0, 16, 16)  -> BiomeGenerator[256]
+  2. chunk.setBiome(x, z, id) per column        -> chunk.biomes byte[256]
+  3. generateTerrain(...)                        -> raw stone/water volume
+  4. replaceBlocks(...)                          -> per column, biome.replaceBlocksForBiomeColumn(...)
+  5. chunk.generateHeightMap()
+  (later) populate(...)                          -> center biome populateOres + decorate
+```
+
+The `BiomeProvider` lives on the `WorldType` (see §5), so every world type
+selects both its generator and its biome distribution.
+
+---
+
+## 2. The abstractions
+
+### 2.1 `BiomeProvider` (abstract)
+
+`net.minecraft.game.world.biome.BiomeProvider`
 
 ```java
 public abstract class BiomeProvider {
-    /** The biome at a single world column (x, z). */
     public abstract BiomeGenerator getBiome(int x, int z);
-
-    /**
-     * A 2-D block of biomes covering [x0, x0+xSize) x [z0, z0+zSize).
-     * Called with chunk origins and 16x16 sizes. The returned array is
-     * indexed z-major: index = z * xSize + x.
-     */
     public abstract BiomeGenerator[] getBiomes(int x0, int z0, int xSize, int zSize);
-
-    /** Resolves a stored biome id (byte in the chunk) back to a BiomeGenerator. */
     public abstract BiomeGenerator getBiomeFromID(int id);
 }
 ```
 
-The array form exists because a chunk wants one contiguous lookup: when a chunk
-is generated, `provideChunk` asks the provider for a whole 16×16 block at once,
-so the chunk can persist it as a flat array (see §4).
+- `getBiome(x, z)` — the biome for a single world column.
+- `getBiomes(x0, z0, xSize, zSize)` — a 2-D block of biomes covering
+  `[x0, x0+xSize) × [z0, z0+zSize)`. Called with chunk origins and `16x16`; the
+  returned array is **z-major**: `index = z * xSize + x`. This block form exists
+  so a chunk fetches its whole grid in one call and stores it flat.
+- `getBiomeFromID(id)` — resolves a stored byte id (from a chunk's biome grid)
+  back to the `BiomeGenerator` it names. This is the registry lookup used by
+  `World.getBiome` and by the surface pass when a loaded chunk restores its grid.
 
-### 1.2 `BiomeGenerator` (abstract)
+### 2.2 `BiomeGenerator` (abstract)
 
-Answers the question **"what terrain does this biome make?"** It owns the
-surface replacement and decoration behavior for a biome.
+`net.minecraft.game.world.biome.BiomeGenerator`
 
 ```java
 public abstract class BiomeGenerator {
-    /** The byte id stored in the chunk. BiomeGenInfdev is id 0. */
     public abstract int getBiomeID();
 
-    /** The surface block (defaults to Block.grass.blockID). */
-    public int topBlock() { return Block.grass.blockID; }
+    public int topBlock()    { return Block.grass.blockID; }
+    public int fillerBlock() { return Block.dirt.blockID;  }
 
-    /** The block under the surface (defaults to Block.dirt.blockID). */
-    public int fillerBlock() { return Block.dirt.blockID; }
-
-    /**
-     * Replaces the surface of one (x, z) column of a chunk.
-     * The chunk-provider computes the per-column terrain noise and passes it in
-     * so the biome does not own the noise generators (see §3.1).
-     */
     public abstract void replaceBlocksForBiomeColumn(
-        World world, Random rand,
-        int chunkX, int chunkZ, int x, int z,
-        byte[] blocks, int seaLevel,
-        boolean sandBeach, boolean gravelBed, int dirtDepth);
+            World world, Random rand,
+            int chunkX, int chunkZ, int x, int z,
+            byte[] blocks, int seaLevel,
+            boolean sandBeach, boolean gravelBed, int dirtDepth);
 
-    /** Drops the ore veins for the chunk this biome decorates. */
     public abstract void populateOres(World world, Random rand, int baseX, int baseZ);
-
-    /** Places everything else (trees, …) for the chunk's center biome. */
     public abstract void decorate(World world, Random rand, int baseX, int baseZ, double treeNoise);
 }
 ```
 
-`topBlock`/`fillerBlock` are the canonical vanilla defaults (grass over dirt)
-and are overridable by future biomes.
+- `getBiomeID()` — the byte stored in the chunk's biome grid (`BiomeGenInfdev`
+  is id `0`).
+- `topBlock()` / `fillerBlock()` — the surface and sub-surface blocks. They
+  default to the canonical grass-over-dirt pairing and are the extension point a
+  future biome overrides to change its material (sand, snow, packed stone, …).
+- `replaceBlocksForBiomeColumn(...)` — stamps one `(x, z)` column of a chunk's
+  block buffer. It receives the **per-column terrain noise already computed by
+  the provider** (`sandBeach`, `gravelBed`, `dirtDepth`, `seaLevel`) rather than
+  owning noise generators (see §3.1).
+- `populateOres(...)` / `decorate(...)` — the two decoration phases invoked on
+  the chunk's **center biome** (§3.2): ores first, then everything else (trees).
 
 ---
 
-## 2. The two concrete classes
+## 3. The concrete classes
 
-### 2.1 `BiomeGenInfdev` (the only `BiomeGenerator` today)
+### 3.1 `BiomeProviderInfdev` — the only `BiomeProvider`
 
-Reproduces exactly the surface and decoration behavior that
-`ChunkProviderGenerate420` already performs today.
+`net.minecraft.game.world.biome.BiomeProviderInfdev` (final)
 
-- `replaceBlocksForBiomeColumn` — the current surface/beach/gravel/dirt logic
-  (grass above sea level, sand beaches, gravel beds, bare stone or water
-  underwater), using the `sandBeach`, `gravelBed`, `dirtDepth` and `seaLevel`
-  values passed in.
-- `populateOres` — the current coal/iron/gold/diamond vein placement.
-- `decorate` — the current tree placement.
-- `topBlock` → `Block.grass.blockID`, `fillerBlock` → `Block.dirt.blockID`
-  (unchanged from the defaults).
+Always resolves to `BiomeGenInfdev.INSTANCE`:
 
-### 2.2 `BiomeProviderInfdev` (the only `BiomeProvider` today)
+- `getBiome(x, z)` → `BiomeGenInfdev.INSTANCE`
+- `getBiomes(...)` → a `xSize * zSize` array filled with `BiomeGenInfdev.INSTANCE`
+- `getBiomeFromID(id)` → `BiomeGenInfdev.INSTANCE` for any id (only one biome is
+  registered, so any stored id, including unknown ones from a future save,
+  resolves to the default world biome).
 
-Always returns `BiomeGenInfdev`:
+It is stateless, so a single shared instance is safe (the owning `WorldType` is
+itself a shared singleton). This is the natural place a future noise-driven
+distribution will appear: `getBiome`/`getBiomes` would consult a noise field and
+return different `BiomeGenerator`s by position, and `getBiomeFromID` would use a
+real id→biome table.
 
-- `getBiome(x, z)` → `BiomeGenInfdev`
-- `getBiomes(...)` → a block filled with `BiomeGenInfdev`
-- `getBiomeFromID(id)` → `BiomeGenInfdev` for any id (only one biome is
-  registered, id 0, so any stored id resolves to it).
+### 3.2 `BiomeGenInfdev` — the only `BiomeGenerator`
 
----
+`net.minecraft.game.world.biome.BiomeGenInfdev` (final)
 
-## 3. Wiring into the chunk provider
+Reproduces byte-for-byte the surface and decoration behaviour that used to live
+inline in `ChunkProviderGenerate420`. It is exposed as a stateless singleton
+`INSTANCE` and reports `getBiomeID() == 0`.
 
-### 3.1 Surface pass — `replaceBlocks`
+**`replaceBlocksForBiomeColumn(...)`** — the exact top-down column walk that was
+`ChunkProviderGenerate420.replaceBlocks`'s inner loop. It finds the first stone
+cell below the air, picks the surface/filler blocks from the `dirtDepth` /
+`sandBeach` / `gravelBed` state (plus `seaLevel` for the underwater-water rule)
+and buries `dirtDepth` filler blocks under the cap. `topBlock()`/`fillerBlock()`
+supply the grass/dirt defaults. The hardcoded `y >= 60 && y <= 65` beach band and
+`y >= 63` cap line are preserved exactly.
 
-Today `ChunkProviderGenerate420.replaceBlocks` walks every column, computes the
-per-column surface noise from its own private `noiseGen4`/`noiseGen5` generators
-(plus `rand`), and stamps the surface directly into the block array.
+**`populateOres(world, rand, baseX, baseZ)`** — the four ore passes (coal ×20,
+iron ×10, gold and diamond on a chunk-local chance), moved verbatim.
 
-After the change:
-
-- `ChunkProviderGenerate.provideChunk` fills the chunk's 16×16 biome array from
-  the `BiomeProvider` (see §4) and then calls `replaceBlocks(chunkX, chunkZ,
-  blocks, chunk)`.
-- `ChunkProviderGenerate420.replaceBlocks` keeps its loop and keeps computing
-  `sandBeach` / `gravelBed` / `dirtDepth` from **its own** `noiseGen4`/`noiseGen5`
-  (these stay private to the provider), but for each column it looks up that
-  column's biome from the chunk and delegates the actual block stamping to:
-
-  ```java
-  biome.replaceBlocksForBiomeColumn(worldObj, rand, chunkX, chunkZ, x, z,
-                                    blocks, SEA_LEVEL, sandBeach, gravelBed, dirtDepth);
-  ```
-
-**Why the loop lives in the provider and not the base class:** the surface noise
-generators are constructed in a load-bearing order inside `ChunkProviderGenerate420`'s
-constructor. Removing them would change the seed stream and therefore the terrain
-and tree placement. So the noise stays provider-owned and is **passed into** the
-biome — a future biome can then decide to ignore it or vary its surface using the
-same inputs. `ChunkProviderGenerate.replaceBlocks` remains an abstract stage.
-
-### 3.2 Decoration — `populate`
-
-`ChunkProviderGenerate420.populate(chunkProvider, chunkX, chunkZ)`:
-
-1. Re-seeds the chunk `rand` (unchanged, so decoration stays reproducible).
-2. Computes the chunk's base origin `baseX = chunkX << 4`, `baseZ = chunkZ << 4`.
-3. Resolves the **center biome**: `getBiome(baseX + 8, baseZ + 8)`.
-4. Calls `biome.populateOres(worldObj, rand, baseX, baseZ)`.
-5. Calls `biome.decorate(worldObj, rand, baseX, baseZ, treeNoise)` where
-   `treeNoise = mobSpawnerNoise.noiseGenerator(baseX * 0.05, baseZ * 0.05)`.
-
-**Behavior fidelity:** the ore logic (steps that consume `rand` via
-`nextInt`) runs first in `populateOres`, then the tree logic in `decorate` —
-splitting sequentially preserves the exact order of `rand` consumption. The tree
-count noise is computed by the provider (which still owns `mobSpawnerNoise`) and
-passed in, following the same "pass the noise, don't give the biome the
-generator" rule as the surface pass.
-
-`decorate` then does `treeCount = (int)(treeNoise − rand.nextDouble())`, the
-bonus tree roll, and places the trees — exactly the current behavior.
+**`decorate(world, rand, baseX, baseZ, treeNoise)`** — the tree line:
+`treeCount = (int)(treeNoise − rand.nextDouble())`, the bonus tree roll
+(`rand.nextInt(100) == 0`), and placement via `WorldGenBigTree`. `treeNoise` is
+computed by the provider and passed in (see §3.2 below).
 
 ---
 
-## 4. Per-chunk biome storage (Chunk)
-
-Each `Chunk` stores the 16×16 biome grid as a flat `byte[]` of biome ids,
-256 bytes, indexed z-major (`z << 4 | x`, matching the height map convention):
-
-```java
-private byte[] biomes = new byte[16 * 16];
-
-public int getBiomeID(int x, int z) { return this.biomes[z << 4 | x] & 255; }
-public void setBiome(int x, int z, int id) {
-    this.biomes[z << 4 | x] = (byte) id;
-    this.isModified = true;
-}
-```
+## 4. Loading the biome grid into a chunk
 
 ### 4.1 Filling during generation
 
-`ChunkProviderGenerate.provideChunk` fills the array before any terrain is
-drawn:
+`ChunkProviderGenerate.provideChunk` (base class) fills the grid before any
+terrain is drawn:
 
 ```java
-BiomeGenerator[] biomes = this.worldObj.worldType.getBiomeProvider()
-        .getBiomes(chunkX << 4, chunkZ << 4, 16, 16);
-for (int x = 0; x < 16; x++)
-    for (int z = 0; z < 16; z++)
-        chunk.setBiome(x, z, biomes[z << 4 | x].getBiomeID());
+this.fillBiomeArray(chunk, chunkX, chunkZ);   // chunk.setBiome(x, z, id) per column
+this.generateTerrain(chunkX, chunkZ, blocks);
+this.replaceBlocks(chunkX, chunkZ, blocks, chunk);
 ```
 
-### 4.2 Persistence
+`fillBiomeArray` calls `worldType.getBiomeProvider().getBiomes(chunkX << 4,
+chunkZ << 4, 16, 16)` and stores one id per column. `BiomeProviderInfdev.getBiomes`
+consumes **no** `Random`, so inserting this before `generateTerrain` does not
+perturb the chunk's RNG stream.
 
-The array is serialized with the rest of the chunk data:
+### 4.2 Storage
 
-- **Save** (`writeChunkNBTData`): `nbtTag.setByteArray("Biomes", this.biomes)`.
-- **Load** (`readChunkNBTData`): read `getByteArray("Biomes")`. NBT's
-  `getByteArray` returns an empty (shared) array when the key is absent, so if
-  `length != 256` the chunk initializes a fresh zero-filled `byte[256]` — all
-  `BiomeGenInfdev` (id 0). This keeps **old save files fully backward
-  compatible** (no `Biomes` tag → every column is `BiomeGenInfdev`, which is the
-  only behavior the engine knows today).
+`Chunk` holds the grid as a flat `byte[16*16]`, indexed z-major to match the
+height map (`z << 4 | x`):
+
+```java
+private byte[] biomes = new byte[SECTION_SIZE * SECTION_SIZE];
+
+public int  getBiomeID(int x, int z) { return this.biomes[z << HEIGHTMAP_Z_SHIFT | x] & 255; }
+public void setBiome(int x, int z, int id) { this.biomes[z << HEIGHTMAP_Z_SHIFT | x] = (byte) id; this.isModified = true; }
+```
+
+### 4.3 Persistence
+
+- **Save** (`Chunk.writeChunkNBTData`): `nbtTag.setByteArray("Biomes", this.biomes)`.
+- **Load** (`Chunk.readChunkNBTData`): reads `getByteArray("Biomes")`. NBT's
+  `getByteArray` returns a shared **empty** array when the key is absent, so if
+  `length != 256` the chunk allocates a fresh zero-filled `byte[256]` — every
+  cell becomes biome id `0` (`BiomeGenInfdev`). **Old save files without a
+  `Biomes` tag therefore load as all-Infdev, exactly the only behaviour the
+  engine knows today**, and are re-saved with the tag on the next write.
 
 ---
 
-## 5. World access & WorldType
+## 5. World access & WorldType wiring
 
-### 5.1 `World.getBiome(x, z)`
+### 5.1 `WorldType` owns the `BiomeProvider`
+
+`WorldType` gained a final `BiomeProvider` field, an accessor, and a constructor
+parameter:
+
+```java
+private final BiomeProvider biomeProvider;
+public final BiomeProvider getBiomeProvider() { return this.biomeProvider; }
+```
+
+`WORLDTYPE_420` registers `new BiomeProviderInfdev()`:
+
+```java
+new WorldType(..., ChunkProviderGenerate420::new, new BiomeProviderInfdev())
+```
+
+### 5.2 `World.getBiome(x, z)`
 
 Added to `World` (mirrors `getHeightValue`):
 
@@ -216,80 +215,123 @@ public final BiomeGenerator getBiome(int x, int z) {
 }
 ```
 
-It extracts the chunk at `(x>>4, z>>4)` and reads the biome at `(x&15, z&15)`
-from the chunk's stored grid.
-
-### 5.2 `BiomeProvider` is part of `WorldType`
-
-`WorldType` grows a `BiomeProvider`:
-
-```java
-private final BiomeProvider biomeProvider;
-
-public BiomeProvider getBiomeProvider() { return this.biomeProvider; }
-```
-
-The constructor gains a `BiomeProvider` parameter, and the single `WORLDTYPE_420`
-registers `new BiomeProviderInfdev()`. Because `WorldType` instances are shared
-singletons and `BiomeProviderInfdev` is stateless, a single shared instance is
-safe and requires no factory ceremony. A future world type can register its own
-`BiomeProvider`.
+It extracts the chunk at `(x >> 4, z >> 4)` and resolves the biome id stored at
+the `(x & 15, z & 15)` cell through the world type's `BiomeProvider`.
 
 ---
 
-## 6. Package layout
+## 6. Surface pass and decoration
 
-New package `net.minecraft.game.world.biome` (additive — no existing package is
-restructured):
+### 6.1 Surface pass — `ChunkProviderGenerate420.replaceBlocks`
+
+The concrete loop still lives in this class (not the base) because the
+per-column surface noise generators are loaded there in a **load-bearing
+construction order**:
+
+```java
+protected final void replaceBlocks(int chunkX, int chunkZ, byte[] blocks, Chunk chunk) {
+    for (int x = 0; x < 16; ++x)
+        for (int z = 0; z < 16; ++z) {
+            double worldX = (double)((chunkX << 4) + x);
+            double worldZ = (double)((chunkZ << 4) + z);
+            boolean sandBeach = this.noiseGen4.generateNoiseOctaves(worldX * (1.0D/32.0D), worldZ * (1.0D/32.0D), 0.0D) + this.rand.nextDouble() * 0.2D > 0.0D;
+            boolean gravelBed = this.noiseGen4.generateNoiseOctaves(worldZ * (1.0D/32.0D), 109.0134D, worldX * (1.0D/32.0D)) + this.rand.nextDouble() * 0.2D > 3.0D;
+            int dirtDepth = (int)(this.noiseGen5.noiseGenerator(worldX * (1.0D/32.0D)*2.0D, worldZ * (1.0D/32.0D)*2.0D) / 3.0D + 3.0D + this.rand.nextDouble() * 0.25D);
+
+            BiomeGenerator biome = this.worldObj.worldType.getBiomeProvider().getBiomeFromID(chunk.getBiomeID(x, z));
+            biome.replaceBlocksForBiomeColumn(this.worldObj, this.rand, chunkX, chunkZ, x, z, blocks, SEA_LEVEL, sandBeach, gravelBed, dirtDepth);
+        }
+}
+```
+
+The provider computes the noise with its **own** `noiseGen4`/`noiseGen5` and
+passes the values into the biome. This keeps the noise generator construction
+order (and therefore the world seed stream) byte-identical, and lets a future
+biome decide to ignore the shared inputs or vary its surface from them — without
+ever owning noise state. `ChunkProviderGenerate.replaceBlocks` remains an
+abstract stage (its signature now takes the `Chunk`).
+
+### 6.2 Decoration — `ChunkProviderGenerate420.populate`
+
+```java
+public final void populate(IChunkProvider chunkProvider, int chunkX, int chunkZ) {
+    this.rand.setSeed((long) chunkX * 318279123L + (long) chunkZ * 919871212L);
+    int baseX = chunkX << 4;
+    int baseZ = chunkZ << 4;
+
+    BiomeGenerator center = this.worldObj.worldType.getBiomeProvider().getBiome(baseX + 8, baseZ + 8);
+    center.populateOres(this.worldObj, this.rand, baseX, baseZ);
+
+    double treeNoise = this.mobSpawnerNoise.noiseGenerator(baseX * 0.05D, baseZ * 0.05D);
+    center.decorate(this.worldObj, this.rand, baseX, baseZ, treeNoise);
+}
+```
+
+- Re-seeds the chunk RNG (unchanged, so decoration stays reproducible).
+- Resolves the **center biome** at `(baseX + 8, baseZ + 8)` (the chunk's middle
+  column) and calls its two phases: `populateOres` then `decorate`.
+- The tree-count noise is read from the provider-owned `mobSpawnerNoise` and
+  passed into `decorate`, following the same "pass the noise, don't hand the
+  biome the generator" rule as the surface pass.
+
+---
+
+## 7. Package layout
+
+New (additive) package `net.minecraft.game.world.biome`:
 
 ```
 net.minecraft.game.world.biome
 ├── BiomeProvider.java        (abstract)
-├── BiomeProviderInfdev.java  (concrete — always BiomeGenInfdev)
+├── BiomeProviderInfdev.java  (final — always BiomeGenInfdev)
 ├── BiomeGenerator.java       (abstract)
-└── BiomeGenInfdev.java       (concrete — today's default behavior)
+└── BiomeGenInfdev.java       (final — today's default behaviour, singleton INSTANCE)
 ```
+
+Existing packages are untouched except for the additions listed in §8.
 
 ---
 
-## 7. Files touched (summary)
+## 8. Files touched
 
 | File | Change |
 |------|--------|
-| `biome/BiomeProvider.java` | **new** — abstract lookup interface |
-| `biome/BiomeGenerator.java` | **new** — abstract surface/decorate contract |
-| `biome/BiomeProviderInfdev.java` | **new** — always returns `BiomeGenInfdev` |
-| `biome/BiomeGenInfdev.java` | **new** — today's default behavior |
-| `world/WorldType.java` | add `BiomeProvider` field + accessor; constructor param |
-| `world/chunk/Chunk.java` | add `biomes` byte array; accessors; save/load `Biomes` |
-| `world/World.java` | add `getBiome(x, z)` |
-| `world/terrain/ChunkProviderGenerate.java` | fill chunk biomes in `provideChunk`; thread `Chunk` into `replaceBlocks` |
-| `world/terrain/ChunkProviderGenerate420.java` | `replaceBlocks` → delegate to biome; `populate` → center biome `populateOres`/`decorate` |
+| `net/minecraft/game/world/biome/BiomeProvider.java` | new — abstract lookup interface |
+| `net/minecraft/game/world/biome/BiomeGenerator.java` | new — abstract surface/decorate contract |
+| `net/minecraft/game/world/biome/BiomeProviderInfdev.java` | new — always returns `BiomeGenInfdev` |
+| `net/minecraft/game/world/biome/BiomeGenInfdev.java` | new — today's default behaviour |
+| `net/minecraft/game/world/WorldType.java` | added `BiomeProvider` field + `getBiomeProvider()`, constructor param; `WORLDTYPE_420` passes `new BiomeProviderInfdev()` |
+| `net/minecraft/game/world/chunk/Chunk.java` | added `biomes` byte[256] grid, `getBiomeID`/`setBiome`; save/load `Biomes` NBT tag with all-Infdev fallback |
+| `net/minecraft/game/world/World.java` | added `getBiome(x, z)` |
+| `net/minecraft/game/world/terrain/ChunkProviderGenerate.java` | `provideChunk` fills the biome grid; `replaceBlocks` signature now takes the `Chunk` |
+| `net/minecraft/game/world/terrain/ChunkProviderGenerate420.java` | `replaceBlocks` delegates each column to the biome; `populate` delegates to the center biome's `populateOres`/`decorate` |
 | `README.md` | diary entry |
 
 ---
 
-## 8. Behavior fidelity checklist
+## 9. Behaviour fidelity
 
-1. **Surface noise** stays in `ChunkProviderGenerate420` — RNG construction order
-   of `noiseGen1..mobSpawnerNoise` is untouched, so terrain/tree values do not
-   change.
-2. **Surface stamping** yields identical blocks: the exact sand/gravel/dirt/grass
-   logic is moved verbatim into `BiomeGenInfdev.replaceBlocksForBiomeColumn`,
-   given the same inputs it used to compute inline.
+1. **Surface noise** stays in `ChunkProviderGenerate420` — the `noiseGen1..mobSpawnerNoise`
+   RNG construction order is untouched, so terrain/tree values are unchanged.
+2. **Surface stamping** yields identical blocks: the sand/gravel/dirt/grass logic
+   moved verbatim into `BiomeGenInfdev.replaceBlocksForBiomeColumn`, given the
+   same inputs it used to compute inline.
 3. **Decoration** runs sequentially (`populateOres` then `decorate`), preserving
-   the order of `rand` consumption; the tree-count noise is still read from the
-   provider-owned `mobSpawnerNoise`.
+   the order of `rand` consumption; the tree-count noise is still read from
+   `mobSpawnerNoise`.
 4. **Old saves** load as all-`BiomeGenInfdev` — the only biome the engine has.
+
+Verified by a full-tree `javac -source 1.8 -target 1.8` compile (EXIT 0).
 
 ---
 
-## 9. Future directions (out of scope today)
+## 10. Extending later (out of scope today)
 
-- Add real biomes as `BiomeGenerator` subclasses (desert/sand, forest, ocean…)
-  by defaulting `topBlock`/`fillerBlock` and overriding `replaceBlocksForBiomeColumn`
-  / `populateOres` / `decorate`.
-- Give `BiomeProviderInfdev` a real distribution (noise-driven `getBiome`/`getBiomes`)
-  instead of always returning `BiomeGenInfdev`.
-- Honors `WorldOptions.generateBiomes` (currently an unused placeholder flag) to
-  gate biome generation on a per-world basis.
+- **A real biome** — add a `BiomeGenerator` subclass overriding `topBlock()` /
+  `fillerBlock()` (different material) and/or `replaceBlocksForBiomeColumn`,
+  `populateOres`, `decorate`; give it a unique `getBiomeID()`.
+- **A real distribution** — make `BiomeProviderInfdev.getBiome`/`getBiomes`
+  noise-driven and `getBiomeFromID` map a table of registered ids to
+  `BiomeGenerator`s.
+- **Respect `WorldOptions.generateBiomes`** — currently an unused placeholder
+  flag; gate biome generation on it per world if desired.

@@ -24,6 +24,7 @@ import net.minecraft.game.physics.MovingObjectPosition;
 import net.minecraft.game.physics.Vec3D;
 import net.minecraft.game.world.block.Block;
 import net.minecraft.game.world.block.tileentity.TileEntity;
+import net.minecraft.game.world.biome.BiomeGenerator;
 import net.minecraft.game.world.chunk.Chunk;
 import net.minecraft.game.world.chunk.ChunkProviderLoadOrGenerate;
 import net.minecraft.game.world.chunk.IChunkProvider;
@@ -504,6 +505,17 @@ public class World implements IBlockAccess {
 			Chunk chunk = this.getChunkFromChunkCoords(x >> 4, z >> 4);
 			return chunk.getHeightValue(x & 15, z & 15);
 		}
+	}
+
+	/**
+	 * Returns the biome at the given world column. Extracts the chunk at
+	 * (x &gt;&gt; 4, z &gt;&gt; 4) and resolves the biome id stored at the
+	 * (x &amp; 15, z &amp; 15) cell of its biome grid through the world type's
+	 * {@link net.minecraft.game.world.biome.BiomeProvider}.
+	 */
+	public final BiomeGenerator getBiome(int x, int z) {
+		Chunk chunk = this.getChunkFromChunkCoords(x >> 4, z >> 4);
+		return this.worldType.getBiomeProvider().getBiomeFromID(chunk.getBiomeID(x & 15, z & 15));
 	}
 
 	/**

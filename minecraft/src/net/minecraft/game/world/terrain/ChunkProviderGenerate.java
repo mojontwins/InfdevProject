@@ -3,6 +3,7 @@ package net.minecraft.game.world.terrain;
 import java.util.Random;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.WorldOptions;
+import net.minecraft.game.world.biome.BiomeGenerator;
 import net.minecraft.game.world.chunk.Chunk;
 import net.minecraft.game.world.chunk.IChunkProvider;
 
@@ -56,10 +57,27 @@ public abstract class ChunkProviderGenerate implements IChunkProvider {
 		this.rand.setSeed((long) chunkX * 341873128712L + (long) chunkZ * 132897987541L);
 		byte[] blocks = new byte[-Short.MIN_VALUE];
 		Chunk chunk = new Chunk(this.worldObj, blocks, chunkX, chunkZ);
+		// Stash the biome grid before the surface pass: replaceBlocks consults
+		// the per-column biome, and the grid is later persisted with the chunk.
+		this.fillBiomeArray(chunk, chunkX, chunkZ);
 		this.generateTerrain(chunkX, chunkZ, blocks);
-		this.replaceBlocks(chunkX, chunkZ, blocks);
+		this.replaceBlocks(chunkX, chunkZ, blocks, chunk);
 		chunk.generateHeightMap();
 		return chunk;
+	}
+
+	/**
+	 * Fills the chunk's 16&times;16 biome grid from the world type's
+	 * {@code BiomeProvider}, one id per column.
+	 */
+	protected final void fillBiomeArray(Chunk chunk, int chunkX, int chunkZ) {
+		BiomeGenerator[] biomes =
+				this.worldObj.worldType.getBiomeProvider().getBiomes(chunkX << 4, chunkZ << 4, 16, 16);
+		for(int x = 0; x < 16; ++x) {
+			for(int z = 0; z < 16; ++z) {
+				chunk.setBiome(x, z, biomes[z << 4 | x].getBiomeID());
+			}
+		}
 	}
 
 	@Override
@@ -78,11 +96,18 @@ public abstract class ChunkProviderGenerate implements IChunkProvider {
 	protected abstract void generateTerrain(int chunkX, int chunkZ, byte[] blocks);
 
 	/**
-	 * Replaces the top of the plain stone volume with the world's surface layer:
-	 * grass and dirt, sand beaches, gravel beds, and exposed bare stone under
-	 * water. This is where the version's beach/gravel/dirt noise is consulted.
+	 * Replaces the top of the plain stone volume with the world's surface layer.
+	 * Subclasses walk the chunk's columns, consulting the per-column biome (read
+	 * from {@code chunk}) and the surface noise, and call the biome's own surface
+	 * replacement. This is where the version's beach/gravel/dirt noise is
+	 * consulted.
+	 *
+	 * @param chunkX the chunk's block-coordinate origin along x (&times;16)
+	 * @param chunkZ the chunk's block-coordinate origin along z (&times;16)
+	 * @param blocks the chunk's block id buffer
+	 * @param chunk the chunk being generated (its biome grid is already filled)
 	 */
-	protected abstract void replaceBlocks(int chunkX, int chunkZ, byte[] blocks);
+	protected abstract void replaceBlocks(int chunkX, int chunkZ, byte[] blocks, Chunk chunk);
 
 	/**
 	 * Samples and blends the coarse 5x5x17 noise field for the chunk at these

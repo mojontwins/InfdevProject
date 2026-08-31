@@ -1,6 +1,8 @@
 package net.minecraft.game.world;
 
 import java.util.Arrays;
+import net.minecraft.game.world.biome.BiomeProvider;
+import net.minecraft.game.world.biome.BiomeProviderInfdev;
 import net.minecraft.game.world.terrain.ChunkProviderGenerate;
 import net.minecraft.game.world.terrain.ChunkProviderGenerate420;
 
@@ -21,14 +23,19 @@ import net.minecraft.game.world.terrain.ChunkProviderGenerate420;
  * world types register themselves in {@link #worldTypes}, and their string id
  * is what gets written to level.dat so a saved world can be re-identified on
  * load.
+ *
+ * <p>Alongside the chunk generator a type also owns the {@link BiomeProvider}
+ * that decides which {@link BiomeGenerator} describes each column. Today the
+ * single type uses {@link BiomeProviderInfdev}, which always yields the one
+ * world biome.
  */
 public final class WorldType {
 	/**
 	 * The over-world type for this version's world format
-	 * ({@code inf-20100420}), using {@link ChunkProviderGenerate420} and the
-	 * classic atmosphere values.
+	 * ({@code inf-20100420}), using {@link ChunkProviderGenerate420},
+	 * {@link BiomeProviderInfdev} and the classic atmosphere values.
 	 */
-	public static final WorldType WORLDTYPE_420 = new WorldType("WORLDTYPE_420", "Infdev 420", 10079487L, 16777215L, 11587839L, 120, ChunkProviderGenerate420::new);
+	public static final WorldType WORLDTYPE_420 = new WorldType("WORLDTYPE_420", "Infdev 420", 10079487L, 16777215L, 11587839L, 120, ChunkProviderGenerate420::new, new BiomeProviderInfdev());
 
 	/** All known world types; the order also defines any future selection order. */
 	private static final WorldType[] worldTypes = {WORLDTYPE_420};
@@ -47,12 +54,14 @@ public final class WorldType {
 	private final int cloudHeight;
 	/** Factory that builds the {@link ChunkProviderGenerate} for this type. */
 	private final ChunkProviderFactory chunkProviderFactory;
+	/** The {@link BiomeProvider} that maps every column to a biome for this type. */
+	private final BiomeProvider biomeProvider;
 
 	/**
 	 * Builds a world type. The factory is typically a constructor reference,
 	 * e.g. {@code ChunkProviderGenerate420::new}.
 	 */
-	private WorldType(String id, String description, long skyColor, long cloudColor, long fogColor, int cloudHeight, ChunkProviderFactory chunkProviderFactory) {
+	private WorldType(String id, String description, long skyColor, long cloudColor, long fogColor, int cloudHeight, ChunkProviderFactory chunkProviderFactory, BiomeProvider biomeProvider) {
 		this.id = id;
 		this.description = description;
 		this.skyColor = skyColor;
@@ -60,6 +69,7 @@ public final class WorldType {
 		this.fogColor = fogColor;
 		this.cloudHeight = cloudHeight;
 		this.chunkProviderFactory = chunkProviderFactory;
+		this.biomeProvider = biomeProvider;
 	}
 
 	/** Returns the unique, level.dat-safe id of this type. */
@@ -97,6 +107,11 @@ public final class WorldType {
 	 */
 	public final ChunkProviderGenerate createChunkProvider(World world, long seed, WorldOptions worldOptions) {
 		return this.chunkProviderFactory.create(world, seed, worldOptions);
+	}
+
+	/** Returns the {@link BiomeProvider} that maps columns to biomes for this type. */
+	public final BiomeProvider getBiomeProvider() {
+		return this.biomeProvider;
 	}
 
 	/** Returns the type registered under the given id, or null when unknown. */
