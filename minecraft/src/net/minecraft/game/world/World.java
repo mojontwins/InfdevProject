@@ -32,18 +32,14 @@ import net.minecraft.game.world.path.Pathfinder;
 import util.MathHelper;
 
 public class World implements IBlockAccess {
-		/** Owns the deferred block-light update queue and its processing budget. */
+	/** Owns the deferred block-light update queue and its processing budget. */
 	private LightingManager lightingManager;
-	private List<Entity> loadedEntityList;
 	/** Schedules and fires delayed block ticks (fire, water/lava flow, ...). */
 	private BlockTickScheduler blockTickScheduler;
+	/** Owns the live-entity list, cached counters and the spawn/update/sweep lifecycle. */
+	private EntityManager entityManager;
+
 	public List<TileEntity> loadedTileEntityList;
-	/** Cached count of {@link EntityMonster} instances in {@link #loadedEntityList}.
-	 *  Maintained incrementally at every entity-list mutation site so the
-	 *  {@link MobSpawner} can read it in O(1) without scanning the list. */
-	private int monsterCount;
-	/** Cached count of {@link EntityAnimal} instances in {@link #loadedEntityList}. */
-	private int animalCount;
 	/** Spawns hostile mobs (max 100). Tick-driven from {@link #tick()}. */
 	private MobSpawner monsterSpawner;
 	/** Spawns passive mobs (max 50). Tick-driven from {@link #tick()}. */
@@ -66,7 +62,7 @@ public class World implements IBlockAccess {
 	public int spawnY;
 	public int spawnZ;
 	public boolean isNewWorld;
-	private List<IWorldAccess> worldAccesses;
+	List<IWorldAccess> worldAccesses;
 	private IChunkProvider chunkProvider;
 	private File saveDirectory;
 	private long randomSeed;
@@ -133,8 +129,8 @@ public class World implements IBlockAccess {
 
 	private World(File workingDirectory, String worldName, long randomSeed, WorldOptions worldOptions, WorldType worldType) {
 		this.lightingManager = new LightingManager(this);
-		this.loadedEntityList = new ArrayList<>();
 		this.blockTickScheduler = new BlockTickScheduler(this);
+		this.entityManager = new EntityManager(this);
 		this.loadedTileEntityList = new ArrayList<>();
 		this.worldTime = 0L;
 		this.skylightSubtracted = 0;
@@ -759,18 +755,7 @@ public class World implements IBlockAccess {
 	 * notified so the renderer can request textures.
 	 */
 	public final void spawnEntityInWorld(Entity entity) {
-		int chunkX = MathHelper.floor_double(entity.posX / 16.0D);
-		int chunkZ = MathHelper.floor_double(entity.posZ / 16.0D);
-		if(!this.chunkExists(chunkX, chunkZ)) {
-			System.out.println("Failed to add entity " + entity);
-		} else {
-			this.getChunkFromChunkCoords(chunkX, chunkZ).addEntity(entity);
-			this.loadedEntityList.add(entity);
-			this.updateEntityCountOnAdd(entity);
-			for(int i = 0; i < this.worldAccesses.size(); ++i) {
-				this.worldAccesses.get(i).obtainEntitySkin(entity);
-			}
-		}
+		this.entityManager.spawnEntityInWorld(entity);
 	}
 
 	/** Marks the entity dead so the next levelEntities() pass will remove it. */
@@ -843,100 +828,13 @@ public class World implements IBlockAccess {
 	}
 
 	/**
-	 * Per-tick entity update pass. For every live entity:
-	 * <ol>
-	 *   <li>skip the full update when the entity is farther than
-	 *       {@link #ENTITY_VIEW_DISTANCE_SQ} from the player, but still
-	 *       advance {@code ticksExisted} and, for dropped items, {@code age}
-	 *       so despawn timers stay accurate;</li>
-	 *   <li>otherwise run {@code onUpdate()} and migrate the entity to the
-	 *       correct chunk if it crossed a chunk boundary (using the
-	 *       entity's cached {@code chunkCoordX/Y/Z} fields — no recomputation
-	 *       of old coords);</li>
-	 *   <li>for entities that moved only between vertical segments within the
-	 *       same chunk, swap the entity between the two segment buckets
-	 *       without touching the chunk-level cache.</li>
-	 * </ol>
-	 *
-	 * <p>onUpdate() is wrapped in a silent try/catch so a single misbehaving
-	 * entity cannot freeze the entire tick loop.
+	 * Per-tick entity update pass. Advances every live entity, migrates it to
+	 * the correct chunk when it crosses a boundary, and sweeps dead entities.
+	 * Far-away entities only get their despawn timers advanced. See
+	 * {@link EntityManager#levelEntities()}.
 	 */
 	public final void levelEntities() {
-		Entity player = this.playerEntity;
-		double px = player != null ? player.posX : 0.0D;
-		double py = player != null ? player.posY : 0.0D;
-		double pz = player != null ? player.posZ : 0.0D;
-		boolean hasPlayer = player != null;
-
-		for(int i = 0; i < this.loadedEntityList.size(); ++i) {
-			Entity entity = this.loadedEntityList.get(i);
-
-			if(!entity.isDead) {
-				double dx = hasPlayer ? entity.posX - px : 0.0D;
-				double dy = hasPlayer ? entity.posY - py : 0.0D;
-				double dz = hasPlayer ? entity.posZ - pz : 0.0D;
-				double distSq = dx * dx + dy * dy + dz * dz;
-
-				if(distSq > ENTITY_VIEW_DISTANCE_SQ) {
-					entity.ticksExisted++;
-					if (entity instanceof EntityItem) {
-						((EntityItem) entity).age++;
-					}
-					continue;
-				}
-
-				entity.lastTickPosX = entity.posX;
-				entity.lastTickPosY = entity.posY;
-				entity.lastTickPosZ = entity.posZ;
-				entity.prevRotationYaw = entity.rotationYaw;
-				entity.prevRotationPitch = entity.rotationPitch;
-				try {
-					entity.onUpdate();
-				} catch(Exception ignored) {
-				}
-
-				int newChunkX = MathHelper.floor_double(entity.posX / 16.0D);
-				int newChunkY = MathHelper.floor_double(entity.posY / 16.0D);
-				int newChunkZ = MathHelper.floor_double(entity.posZ / 16.0D);
-
-				if(!entity.addedToChunk
-					|| entity.chunkCoordX != newChunkX
-					|| entity.chunkCoordY != newChunkY
-					|| entity.chunkCoordZ != newChunkZ) {
-
-					if(entity.addedToChunk && this.chunkExists(entity.chunkCoordX, entity.chunkCoordZ)) {
-						this.getChunkFromChunkCoords(entity.chunkCoordX, entity.chunkCoordZ)
-							.removeEntityAtIndex(entity, entity.chunkCoordY);
-					}
-
-					if(this.chunkExists(newChunkX, newChunkZ)) {
-						this.getChunkFromChunkCoords(newChunkX, newChunkZ).addEntity(entity);
-					} else {
-						entity.addedToChunk = false;
-						entity.isDead = true;
-					}
-				}
-			}
-
-			if(entity.isDead) {
-				int deadChunkX = MathHelper.floor_double(entity.posX / 16.0D);
-				int deadChunkZ = MathHelper.floor_double(entity.posZ / 16.0D);
-				if(entity.addedToChunk && this.chunkExists(deadChunkX, deadChunkZ)) {
-					this.getChunkFromChunkCoords(deadChunkX, deadChunkZ)
-						.removeEntityAtIndex(entity, MathHelper.floor_double(entity.posY / 16.0D));
-				}
-				this.loadedEntityList.remove(i--);
-				this.updateEntityCountOnRemove(entity);
-				for(int j = 0; j < this.worldAccesses.size(); ++j) {
-					this.worldAccesses.get(j).releaseEntitySkin(entity);
-				}
-			}
-		}
-
-		for(int i = 0; i < this.loadedTileEntityList.size(); ++i) {
-			TileEntity tile = this.loadedTileEntityList.get(i);
-			tile.updateEntity();
-		}
+		this.entityManager.levelEntities();
 	}
 
 	/**
@@ -1020,7 +918,7 @@ public class World implements IBlockAccess {
 
 	/** Debug helper: returns a one-line summary of all loaded entities. */
 	public final String getDebugLoadedEntities() {
-		return "All: " + this.loadedEntityList.size();
+		return "All: " + this.entityManager.getLoadedEntityList().size();
 	}
 
 	public final Entity getPlayerEntity() {
@@ -1107,7 +1005,7 @@ public class World implements IBlockAccess {
 	 */
 	public final void tick() {
 		this.chunkProvider.unload100OldestChunks();
-		if(!this.loadedEntityList.contains(this.playerEntity)) {
+		if(!this.entityManager.contains(this.playerEntity)) {
 			this.spawnEntityInWorld(this.playerEntity);
 		}
 
@@ -1204,7 +1102,7 @@ public class World implements IBlockAccess {
 	}
 
 	public final List<Entity> getLoadedEntityList() {
-		return this.loadedEntityList;
+		return this.entityManager.getLoadedEntityList();
 	}
 
 	/**
@@ -1220,36 +1118,11 @@ public class World implements IBlockAccess {
 	}
 
 	/**
-	 * Bumps the monster/animal cached counters after a single entity is added to
-	 * {@link #loadedEntityList}. Called by {@link #spawnEntityInWorld} and by the
-	 * bulk-add path ({@link #addLoadedEntities}).
-	 */
-	private void updateEntityCountOnAdd(Entity entity) {
-		if(entity instanceof EntityMonster) {
-			this.monsterCount++;
-		} else if(entity instanceof EntityAnimal) {
-			this.animalCount++;
-		}
-	}
-
-	/**
-	 * Bumps the monster/animal cached counters after a single entity is removed from
-	 * {@link #loadedEntityList}. Called by {@link #updateEntities}.
-	 */
-	private void updateEntityCountOnRemove(Entity entity) {
-		if(entity instanceof EntityMonster) {
-			this.monsterCount--;
-		} else if(entity instanceof EntityAnimal) {
-			this.animalCount--;
-		}
-	}
-
-	/**
 	 * Returns the cached count of live {@link EntityMonster} subclasses in the world.
 	 * O(1) — the value is maintained incrementally at every entity-list mutation site.
 	 */
 	public final int getMonsterCount() {
-		return this.monsterCount;
+		return this.entityManager.getMonsterCount();
 	}
 
 	/**
@@ -1257,7 +1130,7 @@ public class World implements IBlockAccess {
 	 * O(1) — the value is maintained incrementally at every entity-list mutation site.
 	 */
 	public final int getAnimalCount() {
-		return this.animalCount;
+		return this.entityManager.getAnimalCount();
 	}
 
 	/**
@@ -1266,12 +1139,7 @@ public class World implements IBlockAccess {
 	 * the supplied class — avoids a full-list scan per spawner tick.
 	 */
 	public final int getCachedEntityCount(Class<? extends EntityLiving> entityClass) {
-		if(EntityMonster.class.isAssignableFrom(entityClass)) {
-			return this.monsterCount;
-		} else if(EntityAnimal.class.isAssignableFrom(entityClass)) {
-			return this.animalCount;
-		}
-		return this.countEntities(entityClass);
+		return this.entityManager.getCachedEntityCount(entityClass);
 	}
 
 	/**
@@ -1279,14 +1147,7 @@ public class World implements IBlockAccess {
 	 * O(n) over the entity list. Used as fallback for non-hostile/non-passive types.
 	 */
 	public final int countEntities(Class<? extends Entity> entityClass) {
-		int count = 0;
-		for(int i = 0; i < this.loadedEntityList.size(); ++i) {
-			Entity e = this.loadedEntityList.get(i);
-			if(entityClass.isAssignableFrom(e.getClass())) {
-				++count;
-			}
-		}
-		return count;
+		return this.entityManager.countEntities(entityClass);
 	}
 
 	/**
@@ -1294,39 +1155,21 @@ public class World implements IBlockAccess {
 	 * the entity list, updates cached mob counters, and notifies world accesses.
 	 */
 	public final void addLoadedEntities(List<Entity> entities) {
-		this.loadedEntityList.addAll(entities);
-		entities.forEach(this::updateEntityCountOnAdd);
-		for(int i = 0; i < this.worldAccesses.size(); ++i) {
-			IWorldAccess access = this.worldAccesses.get(i);
-			for(Entity e : entities) {
-				access.obtainEntitySkin(e);
-			}
-		}
+		this.entityManager.addLoadedEntities(entities);
 	}
 
 	/**
-	 * Removes every entity in the list from the world in one bulk operation:
-	 * marks each as dead (the {@link #levelEntities()} loop removes dead
-	 * entities from {@code loadedEntityList} in O(1) per entry — avoiding
-	 * the old {@code removeAll(entities)} O(M×N) scan), updates the cached
-	 * mob counters, and notifies world accesses so the renderer drops the
+	 * Marks every entity in the list dead (the {@link #levelEntities()} loop
+	 * removes dead entities from the entity list in O(1) per entry), updates the
+	 * cached mob counters, and notifies world accesses so the renderer drops the
 	 * textures immediately.
 	 *
 	 * <p>Note: the entity's chunk-ownership fields are cleared when the
-	 * {@link #levelEntities()} cleanup pass hits it, so the entity is
-	 * safely released from its chunk without further coordination.
+	 * {@link #levelEntities()} cleanup pass hits it, so the entity is safely
+	 * released from its chunk without further coordination.
 	 */
 	public final void unloadEntities(List<Entity> entities) {
-		for(Entity e : entities) {
-			e.isDead = true;
-			this.updateEntityCountOnRemove(e);
-		}
-		for(int i = 0; i < this.worldAccesses.size(); ++i) {
-			IWorldAccess access = this.worldAccesses.get(i);
-			for(Entity e : entities) {
-				access.releaseEntitySkin(e);
-			}
-		}
+		this.entityManager.unloadEntities(entities);
 	}
 
 	/** Repeatedly unloads the 100 oldest chunks until the chunk provider says nothing is left. */
