@@ -261,7 +261,7 @@ public class World implements IBlockAccess {
 		return y >= 0 && y < 128 ? this.chunkExists(x >> 4, z >> 4) : false;
 	}
 
-	private boolean chunkExists(int chunkX, int chunkZ) {
+	boolean chunkExists(int chunkX, int chunkZ) {
 		return this.chunkProvider.chunkExists(chunkX, chunkZ);
 	}
 
@@ -791,28 +791,7 @@ public class World implements IBlockAccess {
 	 * entity physics to find which solid cells the entity is overlapping.
 	 */
 	public final List<AxisAlignedBB> getCollidingBoundingBoxes(AxisAlignedBB queryBox) {
-		ArrayList<AxisAlignedBB> result = new ArrayList<>();
-		int minX = MathHelper.floor_double(queryBox.minX);
-		int maxX = MathHelper.floor_double(queryBox.maxX + 1.0D);
-		int minY = MathHelper.floor_double(queryBox.minY);
-		int maxY = MathHelper.floor_double(queryBox.maxY + 1.0D);
-		int minZ = MathHelper.floor_double(queryBox.minZ);
-		int maxZ = MathHelper.floor_double(queryBox.maxZ + 1.0D);
-
-		for(int x = minX; x < maxX; ++x) {
-			for(int y = minY; y < maxY; ++y) {
-				for(int z = minZ; z < maxZ; ++z) {
-					Block block = Block.blocksList[this.getBlockId(x, y, z)];
-					if(block != null) {
-						AxisAlignedBB blockAABB = block.getCollisionBoundingBoxFromPool(x, y, z);
-						if(blockAABB != null && queryBox.intersectsWith(blockAABB)) {
-							result.add(blockAABB);
-						}
-					}
-				}
-			}
-		}
-		return result;
+		return EntityQueryService.getCollidingBoundingBoxes(this, queryBox);
 	}
 
 	/**
@@ -966,13 +945,7 @@ public class World implements IBlockAccess {
 	 * {@link MobSpawner} to validate a candidate spawn position.
 	 */
 	public final boolean checkIfAABBIsClear1(AxisAlignedBB box) {
-		List<Entity> entities = this.getEntitiesWithinAABBExcludingEntity((Entity)null, box);
-		for(int i = 0; i < entities.size(); ++i) {
-			if(entities.get(i).preventEntitySpawning) {
-				return false;
-			}
-		}
-		return true;
+		return EntityQueryService.checkIfAABBIsClear1(this, box);
 	}
 
 	/**
@@ -980,27 +953,7 @@ public class World implements IBlockAccess {
 	 * Used by entity physics to know if a position is submerged.
 	 */
 	public final boolean getIsAnyLiquid(AxisAlignedBB box) {
-		int minX = MathHelper.floor_double(box.minX);
-		int maxX = MathHelper.floor_double(box.maxX + 1.0D);
-		int minY = MathHelper.floor_double(box.minY);
-		int maxY = MathHelper.floor_double(box.maxY + 1.0D);
-		int minZ = MathHelper.floor_double(box.minZ);
-		int maxZ = MathHelper.floor_double(box.maxZ + 1.0D);
-		if(box.minX < 0.0D) --minX;
-		if(box.minY < 0.0D) --minY;
-		if(box.minZ < 0.0D) --minZ;
-
-		for(int x = minX; x < maxX; ++x) {
-			for(int y = minY; y < maxY; ++y) {
-				for(int z = minZ; z < maxZ; ++z) {
-					Block block = Block.blocksList[this.getBlockId(x, y, z)];
-					if(block != null && block.blockMaterial.getIsLiquid()) {
-						return true;
-					}
-				}
-			}
-		}
-		return false;
+		return EntityQueryService.getIsAnyLiquid(this, box);
 	}
 
 	/**
@@ -1008,24 +961,7 @@ public class World implements IBlockAccess {
 	 * lava. Used by entity AI to decide whether to take fire damage.
 	 */
 	public final boolean isBoundingBoxBurning(AxisAlignedBB box) {
-		int minX = MathHelper.floor_double(box.minX);
-		int maxX = MathHelper.floor_double(box.maxX + 1.0D);
-		int minY = MathHelper.floor_double(box.minY);
-		int maxY = MathHelper.floor_double(box.maxY + 1.0D);
-		int minZ = MathHelper.floor_double(box.minZ);
-		int maxZ = MathHelper.floor_double(box.maxZ + 1.0D);
-
-		for(int x = minX; x < maxX; ++x) {
-			for(int y = minY; y < maxY; ++y) {
-				for(int z = minZ; z < maxZ; ++z) {
-					int blockID = this.getBlockId(x, y, z);
-					if(blockID == Block.fire.blockID || blockID == Block.lavaMoving.blockID || blockID == Block.lavaStill.blockID) {
-						return true;
-					}
-				}
-			}
-		}
-		return false;
+		return EntityQueryService.isBoundingBoxBurning(this, box);
 	}
 
 	/**
@@ -1034,24 +970,7 @@ public class World implements IBlockAccess {
 	 * water, on ice, etc.
 	 */
 	public final boolean isMaterialInBB(AxisAlignedBB box, Material material) {
-		int minX = MathHelper.floor_double(box.minX);
-		int maxX = MathHelper.floor_double(box.maxX + 1.0D);
-		int minY = MathHelper.floor_double(box.minY);
-		int maxY = MathHelper.floor_double(box.maxY + 1.0D);
-		int minZ = MathHelper.floor_double(box.minZ);
-		int maxZ = MathHelper.floor_double(box.maxZ + 1.0D);
-
-		for(int x = minX; x < maxX; ++x) {
-			for(int y = minY; y < maxY; ++y) {
-				for(int z = minZ; z < maxZ; ++z) {
-					Block block = Block.blocksList[this.getBlockId(x, y, z)];
-					if(block != null && block.blockMaterial == material) {
-						return true;
-					}
-				}
-			}
-		}
-		return false;
+		return EntityQueryService.isMaterialInBB(this, box, material);
 	}
 
 	/**
@@ -1076,27 +995,7 @@ public class World implements IBlockAccess {
 	 * the camera is inside a solid block.
 	 */
 	public final float getBlockDensity(Vec3D target, AxisAlignedBB box) {
-		double stepX = 1.0D / ((box.maxX - box.minX) * 2.0D + 1.0D);
-		double stepY = 1.0D / ((box.maxY - box.minY) * 2.0D + 1.0D);
-		double stepZ = 1.0D / ((box.maxZ - box.minZ) * 2.0D + 1.0D);
-		int hits = 0;
-		int totalRays = 0;
-
-		for(float tX = 0.0F; tX <= 1.0F; tX = (float)((double)tX + stepX)) {
-			for(float tY = 0.0F; tY <= 1.0F; tY = (float)((double)tY + stepY)) {
-				for(float tZ = 0.0F; tZ <= 1.0F; tZ = (float)((double)tZ + stepZ)) {
-					double x = box.minX + (box.maxX - box.minX) * (double)tX;
-					double y = box.minY + (box.maxY - box.minY) * (double)tY;
-					double z = box.minZ + (box.maxZ - box.minZ) * (double)tZ;
-					if(this.rayTraceBlocks(new Vec3D(x, y, z), target) == null) {
-						++hits;
-					}
-					++totalRays;
-				}
-			}
-		}
-
-		return (float)hits / (float)totalRays;
+		return EntityQueryService.getBlockDensity(this, target, box);
 	}
 
 	/**
@@ -1301,20 +1200,7 @@ public class World implements IBlockAccess {
 	 * Used for collision checks and entity-picking.
 	 */
 	public final List<Entity> getEntitiesWithinAABBExcludingEntity(Entity excludeEntity, AxisAlignedBB queryBox) {
-		int minChunkX = MathHelper.floor_double((queryBox.minX - 2.0D) / 16.0D);
-		int maxChunkX = MathHelper.floor_double((queryBox.maxX + 2.0D) / 16.0D);
-		int minChunkZ = MathHelper.floor_double((queryBox.minZ - 2.0D) / 16.0D);
-		int maxChunkZ = MathHelper.floor_double((queryBox.maxZ + 2.0D) / 16.0D);
-		ArrayList<Entity> result = new ArrayList<>();
-
-		for(int chunkX = minChunkX; chunkX <= maxChunkX; ++chunkX) {
-			for(int chunkZ = minChunkZ; chunkZ <= maxChunkZ; ++chunkZ) {
-				if(this.chunkExists(chunkX, chunkZ)) {
-					this.getChunkFromChunkCoords(chunkX, chunkZ).getEntitiesWithinAABBForEntity(excludeEntity, queryBox, result);
-				}
-			}
-		}
-		return result;
+		return EntityQueryService.getEntitiesWithinAABBExcludingEntity(this, excludeEntity, queryBox);
 	}
 
 	public final List<Entity> getLoadedEntityList() {
