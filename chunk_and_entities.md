@@ -1,6 +1,6 @@
 # Chunk Lifecycle and Entity Management
 
-This document describes how Infdev 20100420 manages the world in memory: how chunks are loaded, cached, and evicted, and how entities are tracked, ticked, and cleaned up when their containing chunk leaves the active area.
+This document describes how this modified version of Infdev Minecraft manages the world in memory: how chunks are loaded, cached, and evicted, and how entities are tracked, ticked, and cleaned up when their containing chunk leaves the active area.
 
 ---
 
