@@ -23,6 +23,13 @@ public final class SoundPool {
 		}
 
 		soundName = soundName.replaceAll("/", ".");
+		String fileExt = "";
+		String fileName = file.getName();
+		int extDot = fileName.lastIndexOf('.');
+		if(extDot >= 0 && extDot < fileName.length() - 1) {
+			fileExt = fileName.substring(extDot);
+		}
+		String soundNameForEntry = soundName + fileExt;
 		List<SoundPoolEntry> entries = this.nameToSoundPoolEntriesMapping.get(soundName);
 		if(entries == null) {
 			entries = new ArrayList<>();
@@ -33,7 +40,7 @@ public final class SoundPool {
 		}
 
 		try {
-			SoundPoolEntry entry = new SoundPoolEntry(soundName, file.toURI().toURL());
+			SoundPoolEntry entry = new SoundPoolEntry(soundNameForEntry, file.toURI().toURL());
 			synchronized(entries) {
 				entries.add(entry);
 			}
