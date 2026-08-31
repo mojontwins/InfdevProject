@@ -95,6 +95,12 @@ public abstract class Entity {
 	public int air = 300;
 	private boolean isFirstUpdate = true;
 	public String skinUrl;
+	/** True when this entity has been placed into a chunk's entity list via {@link Chunk#addEntity}. */
+	public boolean addedToChunk = false;
+	/** The chunk coordinates this entity currently belongs to (set by {@link Chunk#addEntity} and updated on every chunk migration). */
+	public int chunkCoordX;
+	public int chunkCoordY;
+	public int chunkCoordZ;
 
 	public Entity(World world) {
 		this.worldObj = world;

@@ -157,7 +157,6 @@ public final void levelEntities() {
             double dy = entity.posY - py;
             double dz = entity.posZ - pz;
             if (dx*dx + dy*dy + dz*dz > ENTITY_VIEW_DISTANCE_SQ) {
-                // Beyond ~45 blocks: skip onUpdate(), but advance timers.
                 entity.ticksExisted++;
                 if (entity instanceof EntityItem) {
                     ((EntityItem) entity).age++;   // despawn countdown
@@ -165,49 +164,48 @@ public final void levelEntities() {
                 continue;
             }
 
-            // ── Full update (nearby entities) ────────────────────────
-            int oldChunkX = MathHelper.floor_double(entity.posX / 16.0D);
-            int oldChunkY = MathHelper.floor_double(entity.posY / 16.0D);
-            int oldChunkZ = MathHelper.floor_double(entity.posZ / 16.0D);
+            entity.onUpdate();
 
-            entity.onUpdate();   // physics, AI, water, fire, etc.
+            // ── Chunk migration (entity-side cache) ─────────────────────
+            int newX = MathHelper.floor_double(entity.posX / 16.0D);
+            int newY = MathHelper.floor_double(entity.posY / 16.0D);
+            int newZ = MathHelper.floor_double(entity.posZ / 16.0D);
 
-            // ── Chunk migration ──────────────────────────────────────
-            int newChunkX = MathHelper.floor_double(entity.posX / 16.0D);
-            int newChunkY = MathHelper.floor_double(entity.posY / 16.0D);
-            int newChunkZ = MathHelper.floor_double(entity.posZ / 16.0D);
+            if (!entity.addedToChunk
+                || entity.chunkCoordX != newX
+                || entity.chunkCoordY != newY
+                || entity.chunkCoordZ != newZ) {
 
-            if (oldChunkX != newChunkX || oldChunkY != newChunkY || oldChunkZ != newChunkZ) {
-                if (this.chunkExists(oldChunkX, oldChunkZ)) {
-                    this.getChunkFromChunkCoords(oldChunkX, oldChunkZ)
-                        .removeEntityAtIndex(entity, oldChunkY);
+                if (entity.addedToChunk && this.chunkExists(entity.chunkCoordX, entity.chunkCoordZ)) {
+                    this.getChunkFromChunkCoords(entity.chunkCoordX, entity.chunkCoordZ)
+                        .removeEntityAtIndex(entity, entity.chunkCoordY);
                 }
-                if (this.chunkExists(newChunkX, newChunkZ)) {
-                    this.getChunkFromChunkCoords(newChunkX, newChunkZ)
-                        .addEntity(entity);
+                if (this.chunkExists(newX, newZ)) {
+                    this.getChunkFromChunkCoords(newX, newZ).addEntity(entity);
                 } else {
-                    entity.isDead = true;   // entity wandered out of the world
+                    entity.addedToChunk = false;
+                    entity.isDead = true;
                 }
             }
         }
 
         // ── Cleanup dead entities ──────────────────────────────────────
         if (entity.isDead) {
-            int deadChunkX = MathHelper.floor_double(entity.posX / 16.0D);
-            int deadChunkZ = MathHelper.floor_double(entity.posZ / 16.0D);
-            if (this.chunkExists(deadChunkX, deadChunkZ)) {
-                this.getChunkFromChunkCoords(deadChunkX, deadChunkZ)
+            int deadX = MathHelper.floor_double(entity.posX / 16.0D);
+            int deadZ = MathHelper.floor_double(entity.posZ / 16.0D);
+            if (entity.addedToChunk && this.chunkExists(deadX, deadZ)) {
+                this.getChunkFromChunkCoords(deadX, deadZ)
                     .removeEntityAtIndex(entity, MathHelper.floor_double(entity.posY / 16.0D));
             }
             this.loadedEntityList.remove(i--);
-            this.updateEntityCountOnRemove(entity);   // monster/animal counters
+            this.updateEntityCountOnRemove(entity);
             for (IWorldAccess access : this.worldAccesses) {
                 access.releaseEntitySkin(entity);
             }
         }
     }
 
-    // Tile entities (furnaces, etc.) — always ticked regardless of distance
+    // Tile entities — always ticked regardless of distance
     for (int i = 0; i < this.loadedTileEntityList.size(); ++i) {
         this.loadedTileEntityList.get(i).updateEntity();
     }
@@ -224,15 +222,39 @@ Timers are still advanced so that:
 
 The radius is stored as a squared value (`ENTITY_VIEW_DISTANCE_SQ = 2048.0D`) so the distance check is a single multiply-add without a `sqrt`.
 
-#### Chunk migration
+#### Chunk migration — entity-side cache
 
-When an entity moves to a different chunk coordinate, it is removed from the old chunk's entity list and added to the new one. This keeps the per-chunk AABB queries (`Chunk.getEntitiesWithinAABBForEntity()`) accurate — the renderer and physics system only search chunks relevant to the player's vicinity.
+Each `Entity` carries three cached chunk coordinates and an `addedToChunk` flag:
 
-If the destination chunk doesn't exist, the entity is marked dead.
+```java
+public boolean addedToChunk = false;
+public int chunkCoordX;
+public int chunkCoordY;
+public int chunkCoordZ;
+```
+
+`Chunk.addEntity` sets these fields when placing an entity in a bucket. The tick loop then reads them instead of recomputing the old position from scratch — **the entity remembers where it lives**. Migration comparison is against the stored coords, not recomputed ones.
+
+On migration:
+1. Remove from old chunk (if `addedToChunk == true`)
+2. If destination chunk exists: call `Chunk.addEntity` (sets the new cached coords)
+3. If destination chunk doesn't exist: set `addedToChunk = false`, mark dead
+
+`Chunk.removeEntityAtIndex` clears `addedToChunk = false` after removal.
 
 #### Entity cleanup
 
-When `entity.isDead` is `true` (set by the entity itself during `onUpdate()`, or by chunk migration failure), the entity is removed from its chunk's list, the master `loadedEntityList`, and the cached monster/animal counters. The renderer is notified to release the entity's texture.
+When `entity.isDead` is `true` (set by the entity itself during `onUpdate()`, or by chunk migration failure), the entity is removed from its chunk's segment list (if still registered), the master `loadedEntityList`, and the cached monster/animal counters. The renderer is notified to release the entity's texture.
+
+#### `Chunk.addEntity` and `Chunk.removeEntityAtIndex`
+
+`Chunk.addEntity` places the entity in the correct vertical segment and sets `addedToChunk = true`, `chunkCoordX/Y/Z` on the entity — the entity is now authoritative about where it lives. The redundant "Wrong location!" recomputation and check from the original are removed.
+
+`Chunk.removeEntityAtIndex` removes the entity from the segment and sets `addedToChunk = false`. The `contains(entity)` linear scan from the original is removed — the `addedToChunk` flag is trusted as the authoritative guard.
+
+#### Entity spawn path
+
+`World.spawnEntityInWorld` calls `chunk.addEntity(entity)`, which sets `addedToChunk = true`. The entity is immediately placed in the correct chunk without any extra state management.
 
 ### What `onUpdate()` does per entity type
 
@@ -254,8 +276,9 @@ The distance culling primarily benefits `EntityCreature` subclasses (animals, mo
 When a chunk is evicted from the 1024-slot ring cache (`ChunkProviderLoadOrGenerate.provideChunk()`):
 
 1. **`chunk.unloadEntities()`** is called — iterates the chunk's 8 vertical entity segments and calls `World.unloadEntities()` on each
-2. **`World.unloadEntities()`** removes every entity from `loadedEntityList` and the monster/animal counters, and notifies world accesses
+2. **`World.unloadEntities()`** marks every entity as dead (sets `isDead = true`), updates the cached mob counters, and notifies world accesses to drop their textures
 3. **`saveChunk()`** serializes the chunk to `c.x.z.dat` on disk
+4. **`levelEntities()` (next tick)** sees the dead entities, removes them from their chunks' segment lists, then from `loadedEntityList`
 
 ```java
 // Chunk.unloadEntities
@@ -268,8 +291,10 @@ public final void unloadEntities() {
 
 // World.unloadEntities
 public final void unloadEntities(List<Entity> entities) {
-    this.loadedEntityList.removeAll(entities);        // ← O(N²) for large lists
-    entities.forEach(this::updateEntityCountOnRemove);
+    for (Entity e : entities) {
+        e.isDead = true;
+        this.updateEntityCountOnRemove(e);
+    }
     for (IWorldAccess access : this.worldAccesses) {
         for (Entity e : entities) {
             access.releaseEntitySkin(e);
@@ -278,9 +303,13 @@ public final void unloadEntities(List<Entity> entities) {
 }
 ```
 
+### Why mark-dead instead of immediate remove
+
+The previous code did `this.loadedEntityList.removeAll(entities)`, which is O(M × N) where M is the entities being removed and N is the world entity count — every chunk eviction with 50 entities scanned a list of thousands looking for each one. With mark-dead, the eviction is O(M) (just setting the flag), and the actual removal from `loadedEntityList` happens in `levelEntities()` via the existing `remove(i--)` loop, which is O(1) per removal (shifting the tail is O(N) but only over the elements after the dead one).
+
 ### Important: entities stay in the world even if their chunk is unloaded
 
-The ring cache eviction saves entities to disk, but **entities are only truly removed from `loadedEntityList` during `levelEntities()`** — when the dead flag is set, or when `unloadEntities()` is called. The chunk-local entity lists are per-segment `ArrayList`s; they do not prevent the master list from growing.
+The ring cache eviction marks entities as dead, but they remain in `loadedEntityList` until the next `levelEntities()` pass. The chunk-local entity lists are per-segment `ArrayList`s; they do not prevent the master list from growing.
 
 The 1024-slot ring caps the number of loaded chunks, which indirectly caps the number of entities in `loadedEntityList`, because entities are added to the master list only when their chunk is loaded, and removed when the chunk is evicted.
 
@@ -293,10 +322,12 @@ The 1024-slot ring caps the number of loaded chunks, which indirectly caps the n
 - **Chunk generation** — deterministic, stateless, no global state
 - **Chunk cache** — fixed 1024 slots, O(1) slot lookup, O(1) eviction
 - **Per-chunk AABB queries** — only the 8–9 chunks covering an AABB are searched
+- **Entity-side chunk cache** — `chunkCoordX/Y/Z` and `addedToChunk` on the entity avoid recomputing old coordinates every tick
+- **`Chunk.addEntity` / `removeEntityAtIndex`** — direct list ops, no defensive `contains()` scan
+- **Mark-dead chunk unload** — O(M) on chunk eviction, no `removeAll(entities)` quadratic scan
 
 ### What does not scale well
 
-- **`loadedEntityList.removeAll()`** — O(N²) on entity list size. Every chunk eviction scans the entire entity list. For worlds with thousands of entities, this is the most expensive part of chunk unloading. A mark-and-sweep approach (mark entities dead, defer removal to `levelEntities()`) would eliminate this.
 - **`levelEntities()` full iteration** — all entities in `loadedEntityList` are visited every tick, even distant ones. The distance culling gates `onUpdate()` but not the loop overhead. A spatial index (e.g. grid-based bucketing keyed by chunk coordinate) would allow skipping entire chunks worth of entities.
 - **Entity AI for distant mobs** — the 200-sample wander pathfinding runs even for creatures the player will never see. The distance culling gates this, but entities between 45 and 256 blocks away still receive a full AI tick.
 - **`unload100OldestChunks()` is a no-op** — there is no timer-based age eviction. The only eviction happens through cache collisions in `provideChunk()`. A true age-based unloading pass (which the method name implies) would help cap memory use for long play sessions.
@@ -316,3 +347,5 @@ The 1024-slot ring caps the number of loaded chunks, which indirectly caps the n
 | **`levelEntities()`** | The per-tick loop that updates all entities, handles chunk migration, and cleans up dead ones. |
 | **Distance culling** | Skipping `onUpdate()` (but not timer advancement) for entities beyond `ENTITY_VIEW_DISTANCE_SQ`. |
 | **Populate** | The deferred decoration pass (ores, trees) that runs once all four neighbours of a chunk exist. |
+| **`addedToChunk`** | A flag on every `Entity` set by `Chunk.addEntity()`. When `true`, the entity's `chunkCoordX/Y/Z` fields are authoritative. |
+| **`chunkCoordX/Y/Z`** | Cached chunk coordinates on an entity, written by `Chunk.addEntity()` and updated on every migration. Used by `levelEntities()` instead of recomputing from position every tick. |

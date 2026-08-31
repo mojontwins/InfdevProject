@@ -447,13 +447,14 @@ public final class Chunk {
 	 * Registers an entity in this chunk, bucketed by its vertical position into one of the 8
 	 * segment lists. Emits a diagnostic (but proceeds) if the caller passed a "wrong location".
 	 */
+	/**
+	 * Adds an entity to this chunk's entity list. Computes the vertical
+	 * segment from the entity's current y-position, places it in the
+	 * corresponding bucket, and records the chunk coordinates on the entity
+	 * (the entity's {@link Entity#addedToChunk} flag and {@code chunkCoord*}
+	 * fields are the authoritative record of which chunk owns the entity).
+	 */
 	public final void addEntity(Entity entity) {
-		int entityChunkX = MathHelper.floor_double(entity.posX / SECTION_SIZE);
-		int entityChunkZ = MathHelper.floor_double(entity.posZ / SECTION_SIZE);
-		if(entityChunkX != this.xPosition || entityChunkZ != this.zPosition) {
-			System.out.println("Wrong location! " + entity);
-		}
-
 		int segmentIndex = MathHelper.floor_double(entity.posY / SECTION_SIZE);
 		if(segmentIndex < 0) {
 			segmentIndex = 0;
@@ -463,10 +464,19 @@ public final class Chunk {
 		}
 
 		this.entities[segmentIndex].add(entity);
+		entity.addedToChunk = true;
+		entity.chunkCoordX = this.xPosition;
+		entity.chunkCoordY = segmentIndex;
+		entity.chunkCoordZ = this.zPosition;
 		this.isModified = true;
 	}
 
-	/** Removes an entity from a specific vertical segment, clamping the index like the original. */
+	/**
+	 * Removes an entity from a specific vertical segment and clears the
+	 * entity's chunk-ownership fields. The {@code segmentIndex} is clamped
+	 * defensively. Callers must pass the same segment the entity was placed
+	 * in by {@link #addEntity}.
+	 */
 	public final void removeEntityAtIndex(Entity entity, int segmentIndex) {
 		if(segmentIndex < 0) {
 			segmentIndex = 0;
@@ -475,12 +485,8 @@ public final class Chunk {
 			segmentIndex = this.entities.length - 1;
 		}
 
-		List<Entity> entitySegment = this.entities[segmentIndex];
-		if(!entitySegment.contains(entity)) {
-			System.out.println("There\'s no such entity to remove: " + entity);
-		}
-
-		entitySegment.remove(entity);
+		this.entities[segmentIndex].remove(entity);
+		entity.addedToChunk = false;
 		this.isModified = true;
 	}
 

@@ -271,3 +271,13 @@ et.minecraft.client.Start with the same args the launchwrapper used to receive).
 - **loadedEntityList.removeAll() remains O(N²)**: the emoveAll(entities) call in World.unloadEntities() is unchanged — a future improvement would mark distant entities dead and defer removal to the next levelEntities() pass, eliminating the quadratic scan.
 - New chunk_and_entities.md in the project root documents the full chunk lifecycle (two-layer provider pipeline, the 1024-slot ring cache, eviction via hash collision), the entity management system (loadedEntityList, per-chunk entity buckets, levelEntities() tick loop), the distance-culling design, and the chunk→entity cleanup connection.
 - Compile EXIT=0 (286 classes); pushed to master.
+
+### 2026-08-31 — Entity migration optimization: entity-side chunk cache + mark-dead unload
+
+- **Entity-side chunk cache**: added ddedToChunk, chunkCoordX, chunkCoordY, chunkCoordZ fields to Entity. Migration now reads the entity's cached coords instead of recomputing oldChunkX/Y/Z as local variables every tick. The entity itself is the authoritative record of which chunk it belongs to. B1.7.3 brought this pattern; Infdev didn't have it.
+- **Chunk.addEntity**: now sets entity.addedToChunk = true and the three chunkCoord* fields directly — the "Wrong location!" recomputation and check were removed (the entity's own cached coords are authoritative).
+- **Chunk.removeEntityAtIndex**: now clears entity.addedToChunk = false after removal. The contains(entity) defensive scan was removed — ddedToChunk is trusted as the authoritative guard.
+- **World.levelEntities()**: migration now compares against entity-cached coords (!entity.addedToChunk || entity.chunkCoordX != newX || …). No more 6 loor(pos/16) operations as a local pre-snapshot before onUpdate(). Dead-entity cleanup also uses entity.addedToChunk as the guard (instead of always querying the chunk cache), avoiding a redundant chunkExists call.
+- **World.unloadEntities()** (chunk eviction path): replaced loadedEntityList.removeAll(entities) (O(M×N)) with a mark-dead approach — sets isDead = true on each entity, defers removal from loadedEntityList to the existing levelEntities() cleanup loop. Renderer textures still released immediately via worldAccesses loop.
+- chunk_and_entities.md updated with the new migration design, the mark-dead chunk eviction flow, and updated performance notes.
+- Full-tree compile EXIT=0 (286 classes); pushed to master.

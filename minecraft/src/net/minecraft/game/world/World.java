@@ -932,8 +932,13 @@ public class World implements IBlockAccess {
 	 *       {@link #ENTITY_VIEW_DISTANCE_SQ} from the player, but still
 	 *       advance {@code ticksExisted} and, for dropped items, {@code age}
 	 *       so despawn timers stay accurate;</li>
-	 *   <li>otherwise run {@code onUpdate()} and, if the entity crossed into a
-	 *       different chunk, migrate it to that chunk's entity list.</li>
+	 *   <li>otherwise run {@code onUpdate()} and migrate the entity to the
+	 *       correct chunk if it crossed a chunk boundary (using the
+	 *       entity's cached {@code chunkCoordX/Y/Z} fields — no recomputation
+	 *       of old coords);</li>
+	 *   <li>for entities that moved only between vertical segments within the
+	 *       same chunk, swap the entity between the two segment buckets
+	 *       without touching the chunk-level cache.</li>
 	 * </ol>
 	 *
 	 * <p>onUpdate() is wrapped in a silent try/catch so a single misbehaving
@@ -950,29 +955,18 @@ public class World implements IBlockAccess {
 			Entity entity = this.loadedEntityList.get(i);
 
 			if(!entity.isDead) {
-				double dx = 0.0D;
-				double dy = 0.0D;
-				double dz = 0.0D;
-				if(hasPlayer) {
-					dx = entity.posX - px;
-					dy = entity.posY - py;
-					dz = entity.posZ - pz;
-				}
+				double dx = hasPlayer ? entity.posX - px : 0.0D;
+				double dy = hasPlayer ? entity.posY - py : 0.0D;
+				double dz = hasPlayer ? entity.posZ - pz : 0.0D;
 				double distSq = dx * dx + dy * dy + dz * dz;
 
 				if(distSq > ENTITY_VIEW_DISTANCE_SQ) {
-					// Far from the player: advance only the despawn/lifetime timers.
 					entity.ticksExisted++;
 					if (entity instanceof EntityItem) {
 						((EntityItem) entity).age++;
 					}
 					continue;
 				}
-
-				// Capture the chunk coords before the update so we can detect a chunk-crossing.
-				int oldChunkX = MathHelper.floor_double(entity.posX / 16.0D);
-				int oldChunkY = MathHelper.floor_double(entity.posY / 16.0D);
-				int oldChunkZ = MathHelper.floor_double(entity.posZ / 16.0D);
 
 				entity.lastTickPosX = entity.posX;
 				entity.lastTickPosY = entity.posY;
@@ -988,13 +982,20 @@ public class World implements IBlockAccess {
 				int newChunkY = MathHelper.floor_double(entity.posY / 16.0D);
 				int newChunkZ = MathHelper.floor_double(entity.posZ / 16.0D);
 
-				if(oldChunkX != newChunkX || oldChunkY != newChunkY || oldChunkZ != newChunkZ) {
-					if(this.chunkExists(oldChunkX, oldChunkZ)) {
-						this.getChunkFromChunkCoords(oldChunkX, oldChunkZ).removeEntityAtIndex(entity, oldChunkY);
+				if(!entity.addedToChunk
+					|| entity.chunkCoordX != newChunkX
+					|| entity.chunkCoordY != newChunkY
+					|| entity.chunkCoordZ != newChunkZ) {
+
+					if(entity.addedToChunk && this.chunkExists(entity.chunkCoordX, entity.chunkCoordZ)) {
+						this.getChunkFromChunkCoords(entity.chunkCoordX, entity.chunkCoordZ)
+							.removeEntityAtIndex(entity, entity.chunkCoordY);
 					}
+
 					if(this.chunkExists(newChunkX, newChunkZ)) {
 						this.getChunkFromChunkCoords(newChunkX, newChunkZ).addEntity(entity);
 					} else {
+						entity.addedToChunk = false;
 						entity.isDead = true;
 					}
 				}
@@ -1003,9 +1004,9 @@ public class World implements IBlockAccess {
 			if(entity.isDead) {
 				int deadChunkX = MathHelper.floor_double(entity.posX / 16.0D);
 				int deadChunkZ = MathHelper.floor_double(entity.posZ / 16.0D);
-				if(this.chunkExists(deadChunkX, deadChunkZ)) {
-					Chunk deadChunk = this.getChunkFromChunkCoords(deadChunkX, deadChunkZ);
-					deadChunk.removeEntityAtIndex(entity, MathHelper.floor_double(entity.posY / 16.0D));
+				if(entity.addedToChunk && this.chunkExists(deadChunkX, deadChunkZ)) {
+					this.getChunkFromChunkCoords(deadChunkX, deadChunkZ)
+						.removeEntityAtIndex(entity, MathHelper.floor_double(entity.posY / 16.0D));
 				}
 				this.loadedEntityList.remove(i--);
 				this.updateEntityCountOnRemove(entity);
@@ -1522,12 +1523,21 @@ public class World implements IBlockAccess {
 
 	/**
 	 * Removes every entity in the list from the world in one bulk operation:
-	 * removes from the entity list, updates cached mob counters, and notifies
-	 * world accesses so the renderer drops their textures.
+	 * marks each as dead (the {@link #levelEntities()} loop removes dead
+	 * entities from {@code loadedEntityList} in O(1) per entry — avoiding
+	 * the old {@code removeAll(entities)} O(M×N) scan), updates the cached
+	 * mob counters, and notifies world accesses so the renderer drops the
+	 * textures immediately.
+	 *
+	 * <p>Note: the entity's chunk-ownership fields are cleared when the
+	 * {@link #levelEntities()} cleanup pass hits it, so the entity is
+	 * safely released from its chunk without further coordination.
 	 */
 	public final void unloadEntities(List<Entity> entities) {
-		this.loadedEntityList.removeAll(entities);
-		entities.forEach(this::updateEntityCountOnRemove);
+		for(Entity e : entities) {
+			e.isDead = true;
+			this.updateEntityCountOnRemove(e);
+		}
 		for(int i = 0; i < this.worldAccesses.size(); ++i) {
 			IWorldAccess access = this.worldAccesses.get(i);
 			for(Entity e : entities) {
