@@ -32,7 +32,8 @@ import net.minecraft.game.world.path.Pathfinder;
 import util.MathHelper;
 
 public class World implements IBlockAccess {
-	private List<MetadataChunkBlock> lightingToUpdate;
+		/** Owns the deferred block-light update queue and its processing budget. */
+	private LightingManager lightingManager;
 	private List<Entity> loadedEntityList;
 	/** Schedules and fires delayed block ticks (fire, water/lava flow, ...). */
 	private BlockTickScheduler blockTickScheduler;
@@ -75,9 +76,6 @@ public class World implements IBlockAccess {
 	public WorldOptions worldOptions;
 	/** The world type, chosen at world creation and read back from level.dat when loading. */
 	public WorldType worldType;
-	private static final int MAX_LIGHTING_BOXES_PER_CALL = 100000;
-	private static final int MAX_LIGHTING_QUEUE_SIZE = 1000000;
-	private static final int LIGHTING_QUEUE_DRAIN_SIZE = 500000;
 	/** Squared distance beyond which entity onUpdate() is skipped. Timers (ticksExisted, age) still advance. */
 	public static final double ENTITY_VIEW_DISTANCE_SQ = 2048.0D;
 
@@ -134,7 +132,7 @@ public class World implements IBlockAccess {
 	}
 
 	private World(File workingDirectory, String worldName, long randomSeed, WorldOptions worldOptions, WorldType worldType) {
-		this.lightingToUpdate = new ArrayList<>();
+		this.lightingManager = new LightingManager(this);
 		this.loadedEntityList = new ArrayList<>();
 		this.blockTickScheduler = new BlockTickScheduler(this);
 		this.loadedTileEntityList = new ArrayList<>();
@@ -1161,51 +1159,25 @@ public class World implements IBlockAccess {
 
 	/** Number of pending light-update boxes waiting to be processed. */
 	public final int lightUpdatesNeeded() {
-		return this.lightingToUpdate.size();
+		return this.lightingManager.lightUpdatesNeeded();
 	}
 
 	/**
 	 * Pops pending light-update boxes off the back of the queue and processes
-	 * them, up to {@link #MAX_LIGHTING_BOXES_PER_CALL} per call. Returns true
-	 * if the budget was hit (caller should call again next tick).
+	 * them, up to a fixed budget per call. Returns true if the budget was hit
+	 * (caller should call again next tick).
 	 */
 	public final boolean updatingLighting() {
-		int remainingBudget = MAX_LIGHTING_BOXES_PER_CALL;
-
-		while(this.lightingToUpdate.size() > 0) {
-			if(--remainingBudget <= 0) {
-				return true;
-			}
-			MetadataChunkBlock box = this.lightingToUpdate.remove(this.lightingToUpdate.size() - 1);
-			box.updateLight(this);
-		}
-		return false;
+		return this.lightingManager.updatingLighting();
 	}
 
 	/**
 	 * Schedules a light-update box. Tries to merge into the four most recent
 	 * entries of the same light type to keep the queue short. If the queue
-	 * grows beyond {@link #MAX_LIGHTING_QUEUE_SIZE}, half is drained by
-	 * processing on the calling thread.
+	 * grows too large, half is drained by processing on the calling thread.
 	 */
 	public final void scheduleLightingUpdate(EnumSkyBlock lightType, int x1, int y1, int z1, int x2, int y2, int z2) {
-		if(x1 > x2 || y1 > y2 || z1 > z2) {
-			return;
-		}
-		int queueSize = this.lightingToUpdate.size();
-		int scanCount = Math.min(4, queueSize);
-		for(int i = 0; i < scanCount; ++i) {
-			MetadataChunkBlock box = this.lightingToUpdate.get(queueSize - i - 1);
-			if(box.lightType == lightType && box.tryMerge(x1, y1, z1, x2, y2, z2)) {
-				return;
-			}
-		}
-		this.lightingToUpdate.add(new MetadataChunkBlock(lightType, x1, y1, z1, x2, y2, z2));
-		if(this.lightingToUpdate.size() > MAX_LIGHTING_QUEUE_SIZE) {
-			while(this.lightingToUpdate.size() > LIGHTING_QUEUE_DRAIN_SIZE) {
-				this.updatingLighting();
-			}
-		}
+		this.lightingManager.scheduleLightingUpdate(lightType, x1, y1, z1, x2, y2, z2);
 	}
 
 	/**
