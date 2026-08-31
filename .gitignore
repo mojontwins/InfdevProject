@@ -7,6 +7,7 @@
 !/.gitignore
 !/minecraft
 !/chunk_and_entities.md
+!/biome_system.md
 
 # Ignore everything inside minecraft/ except the working sources.
 # Explicitly allow IDE configs and launcher scripts that are part of the project.
