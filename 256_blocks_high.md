@@ -25,10 +25,13 @@ extend the world to 256 blocks (y = 0 to 255) while:
 Each chunk holds up to **16 subchunks** (16×16×16 each).  A subchunk is:
 
 ```
-byte[]   blocks       — 4096 bytes
-NibbleArray skyLight  — 2048 bytes
-NibbleArray blockLight — 2048 bytes
+byte[]        blocks      — 4096 bytes
+NibbleArray   data        — 2048 bytes (block metadata, 4 bits per cell)
+NibbleArray   skyLight    — 2048 bytes
+NibbleArray   blockLight  — 2048 bytes
 ```
+
+Total per subchunk: **8 192 bytes** of block + metadata + light data.
 
 Subchunk index `s` covers world y = `s * 16` to `s * 16 + 15`.
 
@@ -37,12 +40,13 @@ Subchunk index `s` covers world y = `s * 16` to `s * 16 + 15`.
 | 0–7       | 0–127      | Always, on chunk load |
 | 8–15      | 128–255    | Lazily, on first block read or write above y=127 |
 
-The flat arrays (`byte blocks[32768]`, `NibbleArray skyLightMap`,
-`NibbleArray blockLightMap`) are removed from `Chunk` and replaced with
-the subchunk structure.
+The flat arrays (`byte blocks[32768]`, `NibbleArray data`, `NibbleArray
+skyLightMap`, `NibbleArray blockLightMap`) are removed from `Chunk` and
+replaced with the subchunk structure.
 
-**Memory:** 8-eager subchunks = 8 × 6 144 B = ~49 152 B for blocks+lights,
-matching today's ~49 152 B.  Lazy upper half costs nothing until used.
+**Memory:** 8-eager subchunks = 8 × 8 192 B = 65 536 B (blocks + metadata +
+lights), matching today's 65 536 B exactly.  Lazy upper half costs nothing
+until used.
 
 ### Three independent vertical systems
 
@@ -105,12 +109,14 @@ present subchunks.
 
 |                          | Today (128 flat) | 8 eager subchunks | 16 subchunks (fully built) |
 |--------------------------|-------------------|-------------------|---------------------------|
-| Blocks + lights / chunk  | 32 768 + 32 768 = 65 536 B | 49 152 B | 98 304 B |
+| Blocks + metadata + lights / chunk | 32 768 + 16 384 + 16 384 + 16 384 = 81 920 B | 65 536 B | 131 072 B |
 | Entities / chunk         | 8 × List overhead  | 8 × overhead     | 16 × overhead            |
-| 17×17 loaded area        | ~37 MB            | ~19 MB            | ~37 MB                   |
+| 17×17 loaded area        | ~46 MB            | ~18 MB           | ~37 MB                   |
 
-**Result:** new worlds start at ~19 MB (lower than today).  Fully explored
-worlds return to ~37 MB (parity).  Memory is never worse than today.
+**Result:** new worlds start at ~18 MB (substantially lower than today's
+~46 MB because the metadata nibbles are dropped for the lazy upper half).
+Fully explored worlds return to ~37 MB (well below today).  Memory is never
+worse than today.
 
 ### Rendering
 
@@ -144,6 +150,7 @@ Mitigations:
 
 **Fields:**
 - `byte[] blocks` → `byte[][][] blocks` — `[subchunkIdx][x][z*16+yLocal]`
+- `NibbleArray data` → `NibbleArray[][] data` (block metadata, 4 bits per cell)
 - `NibbleArray skyLightMap` → `NibbleArray[][] skyLightMap`
 - `NibbleArray blockLightMap` → `NibbleArray[][] blockLightMap`
 - `heightMap` sentinel: keep `-1` (signed byte; valid range 0–255 unchanged)
@@ -216,6 +223,7 @@ Level {
     Height: Int = 256,              -- missing → legacy 128
     SubchunkMask: Short,             -- bit i set → subchunk i present (0x00FF for 8-eager)
     SubchunkBlocks: List[ByteArray(4096)],
+    SubchunkData: List[ByteArray(2048)],        -- block metadata nibbles
     SubchunkSkyLight: List[ByteArray(2048)],
     SubchunkBlockLight: List[ByteArray(2048)],
     HeightMap: ByteArray(256), Biomes: ByteArray(256),
@@ -224,16 +232,20 @@ Level {
 ```
 
 `SubchunkMask` encodes which subchunks are present (not just eager vs. lazy —
-future-proofed for any sparse subchunk).
+future-proofed for any sparse subchunk).  All four subchunk lists are
+parallel — same length, same order; index `i` corresponds to subchunk `i`.
 
 ### Legacy migration
 
 `readChunkNBTData` when `Height` tag is missing or equals 128:
 
-1. Read flat `Blocks` (32 768 B) into a temporary array.
-2. Split into subchunks 0–7: each subchunk gets its 4 096 B slice.
+1. Read flat `Blocks` (32 768 B), `Data` (16 384 B), `SkyLight` (16 384 B),
+   `BlockLight` (16 384 B) into temporary arrays.
+2. Split each into subchunks 0–7: each subchunk gets its 4 096 / 2 048 B
+   slice.
 3. Upper subchunks 8–15 are `null` (air).
-4. Regenerate `SkyLight` / `BlockLight` via existing `checkLight` path.
+4. If any light map is missing or `isValid()` returns false (existing code
+   path), regenerate via `checkLight`.
 
 Subsequent saves write the new format.  `Height` tag becomes permanent on
 first re-save.
@@ -281,10 +293,10 @@ data arrays for one 16×16×16 slab:
 ```java
 class SubChunkStorage {
     int baseY;                              // world y of subchunk bottom
-    byte[] blocks;                          // 4096 bytes
-    NibbleArray data;                       // 2048 bytes (block metadata)
-    NibbleArray skyLight;                   // 2048 bytes
-    NibbleArray blockLight;                 // 2048 bytes
+    byte[] blocks;                           // 4096 bytes
+    NibbleArray data;                        // 2048 bytes (block metadata)
+    NibbleArray skyLight;                    // 2048 bytes
+    NibbleArray blockLight;                  // 2048 bytes
     boolean isEmpty;                        // all blocks are air (computed)
 }
 ```
