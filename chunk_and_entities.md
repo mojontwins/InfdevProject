@@ -38,9 +38,9 @@ public final Chunk provideChunk(int chunkX, int chunkZ) {
 
 The three stages in detail:
 
-1. **`initializeNoiseField`** — samples six-octave Perlin noise over a coarse 5×5×17 grid (one sample per 4-block corner of the chunk). Three octave banks are blended to produce a deterministic height value for each grid point.
+1. **`initializeNoiseField`** — samples six-octave Perlin noise over a coarse 5×5×17 grid (one sample per 4-block corner of the chunk). Three octave banks are blended to produce a deterministic **density** value for each grid point (a signed scalar: positive ⇒ stone, negative ⇒ water-or-air depending on y).
 
-2. **`generateTerrain`** — tri-linearly up-samples the coarse grid into the full 16×16×128 block array. Cells below sea level (64) become water; above become stone.
+2. **`generateTerrain`** — tri-linearly up-samples the coarse grid into the full 16×16×128 block array. Each cell is decided by its interpolated **density** value (a signed scalar from the height-field blend, not a Y in blocks): positive density is always replaced with stone, negative density is replaced with water below y=64 and with air above y=64.
 
 3. **`replaceBlocks`** — walks every 16×16 column top-down, carving the surface layer: sand on beaches, dirt under grass, gravel beds, bare stone under water.
 

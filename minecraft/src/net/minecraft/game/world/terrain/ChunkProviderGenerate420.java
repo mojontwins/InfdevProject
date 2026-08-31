@@ -16,8 +16,9 @@ import net.minecraft.game.world.terrain.noise.NoiseGeneratorOctaves;
  *
  * <ul>
  *   <li>{@link #initializeNoiseField} samples three octave banks - a fine
- *       height-blend field and two wide low-frequency fields - and blends them
- *       into the coarse 5x5x17 height field that encodes the land's shape.</li>
+ *       blend field and two wide low-frequency fields - and blends them into
+ *       the coarse 5x5x17 density field that encodes the land's shape (a
+ *       signed scalar: positive ⇒ stone, negative ⇒ water-or-air by y).</li>
  *   <li>{@link #generateTerrain} tri-linearly up-samples that field to the
  *       full 16x16x128 block array, stamping stone above the surface and still
  *       water below {@link #SEA_LEVEL}.</li>
@@ -47,7 +48,7 @@ public final class ChunkProviderGenerate420 extends ChunkProviderGenerate {
 	private NoiseGeneratorOctaves noiseGen4;
 	private NoiseGeneratorOctaves noiseGen5;
 	private NoiseGeneratorOctaves mobSpawnerNoise;
-	/** The coarse height field for the chunk currently being generated. */
+	/** The coarse 3-D density field for the chunk currently being generated. */
 	private double[] noiseArray;
 	private double[] noise3;
 	private double[] noise1;
@@ -72,7 +73,9 @@ public final class ChunkProviderGenerate420 extends ChunkProviderGenerate {
 
 	/**
 	 * Samples the three octave banks over the chunk's 5x5x17 grid and blends
-	 * them into the coarse height field stored in {@link #noiseArray}.
+	 * them into the coarse 3-D density field stored in {@link #noiseArray}.
+	 * Each cell is a signed scalar: positive ⇒ stone, negative ⇒ water-or-air
+	 * (decided by y in {@link #generateTerrain}).
 	 */
 	@Override
 	protected final void initializeNoiseField(int chunkX, int chunkZ) {
@@ -83,12 +86,12 @@ public final class ChunkProviderGenerate420 extends ChunkProviderGenerate {
 		this.noise1 = this.noiseGen1.generateNoiseOctaves(this.noise1, gridX, 0, gridZ, GRID_WIDTH, GRID_HEIGHT, GRID_DEPTH, 684.412D, 684.412D, 684.412D);
 		this.noise2 = this.noiseGen2.generateNoiseOctaves(this.noise2, gridX, 0, gridZ, GRID_WIDTH, GRID_HEIGHT, GRID_DEPTH, 684.412D, 684.412D, 684.412D);
 
-		double[] heightMap = this.noiseArray;
-		if(heightMap == null) {
-			heightMap = new double[NOISE_ARRAY_SIZE];
+		double[] densityField = this.noiseArray;
+		if(densityField == null) {
+			densityField = new double[NOISE_ARRAY_SIZE];
 		}
 
-		// Blend the three octave banks into one coarse 5x5x17 height field. The
+		// Blend the three octave banks into one coarse 5x5x17 density field. The
 		// storage order (z, x, y) matches the index math in the upsample below.
 		int index = 0;
 		for(int gridZIndex = 0; gridZIndex < GRID_DEPTH; ++gridZIndex) {
@@ -103,31 +106,32 @@ public final class ChunkProviderGenerate420 extends ChunkProviderGenerate {
 					double highFrequency = this.noise2[index] / 512.0D;
 					double heightBlend = (this.noise3[index] / 10.0D + 1.0D) / 2.0D;
 
-					double height;
+					double density;
 					if(heightBlend < 0.0D) {
-						height = lowFrequency;
+						density = lowFrequency;
 					} else if(heightBlend > 1.0D) {
-						height = highFrequency;
+						density = highFrequency;
 					} else {
-						height = lowFrequency + (highFrequency - lowFrequency) * heightBlend;
+						density = lowFrequency + (highFrequency - lowFrequency) * heightBlend;
 					}
 
-					height -= heightAboveSea;
-					heightMap[index] = height;
+					density -= heightAboveSea;
+					densityField[index] = density;
 					++index;
 				}
 			}
 		}
 
-		this.noiseArray = heightMap;
+		this.noiseArray = densityField;
 	}
 
 	/**
 	 * Tri-linearly up-samples the coarse height field into the chunk's block
 	 * buffer. Each tile reads its 2x2x2 grid corner box (n000..n111, the "0/1"
 	 * suffix is the x/y/z offset), interpolates vertically first (i000..i101),
-	 * then along x (i00/i01), then z, and stamps every cell as stone above the
-	 * surface or still water below {@link #SEA_LEVEL}.
+	 * then along x (i00/i01), then z, and stamps every cell based on the
+	 * interpolated **density** value: positive density is always stone, and
+	 * negative density is water (below {@link #SEA_LEVEL}) or air (above).
 	 */
 	@Override
 	protected final void generateTerrain(int chunkX, int chunkZ, byte[] blocks) {
@@ -160,13 +164,13 @@ public final class ChunkProviderGenerate420 extends ChunkProviderGenerate {
 
 							for(int zStep = 0; zStep < 4; ++zStep) {
 								double zFrac = (double) zStep / 4.0D;
-								double height = i00 + (i01 - i00) * zFrac;
+								double density = i00 + (i01 - i00) * zFrac;
 								int block = 0;
 								if((blockY << 3) + yStep < SEA_LEVEL) {
 									block = Block.waterStill.blockID;
 								}
 
-								if(height > 0.0D) {
+								if(density > 0.0D) {
 									block = Block.stone.blockID;
 								}
 

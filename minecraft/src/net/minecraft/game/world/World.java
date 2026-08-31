@@ -823,22 +823,7 @@ public class World implements IBlockAccess {
 	 * = midnight), so the color is multiplied by it.
 	 */
 	public final Vec3D getSkyColor(float celestialAngle) {
-		celestialAngle = this.getCelestialAngle(celestialAngle);
-		celestialAngle = MathHelper.cos(celestialAngle * (float)Math.PI * 2.0F) * 2.0F + 0.5F;
-		if(celestialAngle < 0.0F) {
-			celestialAngle = 0.0F;
-		}
-		if(celestialAngle > 1.0F) {
-			celestialAngle = 1.0F;
-		}
-
-		float r = (float)(this.skyColor >> 16 & 255L) / 255.0F;
-		float g = (float)(this.skyColor >> 8 & 255L) / 255.0F;
-		float b = (float)(this.skyColor & 255L) / 255.0F;
-		r *= celestialAngle;
-		g *= celestialAngle;
-		b *= celestialAngle;
-		return new Vec3D((double)r, (double)g, (double)b);
+		return AtmosphereCalculator.getSkyColor(this.skyColor, AtmosphereCalculator.getCelestialAngle(this.worldTime, celestialAngle));
 	}
 
 	/**
@@ -847,9 +832,7 @@ public class World implements IBlockAccess {
 	 * Subtracts 0.15 to roughly align the 0 with sunrise.
 	 */
 	public final float getCelestialAngle(float partialTick) {
-		int timeOfDay = (int)(this.worldTime % 24000L);
-		partialTick = ((float)timeOfDay + partialTick) / 24000.0F - 0.15F;
-		return partialTick;
+		return AtmosphereCalculator.getCelestialAngle(this.worldTime, partialTick);
 	}
 
 	/**
@@ -857,42 +840,12 @@ public class World implements IBlockAccess {
 	 * with an asymmetric tint (clouds are slightly warmer at night).
 	 */
 	public final Vec3D getCloudColor(float celestialAngle) {
-		celestialAngle = this.getCelestialAngle(celestialAngle);
-		celestialAngle = MathHelper.cos(celestialAngle * (float)Math.PI * 2.0F) * 2.0F + 0.5F;
-		if(celestialAngle < 0.0F) {
-			celestialAngle = 0.0F;
-		}
-		if(celestialAngle > 1.0F) {
-			celestialAngle = 1.0F;
-		}
-
-		float r = (float)(this.cloudColor >> 16 & 255L) / 255.0F;
-		float g = (float)(this.cloudColor >> 8 & 255L) / 255.0F;
-		float b = (float)(this.cloudColor & 255L) / 255.0F;
-		r *= celestialAngle * 0.9F + 0.1F;
-		g *= celestialAngle * 0.9F + 0.1F;
-		b *= celestialAngle * 0.85F + 0.15F;
-		return new Vec3D((double)r, (double)g, (double)b);
+		return AtmosphereCalculator.getCloudColor(this.cloudColor, AtmosphereCalculator.getCelestialAngle(this.worldTime, celestialAngle));
 	}
 
 	/** Returns the fog-color RGB. Asymmetric tint makes the horizon look warmer. */
 	public final Vec3D getFogColor(float celestialAngle) {
-		celestialAngle = this.getCelestialAngle(celestialAngle);
-		celestialAngle = MathHelper.cos(celestialAngle * (float)Math.PI * 2.0F) * 2.0F + 0.5F;
-		if(celestialAngle < 0.0F) {
-			celestialAngle = 0.0F;
-		}
-		if(celestialAngle > 1.0F) {
-			celestialAngle = 1.0F;
-		}
-
-		float r = (float)(this.fogColor >> 16 & 255L) / 255.0F;
-		float g = (float)(this.fogColor >> 8 & 255L) / 255.0F;
-		float b = (float)(this.fogColor & 255L) / 255.0F;
-		r *= celestialAngle * 0.94F + 0.06F;
-		g *= celestialAngle * 0.94F + 0.06F;
-		b *= celestialAngle * 0.91F + 0.09F;
-		return new Vec3D((double)r, (double)g, (double)b);
+		return AtmosphereCalculator.getFogColor(this.fogColor, AtmosphereCalculator.getCelestialAngle(this.worldTime, celestialAngle));
 	}
 
 	/**
@@ -900,15 +853,7 @@ public class World implements IBlockAccess {
 	 * daylight. Cubic falloff to make stars visibly snap on at dusk.
 	 */
 	public final float getStarBrightness(float celestialAngle) {
-		celestialAngle = this.getCelestialAngle(celestialAngle);
-		celestialAngle = 1.0F - (MathHelper.cos(celestialAngle * (float)Math.PI * 2.0F) * 2.0F + 12.0F / 16.0F);
-		if(celestialAngle < 0.0F) {
-			celestialAngle = 0.0F;
-		}
-		if(celestialAngle > 1.0F) {
-			celestialAngle = 1.0F;
-		}
-		return celestialAngle * celestialAngle * 0.5F;
+		return AtmosphereCalculator.getStarBrightness(AtmosphereCalculator.getCelestialAngle(this.worldTime, celestialAngle));
 	}
 
 	/**
