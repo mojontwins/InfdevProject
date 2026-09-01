@@ -20,16 +20,13 @@ public final class BlockFire extends Block {
 	protected BlockFire(int blockID, int textureIndex) {
 		super(blockID, textureIndex, Material.fire);
 		// Planks/wood catch fire with odds 5/20, while wood, leaves, bookshelves and
-		// every dyed cloth burn at the eager 30/60 pace; TNT sparks almost at once.
+		// cloth burn at the eager 30/60 pace; TNT sparks almost at once.
 		this.setBurnRate(Block.planks.blockID, 5, 20);
 		this.setBurnRate(Block.wood.blockID, 5, 5);
 		this.setBurnRate(Block.leaves.blockID, 30, 60);
 		this.setBurnRate(Block.bookshelf.blockID, 30, 20);
+		this.setBurnRate(Block.cloth.blockID, 30, 60);
 		this.setBurnRate(Block.tnt.blockID, 15, 100);
-
-		for(int clothColor = 0; clothColor < 16; ++clothColor) {
-			this.setBurnRate(Block.clothRed.blockID + clothColor, 30, 60);
-		}
 
 		this.setTickOnLoad(true);
 	}

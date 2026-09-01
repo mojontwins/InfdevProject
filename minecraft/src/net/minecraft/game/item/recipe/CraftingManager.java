@@ -52,7 +52,7 @@ public final class CraftingManager {
 		new RecipesArmor().addRecipe(this);
 
 		// The rest, in their original registration order.
-		this.addRecipe(new ItemStack(Block.clothGray, 1), "###", "###", "###", '#', Item.silk);
+		this.addRecipe(new ItemStack(Block.cloth, 1), "###", "###", "###", '#', Item.silk);
 		this.addRecipe(new ItemStack(Block.tnt, 1), "X#X", "#X#", "X#X", 'X', Item.gunpowder, '#', Block.sand);
 		this.addRecipe(new ItemStack(Block.stairSingle, 3), "###", '#', Block.cobblestone);
 		this.addRecipe(new ItemStack(Block.planks, 4), "#", '#', Block.wood);
@@ -61,7 +61,7 @@ public final class CraftingManager {
 		this.addRecipe(new ItemStack(Item.bowlEmpty, 4), "# #", " # ", '#', Block.planks);
 		this.addRecipe(new ItemStack(Item.flintAndSteel, 1), "A ", " B", 'A', Item.ingotIron, 'B', Item.flint);
 		this.addRecipe(new ItemStack(Item.bread, 1), "###", '#', Item.wheat);
-		this.addRecipe(new ItemStack(Item.painting, 1), "###", "#X#", "###", '#', Item.stick, 'X', Block.clothGray);
+		this.addRecipe(new ItemStack(Item.painting, 1), "###", "#X#", "###", '#', Item.stick, 'X', Block.cloth);
 		this.addRecipe(new ItemStack(Item.appleGold, 1), "###", "#X#", "###", '#', Block.blockGold, 'X', Item.apple);
 
 		this.recipes.sort(Comparator.comparingInt(IRecipe::getRecipeSize).reversed());
