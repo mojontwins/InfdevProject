@@ -17,7 +17,7 @@ public final class RecipesWeapons extends RecipesTiered {
 
 	/** The five sword materials: wood, cobblestone, steel, diamond and gold. */
 	private static final Object[] SWORD_MATERIALS = {
-		Block.planks, Block.cobblestone, Item.ingotIron, Item.diamod, Item.ingotGold
+		Block.planks, Block.cobblestone, Item.ingotIron, Item.diamond, Item.ingotGold
 	};
 
 	/** Output sword per material tier. */

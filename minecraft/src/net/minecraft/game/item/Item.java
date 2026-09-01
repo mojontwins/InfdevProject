@@ -12,9 +12,9 @@ import net.minecraft.game.world.block.Block;
  *
  * <p>Item ids are "shifted" by 256: a block's {@code ItemBlock} lives at the
  * slot matching its block id (0..255), while every custom item (apple, bow,
- * sword, ...) registers at {@code 256 + registerOrder}. Registers happen in the
- * static initialiser below, in release order — the exact sequence is part of the
- * save format and must never change.
+ * sword, ...) registers at {@code 256 + registerOrder}. The static field
+ * initialisers below declare each item in release order — the exact sequence
+ * is part of the save format and must never change.
  */
 public class Item {
 	/** Shared randomness for sound pitch jitter and similar cosmetic effects. */
@@ -22,78 +22,77 @@ public class Item {
 	/** Registry of every item, indexed by the item's shifted id. */
 	public static Item[] itemsList = new Item[1024];
 
-	// --- the item catalogue (in register order; see static initialiser) -----
-	public static Item shovel;
-	public static Item pickaxeSteel;
-	public static Item axeSteel;
-	public static Item flintAndSteel;
-	public static Item apple;
-	public static Item bow;
-	public static Item arrow;
-	public static Item coal;
-	/** The diamond gem — the historic "diamod" misspelling is part of the public API. */
-	public static Item diamod;
-	public static Item ingotIron;
-	public static Item ingotGold;
-	public static Item swordSteel;
-	public static Item swordWood;
-	public static Item shovelWood;
-	public static Item pickaxeWood;
-	public static Item axeWood;
-	public static Item swordStone;
-	public static Item shovelStone;
-	public static Item pickaxeStone;
-	public static Item axeStone;
-	public static Item swordDiamond;
-	public static Item shovelDiamond;
-	public static Item pickaxeDiamond;
-	public static Item axeDiamond;
-	public static Item stick;
-	public static Item bowlEmpty;
-	public static Item bowlSoup;
-	public static Item swordGold;
-	public static Item shovelGold;
-	public static Item pickaxeGold;
-	public static Item axeGold;
-	public static Item silk;
-	public static Item feather;
-	public static Item gunpowder;
-	public static Item hoeWood;
-	public static Item hoeStone;
-	public static Item hoeSteel;
-	public static Item hoeDiamond;
-	public static Item hoeGold;
-	public static Item seeds;
-	public static Item wheat;
-	public static Item bread;
-	public static Item helmetLeather;
-	public static Item plateLeather;
-	public static Item legsLeather;
-	public static Item bootsLeather;
-	public static Item helmetChain;
-	public static Item plateChain;
-	public static Item legsChain;
-	public static Item bootsChain;
-	public static Item helmetSteel;
-	public static Item plateSteel;
-	public static Item legsSteel;
-	public static Item bootsSteel;
-	public static Item helmetDiamond;
-	public static Item plateDiamond;
-	public static Item legsDiamond;
-	public static Item bootsDiamond;
-	public static Item helmetGold;
-	public static Item plateGold;
-	public static Item legsGold;
-	public static Item bootsGold;
-	public static Item flint;
-	public static Item porkRaw;
-	public static Item porkCooked;
-	public static Item painting;
-	public static Item appleGold;
-	public static Item leather;
-	public static Item bucketEmpty;
-	public static Item bucketMilk;
+	// --- the item catalogue (in register order) -----------------------------
+	public static Item shovel = (new ItemSpade(0, 2)).setIconIndex(82);
+	public static Item pickaxeSteel = (new ItemPickaxe(1, 2)).setIconIndex(98);
+	public static Item axeSteel = (new ItemAxe(2, 2)).setIconIndex(114);
+	public static Item flintAndSteel = (new ItemFlintAndSteel(3)).setIconIndex(5);
+	public static Item apple = (new ItemFood(4, 4)).setIconIndex(10);
+	public static Item bow = (new ItemBow(5)).setIconIndex(21);
+	public static Item arrow = (new Item(6)).setIconIndex(37);
+	public static Item coal = (new Item(7)).setIconIndex(7);
+	public static Item diamond = (new Item(8)).setIconIndex(55);
+	public static Item ingotIron = (new Item(9)).setIconIndex(23);
+	public static Item ingotGold = (new Item(10)).setIconIndex(39);
+	public static Item swordSteel = (new ItemSword(11, 2)).setIconIndex(66);
+	public static Item swordWood = (new ItemSword(12, 0)).setIconIndex(64);
+	public static Item shovelWood = (new ItemSpade(13, 0)).setIconIndex(80);
+	public static Item pickaxeWood = (new ItemPickaxe(14, 0)).setIconIndex(96);
+	public static Item axeWood = (new ItemAxe(15, 0)).setIconIndex(112);
+	public static Item swordStone = (new ItemSword(16, 1)).setIconIndex(65);
+	public static Item shovelStone = (new ItemSpade(17, 1)).setIconIndex(81);
+	public static Item pickaxeStone = (new ItemPickaxe(18, 1)).setIconIndex(97);
+	public static Item axeStone = (new ItemAxe(19, 1)).setIconIndex(113);
+	public static Item swordDiamond = (new ItemSword(20, 3)).setIconIndex(67);
+	public static Item shovelDiamond = (new ItemSpade(21, 3)).setIconIndex(83);
+	public static Item pickaxeDiamond = (new ItemPickaxe(22, 3)).setIconIndex(99);
+	public static Item axeDiamond = (new ItemAxe(23, 3)).setIconIndex(115);
+	public static Item stick = (new Item(24)).setIconIndex(53);
+	public static Item bowlEmpty = (new Item(25)).setIconIndex(71);
+	public static Item bowlSoup = (new ItemSoup(26, 10)).setIconIndex(72);
+	public static Item swordGold = (new ItemSword(27, 0)).setIconIndex(68);
+	public static Item shovelGold = (new ItemSpade(28, 0)).setIconIndex(84);
+	public static Item pickaxeGold = (new ItemPickaxe(29, 0)).setIconIndex(100);
+	public static Item axeGold = (new ItemAxe(30, 0)).setIconIndex(116);
+	public static Item silk = (new Item(31)).setIconIndex(8);
+	public static Item feather = (new Item(32)).setIconIndex(24);
+	public static Item gunpowder = (new Item(33)).setIconIndex(40);
+	public static Item hoeWood = (new ItemHoe(34, 0)).setIconIndex(128);
+	public static Item hoeStone = (new ItemHoe(35, 1)).setIconIndex(129);
+	public static Item hoeSteel = (new ItemHoe(36, 2)).setIconIndex(130);
+	public static Item hoeDiamond = (new ItemHoe(37, 3)).setIconIndex(131);
+	public static Item hoeGold = (new ItemHoe(38, 1)).setIconIndex(132);
+	public static Item seeds = (new ItemSeeds(39, Block.crops.blockID)).setIconIndex(9);
+	public static Item wheat = (new Item(40)).setIconIndex(25);
+	public static Item bread = (new ItemFood(41, 5)).setIconIndex(41);
+	public static Item helmetLeather = (new ItemArmor(42, 0, 0, 0)).setIconIndex(0);
+	public static Item plateLeather = (new ItemArmor(43, 0, 0, 1)).setIconIndex(16);
+	public static Item legsLeather = (new ItemArmor(44, 0, 0, 2)).setIconIndex(32);
+	public static Item bootsLeather = (new ItemArmor(45, 0, 0, 3)).setIconIndex(48);
+	public static Item helmetChain = (new ItemArmor(46, 1, 1, 0)).setIconIndex(1);
+	public static Item plateChain = (new ItemArmor(47, 1, 1, 1)).setIconIndex(17);
+	public static Item legsChain = (new ItemArmor(48, 1, 1, 2)).setIconIndex(33);
+	public static Item bootsChain = (new ItemArmor(49, 1, 1, 3)).setIconIndex(49);
+	public static Item helmetSteel = (new ItemArmor(50, 2, 2, 0)).setIconIndex(2);
+	public static Item plateSteel = (new ItemArmor(51, 2, 2, 1)).setIconIndex(18);
+	public static Item legsSteel = (new ItemArmor(52, 2, 2, 2)).setIconIndex(34);
+	public static Item bootsSteel = (new ItemArmor(53, 2, 2, 3)).setIconIndex(50);
+	public static Item helmetDiamond = (new ItemArmor(54, 3, 3, 0)).setIconIndex(3);
+	public static Item plateDiamond = (new ItemArmor(55, 3, 3, 1)).setIconIndex(19);
+	public static Item legsDiamond = (new ItemArmor(56, 3, 3, 2)).setIconIndex(35);
+	public static Item bootsDiamond = (new ItemArmor(57, 3, 3, 3)).setIconIndex(51);
+	public static Item helmetGold = (new ItemArmor(58, 1, 4, 0)).setIconIndex(4);
+	public static Item plateGold = (new ItemArmor(59, 1, 4, 1)).setIconIndex(20);
+	public static Item legsGold = (new ItemArmor(60, 1, 4, 2)).setIconIndex(36);
+	public static Item bootsGold = (new ItemArmor(61, 1, 4, 3)).setIconIndex(52);
+	public static Item flint = (new Item(62)).setIconIndex(6);
+	public static Item porkRaw = (new ItemFood(63, 3)).setIconIndex(87);
+	public static Item porkCooked = (new ItemFood(64, 8)).setIconIndex(88);
+	public static Item painting = (new ItemPainting(65)).setIconIndex(26);
+	public static Item appleGold = (new ItemFood(66, 42)).setIconIndex(11);
+	public static Item leather = (new Item(67)).setIconIndex(103);
+	public static Item bucketEmpty = (new Item(68)).setIconIndex(74);
+	public static Item bucketMilk = (new Item(69)).setIconIndex(77);
 
 	/** The item's id in {@link #itemsList} (= the register order plus the 256 shift). */
 	public final int shiftedIndex;
@@ -176,89 +175,6 @@ public class Item {
 
 	public boolean canHarvestBlock(Block block) {
 		return false;
-	}
-
-	/**
-	 * Constructs the item, applies its atlas sprite and registers it into the
-	 * static fields above. Keeps the original register order, which is what item
-	 * ids in save files are derived from.
-	 */
-	private static Item register(Item item, int iconIndex) {
-		item.setIconIndex(iconIndex);
-		return item;
-	}
-
-	static {
-		shovel = register(new ItemSpade(0, 2), 82);
-		pickaxeSteel = register(new ItemPickaxe(1, 2), 98);
-		axeSteel = register(new ItemAxe(2, 2), 114);
-		flintAndSteel = register(new ItemFlintAndSteel(3), 5);
-		apple = register(new ItemFood(4, 4), 10);
-		bow = register(new ItemBow(5), 21);
-		arrow = register(new Item(6), 37);
-		coal = register(new Item(7), 7);
-		diamod = register(new Item(8), 55);
-		ingotIron = register(new Item(9), 23);
-		ingotGold = register(new Item(10), 39);
-		swordSteel = register(new ItemSword(11, 2), 66);
-		swordWood = register(new ItemSword(12, 0), 64);
-		shovelWood = register(new ItemSpade(13, 0), 80);
-		pickaxeWood = register(new ItemPickaxe(14, 0), 96);
-		axeWood = register(new ItemAxe(15, 0), 112);
-		swordStone = register(new ItemSword(16, 1), 65);
-		shovelStone = register(new ItemSpade(17, 1), 81);
-		pickaxeStone = register(new ItemPickaxe(18, 1), 97);
-		axeStone = register(new ItemAxe(19, 1), 113);
-		swordDiamond = register(new ItemSword(20, 3), 67);
-		shovelDiamond = register(new ItemSpade(21, 3), 83);
-		pickaxeDiamond = register(new ItemPickaxe(22, 3), 99);
-		axeDiamond = register(new ItemAxe(23, 3), 115);
-		stick = register(new Item(24), 53);
-		bowlEmpty = register(new Item(25), 71);
-		bowlSoup = register(new ItemSoup(26, 10), 72);
-		swordGold = register(new ItemSword(27, 0), 68);
-		shovelGold = register(new ItemSpade(28, 0), 84);
-		pickaxeGold = register(new ItemPickaxe(29, 0), 100);
-		axeGold = register(new ItemAxe(30, 0), 116);
-		silk = register(new Item(31), 8);
-		feather = register(new Item(32), 24);
-		gunpowder = register(new Item(33), 40);
-		hoeWood = register(new ItemHoe(34, 0), 128);
-		hoeStone = register(new ItemHoe(35, 1), 129);
-		hoeSteel = register(new ItemHoe(36, 2), 130);
-		hoeDiamond = register(new ItemHoe(37, 3), 131);
-		hoeGold = register(new ItemHoe(38, 4), 132);
-		seeds = register(new ItemSeeds(39, Block.crops.blockID), 9);
-		wheat = register(new Item(40), 25);
-		bread = register(new ItemFood(41, 5), 41);
-		helmetLeather = register(new ItemArmor(42, 0, 0, 0), 0);
-		plateLeather = register(new ItemArmor(43, 0, 0, 1), 16);
-		legsLeather = register(new ItemArmor(44, 0, 0, 2), 32);
-		bootsLeather = register(new ItemArmor(45, 0, 0, 3), 48);
-		helmetChain = register(new ItemArmor(46, 1, 1, 0), 1);
-		plateChain = register(new ItemArmor(47, 1, 1, 1), 17);
-		legsChain = register(new ItemArmor(48, 1, 1, 2), 33);
-		bootsChain = register(new ItemArmor(49, 1, 1, 3), 49);
-		helmetSteel = register(new ItemArmor(50, 2, 2, 0), 2);
-		plateSteel = register(new ItemArmor(51, 2, 2, 1), 18);
-		legsSteel = register(new ItemArmor(52, 2, 2, 2), 34);
-		bootsSteel = register(new ItemArmor(53, 2, 2, 3), 50);
-		helmetDiamond = register(new ItemArmor(54, 3, 3, 0), 3);
-		plateDiamond = register(new ItemArmor(55, 3, 3, 1), 19);
-		legsDiamond = register(new ItemArmor(56, 3, 3, 2), 35);
-		bootsDiamond = register(new ItemArmor(57, 3, 3, 3), 51);
-		helmetGold = register(new ItemArmor(58, 1, 4, 0), 4);
-		plateGold = register(new ItemArmor(59, 1, 4, 1), 20);
-		legsGold = register(new ItemArmor(60, 1, 4, 2), 36);
-		bootsGold = register(new ItemArmor(61, 1, 4, 3), 52);
-		flint = register(new Item(62), 6);
-		porkRaw = register(new ItemFood(63, 3), 87);
-		porkCooked = register(new ItemFood(64, 8), 88);
-		painting = register(new ItemPainting(65), 26);
-		appleGold = register(new ItemFood(66, 42), 11);
-		leather = register(new Item(67), 112);
-		bucketEmpty = register(new Item(68), 117);
-		bucketMilk = register(new Item(69), 122);
 	}
 
 	/**

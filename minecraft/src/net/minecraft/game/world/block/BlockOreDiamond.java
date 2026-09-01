@@ -13,6 +13,6 @@ public final class BlockOreDiamond extends BlockOre {
 
 	@Override
 	public final int idDropped(int metadata, Random random) {
-		return Item.diamod.shiftedIndex;
+		return Item.diamond.shiftedIndex;
 	}
 }

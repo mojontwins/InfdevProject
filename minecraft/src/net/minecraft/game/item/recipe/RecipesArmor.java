@@ -24,7 +24,7 @@ public final class RecipesArmor extends RecipesTiered {
 
 	/** The five armour materials: leather, chain (fire!), steel, diamond and gold. */
 	private static final Object[] ARMOUR_MATERIALS = {
-		Block.cloth, Block.fire, Item.ingotIron, Item.diamod, Item.ingotGold
+		Block.cloth, Block.fire, Item.ingotIron, Item.diamond, Item.ingotGold
 	};
 
 	/** Output item per (armour piece, material) pair. */

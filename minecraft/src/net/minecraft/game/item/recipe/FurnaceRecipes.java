@@ -31,7 +31,7 @@ public final class FurnaceRecipes {
 	private FurnaceRecipes() {
 		this.addSmelting(new ItemStack(Block.oreIron), new ItemStack(Item.ingotIron));
 		this.addSmelting(new ItemStack(Block.oreGold), new ItemStack(Item.ingotGold));
-		this.addSmelting(new ItemStack(Block.oreDiamond), new ItemStack(Item.diamod));
+		this.addSmelting(new ItemStack(Block.oreDiamond), new ItemStack(Item.diamond));
 		this.addSmelting(new ItemStack(Block.sand), new ItemStack(Block.glass));
 		this.addSmelting(new ItemStack(Item.porkRaw), new ItemStack(Item.porkCooked));
 		this.addSmelting(new ItemStack(Block.cobblestone), new ItemStack(Block.stone));

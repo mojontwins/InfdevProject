@@ -21,7 +21,7 @@ public final class RecipesTools extends RecipesTiered {
 
 	/** The five tool materials: wood, cobblestone, steel, diamond and gold. */
 	private static final Object[] TOOL_MATERIALS = {
-		Block.planks, Block.cobblestone, Item.ingotIron, Item.diamod, Item.ingotGold
+		Block.planks, Block.cobblestone, Item.ingotIron, Item.diamond, Item.ingotGold
 	};
 
 	/** Output item per (tool, material) pair. */

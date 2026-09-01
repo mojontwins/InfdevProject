@@ -18,7 +18,7 @@ public final class RecipesIngots {
 
 	/** The matching ingot items. */
 	private static final Item[] INGOT_ITEMS = {
-		Item.ingotGold, Item.ingotIron, Item.diamod
+		Item.ingotGold, Item.ingotIron, Item.diamond
 	};
 
 	public final void addRecipe(CraftingManager manager) {
