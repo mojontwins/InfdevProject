@@ -4,6 +4,10 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 
 ## Diary
 
+### 2026-09-01 — Add b1.7.3 mushroom spread
+
+Mushrooms now spread in dim light exactly like b1.7.3: a 1 % chance per random tick tries to clone the mushroom into a random neighbour air cell (±1 xz, ±1 y) that passes `canBlockStay`. The new mushroom inherits the original's metadata so brown stays brown and red stays red. The `canBlockStay` light threshold was tightened from 13 to 12 (`getBlockLightValue ≤ 12`) to match the b1.7.3 reference.
+
 ### 2026-09-01 — Consolidate flowers and mushrooms into metadata-driven block ids
 
 - Replaced the four separate block ids (`plantYellow` 37, `plantRed` 38, `mushroomBrown` 39, `mushroomRed` 40) with two consolidated blocks: `Block.flowers` (id 37) and `Block.mushrooms` (id 38). The variant now lives in the block metadata: flower metadata 0 = red / 1 = yellow; mushroom metadata 0 = brown / 1 = red.
