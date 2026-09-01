@@ -37,4 +37,11 @@ public final class NBTTagByteArray extends NBTBase {
     public final String toString() {
         return "[" + this.byteArray.length + " bytes]";
     }
+
+    @Override
+    public final NBTBase copy() {
+        byte[] copy = new byte[this.byteArray.length];
+        System.arraycopy(this.byteArray, 0, copy, 0, this.byteArray.length);
+        return new NBTTagByteArray(copy);
+    }
 }

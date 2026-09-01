@@ -34,4 +34,9 @@ public final class NBTTagFloat extends NBTBase {
     public final String toString() {
         return String.valueOf(this.floatValue);
     }
+
+    @Override
+    public final NBTBase copy() {
+        return new NBTTagFloat(this.floatValue);
+    }
 }

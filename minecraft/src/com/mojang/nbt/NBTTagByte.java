@@ -34,4 +34,9 @@ public final class NBTTagByte extends NBTBase {
     public final String toString() {
         return String.valueOf(this.byteValue);
     }
+
+    @Override
+    public final NBTBase copy() {
+        return new NBTTagByte(this.byteValue);
+    }
 }

@@ -15,6 +15,13 @@ public final class ItemStack {
 	public int animationsToGo;
 	public int itemID;
 	public int itemDamage;
+	/**
+	 * Per-stack NBT data. {@code null} when the stack has no extra data; when
+	 * non-null it is saved alongside the rest of the stack and read back on
+	 * load. Use {@link #getTagCompound} / {@link #setTagCompound} to access
+	 * it (the helper {@link #hasTagCompound} reports whether one is set).
+	 */
+	public NBTTagCompound stackTagCompound;
 
 	public ItemStack(Block block) {
 		this(block, 1);
@@ -51,17 +58,28 @@ public final class ItemStack {
 		this.itemID = tag.getShort("id");
 		this.stackSize = tag.getByte("Count");
 		this.itemDamage = tag.getShort("Damage");
+		if(tag.hasKey("tag")) {
+			this.stackTagCompound = tag.getCompoundTag("tag");
+		}
 	}
 
 	/** Removes the given amount from this stack and returns what was split off. */
 	public final ItemStack splitStack(int amount) {
+		ItemStack dest = new ItemStack(this.itemID, amount, this.itemDamage);
+		if(this.stackTagCompound != null) {
+			dest.stackTagCompound = (NBTTagCompound) this.stackTagCompound.copy();
+		}
 		this.stackSize -= amount;
-		return new ItemStack(this.itemID, amount, this.itemDamage);
+		return dest;
 	}
 
 	/** An independent copy of this stack — id, quantity and damage — with no shared state. */
 	public final ItemStack copy() {
-		return new ItemStack(this.itemID, this.stackSize, this.itemDamage);
+		ItemStack duplicate = new ItemStack(this.itemID, this.stackSize, this.itemDamage);
+		if(this.stackTagCompound != null) {
+			duplicate.stackTagCompound = (NBTTagCompound) this.stackTagCompound.copy();
+		}
+		return duplicate;
 	}
 
 	public final Item getItem() {
@@ -72,7 +90,25 @@ public final class ItemStack {
 		tag.setShort("id", (short) this.itemID);
 		tag.setByte("Count", (byte) this.stackSize);
 		tag.setShort("Damage", (short) this.itemDamage);
+		if(this.stackTagCompound != null) {
+			tag.setCompoundTag("tag", this.stackTagCompound);
+		}
 		return tag;
+	}
+
+	/**
+	 * Reads the stack fields out of {@code tag} into this stack. Equivalent to
+	 * the {@link #ItemStack(NBTTagCompound)} constructor, but in-place: useful
+	 * when an {@code ItemStack} is being deserialised from a list and the
+	 * caller already holds the empty instance.
+	 */
+	public final void readFromNBT(NBTTagCompound tag) {
+		this.itemID = tag.getShort("id");
+		this.stackSize = tag.getByte("Count");
+		this.itemDamage = tag.getShort("Damage");
+		if(tag.hasKey("tag")) {
+			this.stackTagCompound = tag.getCompoundTag("tag");
+		}
 	}
 
 	public final int getMaxDamage() {
@@ -93,5 +129,25 @@ public final class ItemStack {
 
 			this.itemDamage = 0;
 		}
+	}
+
+	/** True when this stack carries an extra NBT payload. */
+	public final boolean hasTagCompound() {
+		return this.stackTagCompound != null;
+	}
+
+	/** Returns the NBT payload, or {@code null} if none is set. */
+	public final NBTTagCompound getTagCompound() {
+		return this.stackTagCompound;
+	}
+
+	/** Sets or clears the NBT payload. */
+	public final void setTagCompound(NBTTagCompound tag) {
+		this.stackTagCompound = tag;
+	}
+
+	public final String toString() {
+		return "ItemStack[item=" + this.itemID + ", size=" + this.stackSize + ", damage=" + this.itemDamage
+				+ (this.stackTagCompound != null ? ", tag=" + this.stackTagCompound : "") + "]";
 	}
 }

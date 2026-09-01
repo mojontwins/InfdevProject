@@ -132,4 +132,13 @@ public final class NBTTagCompound extends NBTBase {
 	public final String toString() {
 		return this.tagMap.size() + " entries";
 	}
+
+	@Override
+	public NBTBase copy() {
+		NBTTagCompound duplicate = new NBTTagCompound();
+		for(Map.Entry<String, NBTBase> entry : this.tagMap.entrySet()) {
+			duplicate.setTag(entry.getKey(), entry.getValue().copy());
+		}
+		return duplicate;
+	}
 }

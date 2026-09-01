@@ -91,4 +91,13 @@ public final class NBTTagList extends NBTBase {
 	public final int tagCount() {
 		return this.tagList.size();
 	}
+
+	@Override
+	public final NBTBase copy() {
+		NBTTagList duplicate = new NBTTagList();
+		for(NBTBase child : this.tagList) {
+			duplicate.setTag(child.copy());
+		}
+		return duplicate;
+	}
 }

@@ -4,6 +4,18 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 
 ## Diary
 
+### 2026-09-02 — Add `ItemStack.stackTagCompound` (per-stack NBT payload)
+
+Ported from r1.2.5: `ItemStack` now carries an optional `NBTTagCompound stackTagCompound` field, saved alongside the rest of the stack and read back on load. Behaviour:
+- `writeToNBT` emits the tag under the `"tag"` key only when non-null.
+- The `ItemStack(NBTTagCompound)` constructor and the new in-place `readFromNBT` method both read it back, with the tag field left as `null` if the key is absent.
+- `splitStack` and `copy` clone the tag (deep copy via `NBTTagCompound.copy()`) so the original and the split/copy don't share a mutable payload.
+- `hasTagCompound` / `getTagCompound` / `setTagCompound` helpers mirror r1.2.5.
+
+To support deep copies, `NBTBase` now has an abstract `copy()` method with concrete implementations in every tag type (recursive for `NBTTagList` and `NBTTagCompound`, value copy for byte arrays). The `NBTTagList` tag type is copied correctly so nested lists-of-lists work.
+
+`toString` was updated to include the tag presence. Behaviour is unchanged for stacks that don't set a tag.
+
 ### 2026-09-01 — Extract `Block.itemStackDropped(int, Random)`
 
 Extracted the `ItemStack` construction out of `dropBlockAsItemWithChance` into a new overridable `itemStackDropped(int metadata, Random rand)` method on `Block`. The default implementation calls `idDropped` and `damageDropped` — behaviour is byte-for-byte identical for every existing block. The refactor enables subclasses to attach extra data (enchantments, NBT, display name) to their drops without touching the drop-chance or entity-spawning logic. It also correctly handles blocks that randomise their item id on each call: the stack is now built per loop iteration instead of once per block.

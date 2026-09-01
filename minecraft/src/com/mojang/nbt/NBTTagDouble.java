@@ -29,4 +29,9 @@ public final class NBTTagDouble extends NBTBase {
 	public final String toString() {
 		return String.valueOf(this.doubleValue);
 	}
+
+	@Override
+	public final NBTBase copy() {
+		return new NBTTagDouble(this.doubleValue);
+	}
 }

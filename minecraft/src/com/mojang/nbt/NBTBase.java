@@ -15,6 +15,14 @@ public abstract class NBTBase {
 
 	abstract void readTagContents(DataInput input) throws IOException;
 
+	/**
+	 * Returns a deep copy of this tag and all of its children, useful for
+	 * sharing an attached payload between two item stacks (see
+	 * {@code ItemStack.copy} / {@code ItemStack.splitStack}). Concrete
+	 * subclasses override this to copy their own payload.
+	 */
+	public abstract NBTBase copy();
+
 	public abstract byte getType();
 
 	public final String getKey() {

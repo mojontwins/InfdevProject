@@ -34,4 +34,9 @@ public final class NBTTagShort extends NBTBase {
     public final String toString() {
         return String.valueOf(this.shortValue);
     }
+
+    @Override
+    public final NBTBase copy() {
+        return new NBTTagShort(this.shortValue);
+    }
 }

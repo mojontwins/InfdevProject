@@ -35,4 +35,9 @@ public final class NBTTagString extends NBTBase {
 	public final String toString() {
 		return String.valueOf(this.stringValue);
 	}
+
+	@Override
+	public final NBTBase copy() {
+		return new NBTTagString(this.stringValue);
+	}
 }

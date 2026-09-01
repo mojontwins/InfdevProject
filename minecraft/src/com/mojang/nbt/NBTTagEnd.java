@@ -18,4 +18,9 @@ public final class NBTTagEnd extends NBTBase {
 	public final String toString() {
 		return "END";
 	}
+
+	@Override
+	public final NBTBase copy() {
+		return new NBTTagEnd();
+	}
 }

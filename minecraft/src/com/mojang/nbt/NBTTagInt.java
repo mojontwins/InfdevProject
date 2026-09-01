@@ -34,4 +34,9 @@ public final class NBTTagInt extends NBTBase {
     public final String toString() {
         return String.valueOf(this.intValue);
     }
+
+    @Override
+    public final NBTBase copy() {
+        return new NBTTagInt(this.intValue);
+    }
 }
