@@ -66,6 +66,10 @@ public final class ItemBlock extends Item {
 			Block blockToPlace = Block.blocksList[this.blockID];
 			AxisAlignedBB placementBox = blockToPlace.getCollisionBoundingBoxFromPool(targetX, targetY, targetZ);
 			if((placementBox == null || world.checkIfAABBIsClear1(placementBox)) && blockToPlace.canPlaceBlockAt(world, targetX, targetY, targetZ)) {
+				if(targetBlock != null) {
+					int targetMeta = world.getBlockMetadata(targetX, targetY, targetZ);
+					targetBlock.onSubstituted(world, targetX, targetY, targetZ, targetMeta);
+				}
 				world.setBlockAndMetadataWithNotify(targetX, targetY, targetZ, this.blockID, this.getMetadata(stack.itemDamage));
 				blockToPlace.onBlockPlaced(world, targetX, targetY, targetZ, side, xWithinFace, yWithinFace, zWithinFace);
 				world.playSoundEffect(

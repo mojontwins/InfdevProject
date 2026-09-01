@@ -69,8 +69,16 @@ public class EntityFallingSand extends Entity {
 				this.motionZ *= 0.7F;
 				this.motionY *= -0.5D;
 				this.isDead = true;
-				if(!this.canBlockBePlacedAt(blockX, blockY, blockZ) || BlockSand.canFallBelow(this.worldObj, blockX, blockY - 1, blockZ) || !this.worldObj.setBlockWithNotify(blockX, blockY, blockZ, this.blockID)) {
+				if(!this.canBlockBePlacedAt(blockX, blockY, blockZ) || BlockSand.canFallBelow(this.worldObj, blockX, blockY - 1, blockZ)) {
 					this.dropItemWithOffset(this.blockID, 1);
+				} else {
+					Block occupied = Block.blocksList[this.worldObj.getBlockId(blockX, blockY, blockZ)];
+					if(occupied != null) {
+						occupied.onSubstituted(this.worldObj, blockX, blockY, blockZ, this.worldObj.getBlockMetadata(blockX, blockY, blockZ));
+					}
+					if(!this.worldObj.setBlockWithNotify(blockX, blockY, blockZ, this.blockID)) {
+						this.dropItemWithOffset(this.blockID, 1);
+					}
 				}
 			} else if(this.fallTime > 100) {
 				this.dropItemWithOffset(this.blockID, 1);

@@ -487,3 +487,33 @@ et.minecraft.client.Start with the same args the launchwrapper used to receive).
 - `ThreadDownloadResources.registerFromFolder` was passing `assetName = "newsound/random/click"` to `addSound`, which then replaced `/` with `.` → key `"newsound.random.click"`. The game looks up `"random.click"` (no category prefix). Fixed by stripping the `<category>/` prefix from `assetPath` before registering, so `newsound/random/click.ogg` produces the key `"random.click"` matching the engine's pool calls.
 - `SoundPoolEntry.soundName` was stored as `fullName` (with the original slash: `"random/click"`), and `LibraryLWJGLOpenAL` uses that string as the audio-file identifier for codec lookup. It couldn't find the `.ogg` codec from `"random/click"` because there was no `.` before the extension. Now stores `soundName` (the slash-normalized key: `"random.click"`), so LWJGL can extract `.ogg` and find the codec.
 - `SoundPool.addSound` now appends the real file extension (from `file.getName()`) to the pool key when constructing the `SoundPoolEntry.soundName`. So a file `click.ogg` registered as `"random/click"` ends up with `soundName = "random.ogg"` — LWJGL sees the `.ogg` extension, finds the `CodecJOrbis` codec, and the sound plays. The map key stays `"random"` (the digit-stripped, slash-normalized bare key), so lookups from the engine are unchanged. Compile EXIT=0.
+
+### 2026-09-02 — `Block.onSubstituted()` — substituted blocks drop themselves
+
+Added a new virtual method on `Block`:
+```java
+public void onSubstituted(World world, int x, int y, int z, int metadata) {
+}
+```
+
+The default is no-op: fire, water, lava vanish silently when replaced. `BlockFlower` overrides to call `dropBlockAsItem`, so a yellow-flower block drops a yellow-flower item (the existing `damageDropped` chain makes the metadata follow the variant). The call site is responsible for reading the cell's `metadata` *before* the new block is written.
+
+Three call sites are wired through it:
+
+- `ItemBlock.onItemUse` — when a player right-clicks a substitutable block with a block item, the new block writes into the same cell. Now the existing block's `onSubstituted` is called first, so clicking a flower with a stone item drops a flower. Clicking a flower with another flower drops a flower. Clicking fire / water / lava drops nothing.
+- `EntityFallingSand.onUpdate` — when a sand entity settles into a cell that contains a non-null, non-blocked block, `onSubstituted` is called before the sand writes itself. Sand falling onto a flower drops a flower item. Sand falling onto fire drops nothing. Sand falling into air is unchanged.
+- `BlockFlowing.flowIntoBlock` — water flowing over a block calls `occupied.onSubstituted(...)`. Lava is unchanged: the `triggerLavaMixEffects` branch (fizz, no drop) stays in place because the lava's "destroy" effect is a property of the lava, not of the displaced block. This preserves the existing vanilla asymmetry: water breaks a flower; lava fizzes it away.
+
+Behavioural cross-check (matches modern vanilla expectations):
+
+| Path | Drop? |
+|---|---|
+| Player right-clicks flower with stone | yes (flower) |
+| Player right-clicks flower with flower | yes (flower) |
+| Sand falls onto flower | yes (flower) |
+| Sand falls onto fire | no |
+| Water flows onto flower | yes (flower) |
+| Water flows onto fire | no |
+| Lava flows onto flower | no (fizz) |
+
+Verified by full-tree `javac -source 1.8 -target 1.8` compile (EXIT=0, 291 files).

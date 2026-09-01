@@ -370,6 +370,29 @@ public class Block {
 	}
 
 	/**
+	 * Called when this block is about to be replaced by another block via the
+	 * substitution path: a player right-clicks it with a block item
+	 * ({@link net.minecraft.game.item.ItemBlock#onItemUse}), a falling sand
+	 * entity settles into its cell
+	 * ({@link net.minecraft.game.entity.misc.EntityFallingSand#onUpdate}), or
+	 * water flows over it
+	 * ({@link BlockFlowing#flowIntoBlock}). Note: when lava flows, this
+	 * method is <em>not</em> called; the lava fizz effect is the property of
+	 * the lava, not the displaced block, and is handled in place.
+	 *
+	 * <p>The default is no-op: fire, water, and lava vanish silently when
+	 * replaced. {@link BlockFlower} overrides to drop the corresponding
+	 * item, so right-clicking a flower with a block item (or sand falling
+	 * onto it, or water flowing over it) yields a flower drop.
+	 *
+	 * <p>The call site is responsible for reading {@code metadata} from
+	 * the cell <em>before</em> the new block is written, since the
+	 * substituted block's metadata is otherwise lost.
+	 */
+	public void onSubstituted(net.minecraft.game.world.World world, int x, int y, int z, int metadata) {
+	}
+
+	/**
 	 * How readily this block encourages fire to spread to its neighbours
 	 * (a 0-300 rating used by {@link BlockFire#updateTick}). Higher means
 	 * fire spreads onto this block more eagerly. The default of 0 means

@@ -154,7 +154,7 @@ public final class BlockFlowing extends BlockFluid {
 				if(this.blockMaterial == Material.lava) {
 					this.triggerLavaMixEffects(world, x, y, z);
 				} else {
-					occupied.dropBlockAsItem(world, x, y, z, world.getBlockMetadata(x, y, z));
+					occupied.onSubstituted(world, x, y, z, world.getBlockMetadata(x, y, z));
 				}
 			}
 			world.setBlockAndMetadataWithNotify(x, y, z, this.blockID, decay);

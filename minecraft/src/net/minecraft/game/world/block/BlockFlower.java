@@ -99,4 +99,10 @@ public class BlockFlower extends Block {
 	public boolean canBeSubstituted() {
 		return true;
 	}
+
+	/** Flowers drop themselves as an item when replaced. */
+	@Override
+	public void onSubstituted(World world, int x, int y, int z, int metadata) {
+		this.dropBlockAsItem(world, x, y, z, metadata);
+	}
 }
