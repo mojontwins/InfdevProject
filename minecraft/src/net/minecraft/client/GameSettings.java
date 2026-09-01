@@ -8,6 +8,8 @@ import java.io.PrintWriter;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import net.minecraft.game.world.block.Block;
+import net.minecraft.game.world.block.BlockLeavesBase;
 import org.lwjgl.input.Keyboard;
 
 /**
@@ -57,10 +59,11 @@ public final class GameSettings {
 		INVERT_MOUSE(2, "invertYMouse", OptionType.BOOLEAN, "Invert mouse", null, settings -> settings.invertMouse, (settings, value) -> settings.invertMouse = (Boolean) value, null),
 		SHOW_FPS(3, "showFrameRate", OptionType.BOOLEAN, "Show FPS", null, settings -> settings.showFPS, (settings, value) -> settings.showFPS = (Boolean) value, null),
 		RENDER_DISTANCE(4, "viewDistance", OptionType.INTEGER, "Render distance", RENDER_DISTANCES, settings -> settings.renderDistance, (settings, value) -> settings.renderDistance = (Integer) value, null),
-		VIEW_BOBBING(5, "bobView", OptionType.BOOLEAN, "View bobbing", null, settings -> settings.fancyGraphics, (settings, value) -> settings.fancyGraphics = (Boolean) value, null),
-		ANAGLYPH(6, "anaglyph3d", OptionType.BOOLEAN, "3d anaglyph", null, settings -> settings.anaglyph, (settings, value) -> settings.anaglyph = (Boolean) value, settings -> settings.mc.renderEngine.refreshTextures()),
-		LIMIT_FRAMERATE(7, "limitFramerate", OptionType.BOOLEAN, "Limit framerate", null, settings -> settings.limitFramerate, (settings, value) -> settings.limitFramerate = (Boolean) value, null),
-		DIFFICULTY(8, "difficulty", OptionType.INTEGER, "Difficulty", DIFFICULTIES, settings -> settings.difficulty, (settings, value) -> settings.difficulty = (Integer) value, null);
+		VIEW_BOBBING(5, "bobView", OptionType.BOOLEAN, "View bobbing", null, settings -> settings.viewBobbing, (settings, value) -> settings.viewBobbing = (Boolean) value, null),
+		FANCY_GRAPHICS(6, "fancyGraphics", OptionType.BOOLEAN, "Fancy graphics", null, settings -> settings.fancyGraphics, (settings, value) -> settings.fancyGraphics = (Boolean) value, settings -> applyFancyGraphics(settings.fancyGraphics)),
+		ANAGLYPH(7, "anaglyph3d", OptionType.BOOLEAN, "3d anaglyph", null, settings -> settings.anaglyph, (settings, value) -> settings.anaglyph = (Boolean) value, settings -> settings.mc.renderEngine.refreshTextures()),
+		LIMIT_FRAMERATE(8, "limitFramerate", OptionType.BOOLEAN, "Limit framerate", null, settings -> settings.limitFramerate, (settings, value) -> settings.limitFramerate = (Boolean) value, null),
+		DIFFICULTY(9, "difficulty", OptionType.INTEGER, "Difficulty", DIFFICULTIES, settings -> settings.difficulty, (settings, value) -> settings.difficulty = (Integer) value, null);
 
 		private final int id;
 		private final String saveKey;
@@ -115,6 +118,7 @@ public final class GameSettings {
 	public boolean invertMouse = false;
 	public boolean showFPS = false;
 	public int renderDistance = 0;
+	public boolean viewBobbing = true;
 	public boolean fancyGraphics = true;
 	public boolean anaglyph = false;
 	public boolean limitFramerate = false;
@@ -144,6 +148,7 @@ public final class GameSettings {
 		this.mc = minecraft;
 		this.optionsFile = new File(dataDir, "options.txt");
 		this.loadOptions();
+		applyFancyGraphics(this.fancyGraphics);
 	}
 
 	/** Returns the label shown next to a key binding in the options screen. */
@@ -314,5 +319,21 @@ public final class GameSettings {
 		}
 
 		return "";
+	}
+
+	/**
+	 * Broadcasts a fancy-graphics change to every leaf block. Walks the
+	 * {@link Block#blocksList} registry, narrows to {@link BlockLeavesBase}
+	 * and asks each one to switch mode so the next render frame picks the
+	 * right texture and culling behaviour. Leaf blocks already initialise
+	 * themselves to fancy, so the first time this runs leaves only need to
+	 * be touched when the player turns fancy off.
+	 */
+	private static void applyFancyGraphics(boolean fancy) {
+		for(Block block : Block.blocksList) {
+			if(block instanceof BlockLeavesBase) {
+				((BlockLeavesBase)block).setGraphicsLevel(fancy);
+			}
+		}
 	}
 }

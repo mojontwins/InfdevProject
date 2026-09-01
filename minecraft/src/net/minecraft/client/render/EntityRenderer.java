@@ -378,7 +378,7 @@ public final class EntityRenderer {
 			}
 
 			this.hurtCameraEffect(partialTick);
-			if(this.mc.gameSettings.fancyGraphics) {
+			if(this.mc.gameSettings.viewBobbing) {
 				this.setupViewBobbing(partialTick);
 			}
 
@@ -557,7 +557,7 @@ public final class EntityRenderer {
 
 			GL11.glPushMatrix();
 			this.hurtCameraEffect(partialTick);
-			if(this.mc.gameSettings.fancyGraphics) {
+			if(this.mc.gameSettings.viewBobbing) {
 				this.setupViewBobbing(partialTick);
 			}
 
@@ -571,7 +571,7 @@ public final class EntityRenderer {
 				this.hurtCameraEffect(partialTick);
 			}
 
-			if(this.mc.gameSettings.fancyGraphics) {
+			if(this.mc.gameSettings.viewBobbing) {
 				this.setupViewBobbing(partialTick);
 			}
 
