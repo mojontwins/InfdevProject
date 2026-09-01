@@ -44,7 +44,7 @@ public final class RenderBlockDoor implements BlockRenderHandler {
 			brightness = selfBrightness;
 		}
 
-		if(Block.lightValue[block.blockID] > 0) {
+		if(block.getLightValue(metadata) > 0) {
 			brightness = 1.0F;
 		}
 
@@ -56,7 +56,7 @@ public final class RenderBlockDoor implements BlockRenderHandler {
 			brightness = selfBrightness;
 		}
 
-		if(Block.lightValue[block.blockID] > 0) {
+		if(block.getLightValue(metadata) > 0) {
 			brightness = 1.0F;
 		}
 
@@ -80,7 +80,7 @@ public final class RenderBlockDoor implements BlockRenderHandler {
 			brightness = selfBrightness;
 		}
 
-		if(Block.lightValue[block.blockID] > 0) {
+		if(block.getLightValue(blockAccess.getBlockMetadata(x, y, z)) > 0) {
 			brightness = 1.0F;
 		}
 

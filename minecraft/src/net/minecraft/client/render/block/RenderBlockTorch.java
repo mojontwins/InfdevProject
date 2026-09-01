@@ -21,7 +21,7 @@ public final class RenderBlockTorch implements BlockRenderHandler {
 		int metadata = blockAccess.getBlockMetadata(x, y, z);
 		Tessellator tessellator = Tessellator.instance;
 		float torchBrightness = block.getBlockBrightness(blockAccess, x, y, z);
-		if(Block.lightValue[block.blockID] > 0) {
+		if(block.getLightValue(metadata) > 0) {
 			torchBrightness = 1.0F;
 		}
 

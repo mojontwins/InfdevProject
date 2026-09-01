@@ -95,7 +95,9 @@ public final class MetadataChunkBlock {
 				selfLight = 15;
 			}
 		} else {
-			selfLight = Block.lightValue[blockID];
+			Block block = Block.blocksList[blockID];
+			int meta = world.getBlockMetadata(x, y, z);
+			selfLight = block != null ? block.getLightValue(meta) : 0;
 		}
 
 		int newLightValue;

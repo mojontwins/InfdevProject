@@ -4,6 +4,20 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 
 ## Diary
 
+### 2026-09-02 — Add `Block.getLightValue(int metadata)` hook
+
+Added a per-metadata light-value hook to `Block`, mirroring the r1.2.5 pattern. Default returns `Block.lightValue[blockID]`, so existing blocks keep their behaviour byte-for-byte; subclasses (e.g. a future glowing-mushroom variant reusing `Block.mushrooms` with a reserved metadata) can override it to return a per-metadata brightness.
+
+Direct reads of the static `Block.lightValue[]` array were routed through the new method, with a null check on the looked-up `Block` instance:
+- `MetadataChunkBlock.relightBlock` — now uses `block.getLightValue(world.getBlockMetadata(x, y, z))` with a `Block.blocksList[blockID] != null` guard.
+- `RenderBlockDoor` (3 call sites) — uses the cached `metadata` from the door's own `blockAccess.getBlockMetadata` call.
+- `RenderBlockNormal.neighborBrightness` — calls `block.getLightValue(renderBlocks.blockAccess.getBlockMetadata(...))` per side.
+- `RenderBlockTorch`, `RenderBlockLever`, `RenderBlockRepeater` — use their cached `metadata` directly.
+
+`World.computeLightAt` is intentionally left as `Block.lightValue[blockID]` — it runs in a hot inner loop with only the id in hand, and there is no per-block instance or metadata there. A 256×16 LUT was considered and rejected for now: the static array is already a single load, the shift+or indirection of `(id << 4) | meta` is not a measurable win, and the real value of the hook is the override path, not the lookup. The LUT can be added later if profiling shows it matters.
+
+Full-tree `javac -source 1.8 -target 1.8` compile passed (`EXIT: 0`).
+
 ### 2026-09-02 — Add `ItemStack.stackTagCompound` (per-stack NBT payload)
 
 Ported from r1.2.5: `ItemStack` now carries an optional `NBTTagCompound stackTagCompound` field, saved alongside the rest of the stack and read back on load. Behaviour:

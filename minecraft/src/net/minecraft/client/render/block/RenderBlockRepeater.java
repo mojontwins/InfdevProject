@@ -28,7 +28,7 @@ public final class RenderBlockRepeater implements BlockRenderHandler {
 		RenderBlockUtil.renderStandardBlock(renderBlocks, block, x, y, z);
 		Tessellator tessellator = Tessellator.instance;
 		float brightness = block.getBlockBrightness(blockAccess, x, y, z);
-		if(Block.lightValue[block.blockID] > 0) {
+		if(block.getLightValue(metadata) > 0) {
 			brightness = 1.0F;
 		}
 

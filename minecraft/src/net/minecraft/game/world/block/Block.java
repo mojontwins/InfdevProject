@@ -128,6 +128,10 @@ public class Block {
 		return this;
 	}
 
+	public int getLightValue(int metadata) {
+		return lightValue[this.blockID];
+	}
+
 	protected final Block setResistance(float resistance) {
 		this.blockResistance = resistance * 3.0F;
 		return this;

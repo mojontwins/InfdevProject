@@ -70,6 +70,6 @@ public final class RenderBlockNormal implements BlockRenderHandler {
 			brightness = selfBrightness;
 		}
 
-		return Block.lightValue[block.blockID] > 0 ? 1.0F : brightness;
+		return block.getLightValue(renderBlocks.blockAccess.getBlockMetadata(x, y, z)) > 0 ? 1.0F : brightness;
 	}
 }

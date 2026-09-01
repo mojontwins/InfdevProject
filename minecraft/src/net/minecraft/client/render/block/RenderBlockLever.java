@@ -62,7 +62,7 @@ public final class RenderBlockLever implements BlockRenderHandler {
 		}
 
 		float brightness = block.getBlockBrightness(blockAccess, x, y, z);
-		if(Block.lightValue[block.blockID] > 0) {
+		if(block.getLightValue(metadata) > 0) {
 			brightness = 1.0F;
 		}
 
