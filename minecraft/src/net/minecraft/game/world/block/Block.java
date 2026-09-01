@@ -286,6 +286,19 @@ public class Block {
 		return false;
 	}
 
+	/**
+	 * Whether crops (wheat) may grow on this block. Distinct from
+	 * {@link #canGrowPlants} because crops can only grow on tilled soil,
+	 * not on generic plant bases like dirt or grass. Override to return
+	 * {@code true} on farmland blocks.
+	 *
+	 * @param metadata  the block's current metadata
+	 * @return {@code true} if crops can grow on this block
+	 */
+	public boolean canGrowCrops(int metadata) {
+		return false;
+	}
+
 	/** Digging strength without knowing the block's state; treats metadata as "any". */
 	public final float blockStrength(EntityPlayer player) {
 		return this.blockStrength(player, -1);

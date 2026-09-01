@@ -90,4 +90,9 @@ public final class BlockFarmland extends Block {
 	public final int idDropped(int metadata, Random random) {
 		return Block.dirt.idDropped(0, random);
 	}
+
+	@Override
+	public boolean canGrowCrops(int metadata) {
+		return true;
+	}
 }

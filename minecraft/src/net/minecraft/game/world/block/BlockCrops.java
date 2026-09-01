@@ -44,11 +44,12 @@ public final class BlockCrops extends BlockFlower {
 
 				for(int tileX = x - 1; tileX <= x + 1; ++tileX) {
 					for(int tileZ = z - 1; tileZ <= z + 1; ++tileZ) {
-						int belowBlockID = world.getBlockId(tileX, y - 1, tileZ);
+						Block below = world.getBlock(tileX, y - 1, tileZ);
+						int belowMeta = world.getBlockMetadata(tileX, y - 1, tileZ);
 						float tileChance = 0.0F;
-						if(belowBlockID == Block.tilledField.blockID) {
+						if(below != null && below.canGrowCrops(belowMeta)) {
 							tileChance = 1.0F;
-							if(world.getBlockMetadata(tileX, y - 1, tileZ) > 0) {
+							if(belowMeta > 0) {
 								tileChance = 3.0F;
 							}
 						}

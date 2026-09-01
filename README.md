@@ -4,6 +4,23 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 
 ## Diary
 
+### 2026-09-02 — Add `Block.canGrowCrops(int metadata)` hook
+
+De-hardcoded `BlockCrops.updateTick`: the 3×3 neighbourhood scan of farmland used to read `world.getBlockId(tileX, y-1, tileZ) == Block.tilledField.blockID` nine times per random tick and used the metadata inline. Replaced with a virtual method on `Block`:
+```java
+public boolean canGrowCrops(int metadata) { return false; }
+```
+Override `true` on `BlockFarmland` only — distinct from `canGrowPlants` (which is true for dirt/grass) because crops must grow on tilled soil specifically, not on any plant-supporting block.
+
+`BlockCrops.updateTick` now reads:
+```java
+Block below = world.getBlock(tileX, y - 1, tileZ);
+int belowMeta = world.getBlockMetadata(tileX, y - 1, tileZ);
+if(below != null && below.canGrowCrops(belowMeta)) { ... }
+```
+
+Full-tree `javac -source 1.8 -target 1.8` compile passed (`EXIT: 0`).
+
 ### 2026-09-02 — Add `Block.getLightValue(int metadata)` hook
 
 Added a per-metadata light-value hook to `Block`, mirroring the r1.2.5 pattern. Default returns `Block.lightValue[blockID]`, so existing blocks keep their behaviour byte-for-byte; subclasses (e.g. a future glowing-mushroom variant reusing `Block.mushrooms` with a reserved metadata) can override it to return a per-metadata brightness.
