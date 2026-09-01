@@ -592,14 +592,22 @@ public class World implements IBlockAccess {
 
 	/**
 	 * Voxel-based ray cast from rayStart to rayEnd. Steps through the world
-	 * one axis-aligned unit cube at a time and returns the first collidable
-	 * block intersection found, or null if no block is hit within 20 steps.
+	 * one axis-aligned unit cube at a time and returns the first block
+	 * intersection found, or null if no block is hit within 20 steps.
 	 *
-	 * @param rayStart  Start of the ray
-	 * @param rayEnd    End of the ray
+	 * <p>By default the trace stops on collidable blocks only. The
+	 * {@code stopOnLiquid} flag extends the stop set to liquid cells (water
+	 * and lava), so the empty bucket can find a source block to pick up; a
+	 * filled bucket should pass {@code false} so the trace walks past the
+	 * fluid on its way to the face it actually wants to pour against.
+	 *
+	 * @param rayStart      Start of the ray
+	 * @param rayEnd        End of the ray
+	 * @param stopOnLiquid  whether the trace also stops on water / lava
+	 *                      source cells (a1.1.2 semantics for the bucket)
 	 * @return a {@link MovingObjectPosition} with sub-block hit information, or null
 	 */
-	public final MovingObjectPosition rayTraceBlocks(Vec3D rayStart, Vec3D rayEnd) {
+	public final MovingObjectPosition rayTraceBlocks(Vec3D rayStart, Vec3D rayEnd, boolean stopOnLiquid) {
 		if(!Double.isNaN(rayStart.xCoord) && !Double.isNaN(rayStart.yCoord) && !Double.isNaN(rayStart.zCoord)
 			&& !Double.isNaN(rayEnd.xCoord) && !Double.isNaN(rayEnd.yCoord) && !Double.isNaN(rayEnd.zCoord)) {
 
@@ -717,12 +725,34 @@ public class World implements IBlockAccess {
 					if(hit != null) {
 						return hit;
 					}
+				} else if(stopOnLiquid && block != null
+						&& (block.blockMaterial == Material.water || block.blockMaterial == Material.lava)) {
+					// Liquid source cells are not collidable, so the trace
+					// walks through them. With stopOnLiquid we synthesise a
+					// block hit at the cell the ray is now inside, with
+					// sideHit = -1 to mark a "ray passed through" hit.
+					MovingObjectPosition hit = new MovingObjectPosition(
+						currentX, currentY, currentZ, (byte)-1, rayStart);
+					return hit;
 				}
 			}
 
 			return null;
 		}
 		return null;
+	}
+
+	/**
+	 * Voxel-based ray cast from rayStart to rayEnd. Steps through the world
+	 * one axis-aligned unit cube at a time and returns the first collidable
+	 * block intersection found, or null if no block is hit within 20 steps.
+	 *
+	 * @param rayStart  Start of the ray
+	 * @param rayEnd    End of the ray
+	 * @return a {@link MovingObjectPosition} with sub-block hit information, or null
+	 */
+	public final MovingObjectPosition rayTraceBlocks(Vec3D rayStart, Vec3D rayEnd) {
+		return this.rayTraceBlocks(rayStart, rayEnd, false);
 	}
 
 	/**

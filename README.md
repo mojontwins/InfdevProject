@@ -4,6 +4,49 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 
 ## Diary
 
+### 2026-09-02 — Organised static Block and Item lists by id, grouped by tens
+
+`Block.java` and `Item.java` static catalogue sections are now:
+
+- Ordered strictly by id (ascending).
+- Grouped in blocks of 10 with an extra blank line after every group.
+- `Block.java` includes `// ID NNN` placeholder comments for every unoccupied id
+  (e.g. 21–34, 36, 39–40, 50–53, 63–255). `Item.java` has no gaps (ids 0–71
+  are all occupied).
+
+This makes it easy to scan which ids are free and where to insert new blocks/items.
+
+### 2026-09-02 — Add `ItemBucket` from a1.1.2 (water, lava, milk)
+
+Backported from `minecraft_a1.1.2/src/net/minecraft/src/ItemBucket.java`.
+
+- `ItemBucket extends Item`: the field `isFull` stores the block id to place
+  (0 = empty, 8 = waterMoving, 10 = lavaMoving, -1 = milk).
+  `onItemRightClick` handles all four cases via a single ray trace:
+
+  - Empty bucket + hitting a source block of water / lava → picks it up,
+    clears the cell, plays `liquid.water` / `liquid.lava`, returns the
+    water / lava bucket.
+  - Water / lava bucket + hitting a block face → resolves the neighbour
+    cell using `neighbourAcrossFace` (the same helper used by `ItemBlock`
+    and `ItemFlintAndSteel`), places the fluid if the neighbour is empty
+    or non-solid, plays `liquid.water` / `random.fizz`, returns the empty
+    bucket.
+  - Empty bucket + hitting a cow entity → milks it, returns the milk bucket.
+  - Milk bucket + hitting any block face → consumes the bucket, returns
+    the empty bucket (the milk bucket cannot be refilled from a cow —
+    a1.1.2 semantics preserved).
+
+- `Item.java`: the four bucket fields are now `ItemBucket` instances:
+  `bucketEmpty` (id 68, isFull=0), `bucketWater` (id 70, isFull=8),
+  `bucketLava` (id 71, isFull=10), `bucketMilk` (id 69, isFull=-1).
+  Item ids 67 (leather) and 68–69 are unchanged from the previous commit.
+
+- `EntityCow.interact` updated: the milking path is now handled by
+  `ItemBucket`; the stub is retained but noted as unused.
+
+Full-tree `javac -source 1.8 -target 1.8` EXIT=0, 295 files.
+
 ### 2026-09-02 — Backport `EntityCow` from a1.1.2
 
 Cows now exist in the world. Backported from `minecraft_a1.1.2/src/net/minecraft/src/EntityCow.java`.

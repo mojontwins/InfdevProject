@@ -8,9 +8,9 @@ import net.minecraft.game.world.World;
 
 /**
  * The cow: a passive, four-legged animal that drops leather when killed.
- * Bucket milking ({@link #interact}) is not yet wired — there is no caller
- * in the current codebase; the method is a stub waiting for a right-click
- * interaction path.
+ * Milking is handled on the item side via {@link ItemBucket} — the empty
+ * bucket milks a cow when right-clicking it.  This {@link #interact} stub is
+ * never called in the current codebase.
  */
 public class EntityCow extends EntityAnimal {
 

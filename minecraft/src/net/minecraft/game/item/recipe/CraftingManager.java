@@ -60,6 +60,7 @@ public final class CraftingManager {
 		this.addRecipe(new ItemStack(Item.stick, 4), "#", "#", '#', Block.planks);
 		this.addRecipe(new ItemStack(Block.torch, 4), "X", "#", 'X', Item.coal, '#', Item.stick);
 		this.addRecipe(new ItemStack(Item.bowlEmpty, 4), "# #", " # ", '#', Block.planks);
+		this.addRecipe(new ItemStack(Item.bucketEmpty, 1), "# #", " # ", '#', Item.ingotIron);
 		this.addRecipe(new ItemStack(Item.flintAndSteel, 1), "A ", " B", 'A', Item.ingotIron, 'B', Item.flint);
 		this.addRecipe(new ItemStack(Item.bread, 1), "###", '#', Item.wheat);
 		this.addRecipe(new ItemStack(Item.painting, 1), "###", "#X#", "###", '#', Item.stick, 'X', Block.cloth);

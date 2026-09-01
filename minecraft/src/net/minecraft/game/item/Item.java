@@ -22,7 +22,7 @@ public class Item {
 	/** Registry of every item, indexed by the item's shifted id. */
 	public static Item[] itemsList = new Item[1024];
 
-	// --- the item catalogue (in register order) -----------------------------
+	// --- the item catalogue (in register order, grouped by tens) -----------------
 	public static Item shovel = (new ItemSpade(0, 2)).setIconIndex(82);
 	public static Item pickaxeSteel = (new ItemPickaxe(1, 2)).setIconIndex(98);
 	public static Item axeSteel = (new ItemAxe(2, 2)).setIconIndex(114);
@@ -33,6 +33,7 @@ public class Item {
 	public static Item coal = (new Item(7)).setIconIndex(7);
 	public static Item diamond = (new Item(8)).setIconIndex(55);
 	public static Item ingotIron = (new Item(9)).setIconIndex(23);
+
 	public static Item ingotGold = (new Item(10)).setIconIndex(39);
 	public static Item swordSteel = (new ItemSword(11, 2)).setIconIndex(66);
 	public static Item swordWood = (new ItemSword(12, 0)).setIconIndex(64);
@@ -43,6 +44,7 @@ public class Item {
 	public static Item shovelStone = (new ItemSpade(17, 1)).setIconIndex(81);
 	public static Item pickaxeStone = (new ItemPickaxe(18, 1)).setIconIndex(97);
 	public static Item axeStone = (new ItemAxe(19, 1)).setIconIndex(113);
+
 	public static Item swordDiamond = (new ItemSword(20, 3)).setIconIndex(67);
 	public static Item shovelDiamond = (new ItemSpade(21, 3)).setIconIndex(83);
 	public static Item pickaxeDiamond = (new ItemPickaxe(22, 3)).setIconIndex(99);
@@ -53,6 +55,7 @@ public class Item {
 	public static Item swordGold = (new ItemSword(27, 0)).setIconIndex(68);
 	public static Item shovelGold = (new ItemSpade(28, 0)).setIconIndex(84);
 	public static Item pickaxeGold = (new ItemPickaxe(29, 0)).setIconIndex(100);
+
 	public static Item axeGold = (new ItemAxe(30, 0)).setIconIndex(116);
 	public static Item silk = (new Item(31)).setIconIndex(8);
 	public static Item feather = (new Item(32)).setIconIndex(24);
@@ -63,6 +66,7 @@ public class Item {
 	public static Item hoeDiamond = (new ItemHoe(37, 3)).setIconIndex(131);
 	public static Item hoeGold = (new ItemHoe(38, 1)).setIconIndex(132);
 	public static Item seeds = (new ItemSeeds(39, Block.crops.blockID)).setIconIndex(9);
+
 	public static Item wheat = (new Item(40)).setIconIndex(25);
 	public static Item bread = (new ItemFood(41, 5)).setIconIndex(41);
 	public static Item helmetLeather = (new ItemArmor(42, 0, 0, 0)).setIconIndex(0);
@@ -73,6 +77,7 @@ public class Item {
 	public static Item plateChain = (new ItemArmor(47, 1, 1, 1)).setIconIndex(17);
 	public static Item legsChain = (new ItemArmor(48, 1, 1, 2)).setIconIndex(33);
 	public static Item bootsChain = (new ItemArmor(49, 1, 1, 3)).setIconIndex(49);
+
 	public static Item helmetSteel = (new ItemArmor(50, 2, 2, 0)).setIconIndex(2);
 	public static Item plateSteel = (new ItemArmor(51, 2, 2, 1)).setIconIndex(18);
 	public static Item legsSteel = (new ItemArmor(52, 2, 2, 2)).setIconIndex(34);
@@ -83,6 +88,7 @@ public class Item {
 	public static Item bootsDiamond = (new ItemArmor(57, 3, 3, 3)).setIconIndex(51);
 	public static Item helmetGold = (new ItemArmor(58, 1, 4, 0)).setIconIndex(4);
 	public static Item plateGold = (new ItemArmor(59, 1, 4, 1)).setIconIndex(20);
+
 	public static Item legsGold = (new ItemArmor(60, 1, 4, 2)).setIconIndex(36);
 	public static Item bootsGold = (new ItemArmor(61, 1, 4, 3)).setIconIndex(52);
 	public static Item flint = (new Item(62)).setIconIndex(6);
@@ -91,8 +97,11 @@ public class Item {
 	public static Item painting = (new ItemPainting(65)).setIconIndex(26);
 	public static Item appleGold = (new ItemFood(66, 42)).setIconIndex(11);
 	public static Item leather = (new Item(67)).setIconIndex(103);
-	public static Item bucketEmpty = (new Item(68)).setIconIndex(74);
-	public static Item bucketMilk = (new Item(69)).setIconIndex(77);
+	public static Item bucketEmpty = (new ItemBucket(68, 0)).setIconIndex(74);
+	public static Item bucketMilk = (new ItemBucket(69, -1)).setIconIndex(77);
+
+	public static Item bucketWater = (new ItemBucket(70, Block.waterMoving.blockID)).setIconIndex(75);
+	public static Item bucketLava = (new ItemBucket(71, Block.lavaMoving.blockID)).setIconIndex(76);
 
 	/** The item's id in {@link #itemsList} (= the register order plus the 256 shift). */
 	public final int shiftedIndex;
