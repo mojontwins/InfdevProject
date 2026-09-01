@@ -255,6 +255,18 @@ public class Block {
 		return 0;
 	}
 
+	/**
+	 * Whether a plant (flower, sapling, mushroom) may grow on this block. Override
+	 * to return {@code true} for dirt, grass and any other block that should be a
+	 * valid plant base. The metadata parameter allows a block to accept or reject
+	 * based on its own state (e.g. farmland moisture level, mycelium variant).
+	 *
+	 * @return {@code true} if this block is a valid plant base
+	 */
+	public boolean canGrowPlants(int metadata) {
+		return false;
+	}
+
 	/** Digging strength without knowing the block's state; treats metadata as "any". */
 	public final float blockStrength(EntityPlayer player) {
 		return this.blockStrength(player, -1);

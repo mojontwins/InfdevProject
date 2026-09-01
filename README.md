@@ -4,6 +4,16 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 
 ## Diary
 
+### 2026-09-01 — Extract plant-support check to a extensible Block hook
+
+Introduced `Block.canGrowPlants(int metadata)` returning `false` by default. `BlockDirt` and `BlockGrass` now override it to return `true`, so any new dirt/grass variants can opt in by doing the same.
+
+Added `World.getBlock(x, y, z)` (null-safe shortcut for `Block.blocksList[id]`) and `World.canPlantsGrowOn(x, y, z)` (true when the block exists and `block.canGrowPlants(metadata)` is true). All plant placement checks in `BlockFlower.canPlaceBlockAt`, `BlockFlower.canBlockStay` and `WorldGenBigTree` now call this single method instead of hard-coding `grass || dirt`. The two subclasses that need different rules override the two methods directly:
+- `BlockMushroom` places on any opaque block (no longer tied to `canGrowPlants`).
+- `BlockCrops` places and stays only on farmland (its own override, unchanged behaviour).
+
+Removing the dead `protected canThisPlantGrowOnThisBlockID` from `BlockFlower` freed `canPlaceBlockAt` to be non-final, so mushroom and crop subclasses can override it.
+
 ### 2026-09-01 — Add b1.7.3 mushroom spread
 
 Mushrooms now spread in dim light exactly like b1.7.3: a 1 % chance per random tick tries to clone the mushroom into a random neighbour air cell (±1 xz, ±1 y) that passes `canBlockStay`. The new mushroom inherits the original's metadata so brown stays brown and red stays red. The `canBlockStay` light threshold was tightened from 13 to 12 (`getBlockLightValue ≤ 12`) to match the b1.7.3 reference.

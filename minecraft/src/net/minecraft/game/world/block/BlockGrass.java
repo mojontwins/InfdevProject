@@ -43,4 +43,10 @@ public final class BlockGrass extends Block {
 	public final int idDropped(int metadata, Random random) {
 		return Block.dirt.idDropped(0, random);
 	}
+
+	/** Grass is a valid plant base (alongside dirt). */
+	@Override
+	public boolean canGrowPlants(int metadata) {
+		return true;
+	}
 }

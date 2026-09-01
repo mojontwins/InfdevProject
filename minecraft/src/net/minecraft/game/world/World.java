@@ -321,6 +321,25 @@ public class World implements IBlockAccess {
 		}
 	}
 
+	/**
+	 * Convenience: returns the {@link Block} at the given coordinates, or
+	 * {@code null} if the cell is air.
+	 */
+	public Block getBlock(int x, int y, int z) {
+		int id = this.getBlockId(x, y, z);
+		return id == 0 ? null : Block.blocksList[id];
+	}
+
+	/**
+	 * True when the block at (x, y, z) exists and
+	 * {@link Block#canGrowPlants} is true for its metadata. This is the single
+	 * place that answers "can a plant grow on the block below?".
+	 */
+	public boolean canPlantsGrowOn(int x, int y, int z) {
+		Block block = this.getBlock(x, y, z);
+		return block != null && block.canGrowPlants(this.getBlockMetadata(x, y, z));
+	}
+
 	public final void setBlockMetadataWithNotify(int x, int y, int z, int metadata) {
 		if(this.setBlockMetadata(x, y, z, metadata)) {
 			this.markBlockNeedsUpdate(x, y, z);

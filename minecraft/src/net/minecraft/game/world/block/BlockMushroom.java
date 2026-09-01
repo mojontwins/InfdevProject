@@ -18,7 +18,8 @@ public final class BlockMushroom extends BlockFlower {
 	}
 
 	@Override
-	protected final boolean canThisPlantGrowOnThisBlockID(int belowBlockID) {
+	public final boolean canPlaceBlockAt(World world, int x, int y, int z) {
+		int belowBlockID = world.getBlockId(x, y - 1, z);
 		return Block.opaqueCubeLookup[belowBlockID];
 	}
 

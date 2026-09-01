@@ -28,12 +28,8 @@ public class BlockFlower extends Block {
 	}
 
 	@Override
-	public final boolean canPlaceBlockAt(World world, int x, int y, int z) {
-		return this.canThisPlantGrowOnThisBlockID(world.getBlockId(x, y - 1, z));
-	}
-
-	protected boolean canThisPlantGrowOnThisBlockID(int belowBlockID) {
-		return belowBlockID == Block.grass.blockID || belowBlockID == Block.dirt.blockID || belowBlockID == Block.tilledField.blockID;
+	public boolean canPlaceBlockAt(World world, int x, int y, int z) {
+		return world.canPlantsGrowOn(x, y - 1, z);
 	}
 
 	@Override
@@ -55,7 +51,7 @@ public class BlockFlower extends Block {
 	}
 
 	public boolean canBlockStay(World world, int x, int y, int z) {
-		return (world.getBlockLightValue(x, y, z) >= 8 || world.canBlockSeeTheSky(x, y, z)) && this.canThisPlantGrowOnThisBlockID(world.getBlockId(x, y - 1, z));
+		return (world.getBlockLightValue(x, y, z) >= 8 || world.canBlockSeeTheSky(x, y, z)) && world.canPlantsGrowOn(x, y - 1, z);
 	}
 
 	@Override

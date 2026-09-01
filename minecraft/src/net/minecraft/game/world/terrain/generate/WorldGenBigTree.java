@@ -132,9 +132,8 @@ public final class WorldGenBigTree extends WorldGenerator {
 
 		int[] base = new int[]{this.basePos[0], this.basePos[1], this.basePos[2]};
 		int[] top = new int[]{this.basePos[0], this.basePos[1] + this.heightLimit - 1, this.basePos[2]};
-		int groundBlock = this.worldObj.getBlockId(this.basePos[0], this.basePos[1] - 1, this.basePos[2]);
 		boolean canGrow;
-		if(groundBlock != Block.grass.blockID && groundBlock != Block.dirt.blockID) {
+		if(!this.worldObj.canPlantsGrowOn(this.basePos[0], this.basePos[1] - 1, this.basePos[2])) {
 			canGrow = false;
 		} else {
 			int clearHeight = this.checkBlockLine(base, top);

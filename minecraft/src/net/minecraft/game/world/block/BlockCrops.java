@@ -18,6 +18,15 @@ public final class BlockCrops extends BlockFlower {
 	}
 
 	@Override
+	public final boolean canPlaceBlockAt(World world, int x, int y, int z) {
+		return world.getBlockId(x, y - 1, z) == Block.tilledField.blockID;
+	}
+
+	@Override
+	public final boolean canBlockStay(World world, int x, int y, int z) {
+		return (world.getBlockLightValue(x, y, z) >= 8 || world.canBlockSeeTheSky(x, y, z)) && world.getBlockId(x, y - 1, z) == Block.tilledField.blockID;
+	}
+
 	protected final boolean canThisPlantGrowOnThisBlockID(int belowBlockID) {
 		return belowBlockID == Block.tilledField.blockID;
 	}
@@ -63,19 +72,6 @@ public final class BlockCrops extends BlockFlower {
 	}
 
 	@Override
-	public final int getBlockTextureFromSideAndMetadata(int side, int metadata) {
-		if(metadata < 0) {
-			metadata = 7;
-		}
-		return this.blockIndexInTexture + metadata;
-	}
-
-	@Override
-	public final int getRenderType() {
-		return 6;
-	}
-
-	@Override
 	public final void onBlockDestroyedByPlayer(World world, int x, int y, int z, int metadata) {
 		super.onBlockDestroyedByPlayer(world, x, y, z, metadata);
 
@@ -92,8 +88,20 @@ public final class BlockCrops extends BlockFlower {
 	}
 
 	@Override
+	public final int getBlockTextureFromSideAndMetadata(int side, int metadata) {
+		if(metadata < 0) {
+			metadata = 7;
+		}
+		return this.blockIndexInTexture + metadata;
+	}
+
+	@Override
+	public final int getRenderType() {
+		return 6;
+	}
+
+	@Override
 	public final int idDropped(int metadata, Random random) {
-		// Genuine Infdev debug output; kept verbatim.
 		System.out.println("Get resource: " + metadata);
 		return metadata == 7 ? Item.wheat.shiftedIndex : -1;
 	}
