@@ -4,6 +4,19 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 
 ## Diary
 
+### 2026-09-01 — Block colour tint hook (`getRenderColor`) and metadata-aware inventory renderer
+
+- Added `Block.getRenderColor(int metadata)` returning `0xFFFFFF` (white / no tint) as the base implementation. Subclasses that need a per-metadata colour (e.g. cloth) can override this; the renderer reads it automatically.
+- Colour is packed as `0xRRGGBB` (R = high byte, B = low byte, matching `Tessellator.setColorOpaque_F` / a1.1.2 convention).
+- Extended `BlockRenderHandler.renderBlockOnInventory` with an `int metadata` parameter, propagated through `RenderBlocks` and all four handlers that produce inventory previews (`RenderBlockNormal`, `RenderBlockCrops`, `RenderBlockPlant`, `RenderBlockTorch`).
+- Updated callers to thread metadata through: `ItemRenderer` and `RenderItem` now extract `itemStack.itemDamage`; `RenderTNT` passes `0`; `RenderFallingSand` passes `0` (the entity has no metadata field in 2010 NBT).
+- The in-world cube renderer (`RenderBlockNormal.renderBlock`) was also updated to apply the `getRenderColor` tint per-face using the block's actual world metadata, so future colour-aware blocks will tint in-world too.
+
+### 2026-08-31 — First-frame lighting flash fix
+
+- Diagnosed the "fully lit for one frame" flash when loading a night-time world: `World.skylightSubtracted` was hard-initialised to `0` in the constructor, so the first rendered frame used daytime ambient brightness; the value only updated to the saved world's correct value when `World.tick()` ran for the first time.
+- Added `World.computeSkylightSubtracted()` which mirrors the day-factor formula from `tick()`, and call it right after `worldTime` is read from `level.dat` (`World.java:167`) so the renderer picks the correct ambient value on the very first frame.
+
 ### 2026-08-27 — Baseline import
 
 - Tracked the original 2010 Java 5 decompiled sources as the working snapshot (`minecraft/src`), byte-identical to the pristine `minecraft/src_original` reference.

@@ -223,6 +223,21 @@ public class Block {
 	public void onBlockRemoval(World world, int x, int y, int z) {
 	}
 
+	/**
+	 * Returns the RGB tint applied to this block when it is rendered. The
+	 * 24-bit value packs red, green and blue as the high, middle and low
+	 * 8 bits respectively (so {@code 0xRRGGBB}). The default is
+	 * {@code 0xFFFFFF} (no tint — the texture colour shows through unchanged);
+	 * blocks such as cloth override this and let their metadata select a
+	 * coloured swatch.
+	 *
+	 * @param metadata the block's current metadata nibble
+	 * @return the tint colour in 0xRRGGBB form
+	 */
+	public int getRenderColor(int metadata) {
+		return 0xFFFFFF;
+	}
+
 	public int quantityDropped(Random random) {
 		return 1;
 	}

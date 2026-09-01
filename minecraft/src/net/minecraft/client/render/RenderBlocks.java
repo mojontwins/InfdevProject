@@ -63,8 +63,8 @@ public final class RenderBlocks {
 	}
 
 	/** Draws a single block preview inside an inventory slot. */
-	public final void renderBlockOnInventory(Block block) {
-		BlockRenderType.get(block.getRenderType()).handler().renderBlockOnInventory(this, block);
+	public final void renderBlockOnInventory(Block block, int metadata) {
+		BlockRenderType.get(block.getRenderType()).handler().renderBlockOnInventory(this, block, metadata);
 	}
 
 	/** Emits one face of the block's current bounds on the given side. */

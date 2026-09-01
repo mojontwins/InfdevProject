@@ -21,7 +21,7 @@ public final class RenderBlockPlant implements BlockRenderHandler {
 	}
 
 	@Override
-	public final void renderBlockOnInventory(RenderBlocks renderBlocks, Block block) {
+	public final void renderBlockOnInventory(RenderBlocks renderBlocks, Block block, int metadata) {
 		Tessellator tessellator = Tessellator.instance;
 		tessellator.startDrawingQuads();
 		Tessellator.setNormal(0.0F, -1.0F, 0.0F);

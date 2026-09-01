@@ -14,7 +14,11 @@ public interface BlockRenderHandler {
 	/** Renders the block in the world. Returns true when at least one face was emitted. */
 	boolean renderBlock(RenderBlocks renderBlocks, Block block, int x, int y, int z);
 
-	/** Renders the block as a 3D preview inside an inventory slot. Defaults to nothing. */
-	default void renderBlockOnInventory(RenderBlocks renderBlocks, Block block) {
+	/**
+	 * Renders the block as a 3D preview inside an inventory slot. The
+	 * {@code metadata} value lets colour-aware blocks (cloth) pick a swatch.
+	 * Defaults to nothing.
+	 */
+	default void renderBlockOnInventory(RenderBlocks renderBlocks, Block block, int metadata) {
 	}
 }
