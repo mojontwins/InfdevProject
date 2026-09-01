@@ -20,10 +20,24 @@ public final class ItemBlock extends Item {
 	}
 
 	/**
+	 * Translates an {@link ItemStack#itemDamage item damage} value into the
+	 * block metadata that should be written when this item is placed. Default
+	 * passes the damage through unchanged so a damaged block item places
+	 * with that exact metadata; sub-classes (stairs, logs, slabs) override
+	 * this to remap damage to a different nibble.
+	 */
+	public int getMetadata(int damage) {
+		return damage;
+	}
+
+	/**
 	 * Places the block on the far side of the clicked face, but only where the
 	 * target cell is empty or holds replaceable material (fluids, fire) and the
 	 * block's own placement rules pass. The exact click position on the face is
-	 * forwarded so blocks can react to where precisely they were placed.
+	 * forwarded so blocks can react to where precisely they were placed. The
+	 * block's metadata is taken from the item's damage (clamped via
+	 * {@link #getMetadata}) so that placing a damaged item stack actually
+	 * places the matching sub-variant of the block.
 	 */
 	@Override
 	public final boolean onItemUse(ItemStack stack, World world, int x, int y, int z, int side, float xWithinFace, float yWithinFace, float zWithinFace) {
@@ -38,7 +52,7 @@ public final class ItemBlock extends Item {
 			AxisAlignedBB placementBox = Block.blocksList[this.blockID].getCollisionBoundingBoxFromPool(x, y, z);
 			if ((this.blockID > 0 && existingBlock == null) || existingBlock == Block.waterMoving || existingBlock == Block.waterStill || existingBlock == Block.lavaMoving || existingBlock == Block.lavaStill || existingBlock == Block.fire) {
 				Block blockToPlace = Block.blocksList[this.blockID];
-				if ((placementBox == null || world.checkIfAABBIsClear1(placementBox)) && blockToPlace.canPlaceBlockAt(world, x, y, z) && world.setBlockWithNotify(x, y, z, this.blockID)) {
+				if ((placementBox == null || world.checkIfAABBIsClear1(placementBox)) && blockToPlace.canPlaceBlockAt(world, x, y, z) && world.setBlockAndMetadataWithNotify(x, y, z, this.blockID, this.getMetadata(stack.itemDamage))) {
 					blockToPlace.onBlockPlaced(world, x, y, z, side, xWithinFace, yWithinFace, zWithinFace);
 					world.playSoundEffect((double) ((float) x + 0.5F), (double) ((float) y + 0.5F), (double) ((float) z + 0.5F), blockToPlace.stepSound.getStepSound(), (blockToPlace.stepSound.stepSoundVolume + 1.0F) / 2.0F, blockToPlace.stepSound.stepSoundPitch * 0.8F);
 					--stack.stackSize;

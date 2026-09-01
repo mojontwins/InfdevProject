@@ -4,6 +4,11 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 
 ## Diary
 
+### 2026-09-01 — Use `ItemStack.itemDamage` as block metadata when placing
+
+- `ItemBlock.onItemUse` now reads the stack's `itemDamage` and writes it to the world as the block's metadata via `World.setBlockAndMetadataWithNotify` (replacing the old `setBlockWithNotify` call), so a damaged block item places with the matching sub-variant — e.g. a damaged cloth item places the matching colour swatch, and a damaged stair item places the matching orientation.
+- The damage-to-metadata translation goes through a new overridable `ItemBlock.getMetadata(int damage)` hook (default: pass-through). Sub-classes can override it to remap damage to a different nibble without changing the public item damage stored in the `ItemStack`. Mirrors the r1.2.5 pattern.
+
 ### 2026-09-01 — Wire up a real "Fancy graphics" option
 
 - Added a `FANCY_GRAPHICS` row in the options screen (id 6) that calls `BlockLeavesBase.setGraphicsLevel(boolean)` for every registered leaf block, so toggling the option flips leaves between translucent merged-face "fancy" mode and opaque "fast" mode. The block class already had the two-mode logic; it just had no caller.
