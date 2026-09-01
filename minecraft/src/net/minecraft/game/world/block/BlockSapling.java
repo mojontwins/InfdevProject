@@ -62,7 +62,7 @@ public final class BlockSapling extends BlockFlower {
 	@Override
 	public final void updateTick(World world, int x, int y, int z, Random random) {
 		super.updateTick(world, x, y, z, random);
-		if(world.getBlockLightValue(x, y + 1, z) >= 9 && random.nextInt(5) == 0) {
+		if(world.getBlockLightValue(x, y + 1, z) >= 10 && random.nextInt(20) == 0) {
 			int metadata = world.getBlockMetadata(x, y, z);
 			// NOTE: bit 3 (& 8) is the "ready to grow" state. The other bits
 			// (currently 0–2) are left untouched so a future sapling subtype
