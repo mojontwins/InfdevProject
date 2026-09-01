@@ -6,9 +6,9 @@ import net.minecraft.game.world.material.Material;
 
 /**
  * Sand (and, via {@link BlockGravel}, gravel): a gravity block. When the cell
- * below is air, water, lava or fire the block turns into an {@link
- * EntityFallingSand} (or simply drops to the floor below when physics are at
- * their coarsest).
+ * below is air, water, lava, fire or another substitutable block, the block
+ * turns into an {@link EntityFallingSand} (or simply drops to the floor below
+ * when physics are at their coarsest). See {@link Block#canBeSubstituted}.
  */
 public class BlockSand extends Block {
 	public static boolean fallInstantly = false;
@@ -44,16 +44,13 @@ public class BlockSand extends Block {
 		}
 	}
 
+	/**
+	 * True when the block at (x, y, z) is air or otherwise can be replaced
+	 * (fire, water, lava, flowers — see {@link Block#canBeSubstituted}). Sand
+	 * falls through such cells.
+	 */
 	public static boolean canFallBelow(World world, int x, int y, int z) {
-		int blockID = world.getBlockId(x, y, z);
-		if(blockID == 0) {
-			return true;
-		} else if(blockID == Block.fire.blockID) {
-			return true;
-		} else {
-			Block block = Block.blocksList[blockID];
-			Material material = block == null ? Material.air : block.blockMaterial;
-			return material == Material.water ? true : material == Material.lava;
-		}
+		Block block = world.getBlock(x, y, z);
+		return block == null || block.canBeSubstituted();
 	}
 }

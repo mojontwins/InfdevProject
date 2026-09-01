@@ -31,35 +31,54 @@ public final class ItemBlock extends Item {
 	}
 
 	/**
-	 * Places the block on the far side of the clicked face, but only where the
-	 * target cell is empty or holds replaceable material (fluids, fire) and the
-	 * block's own placement rules pass. The exact click position on the face is
-	 * forwarded so blocks can react to where precisely they were placed. The
-	 * block's metadata is taken from the item's damage (clamped via
-	 * {@link #getMetadata}) so that placing a damaged item stack actually
-	 * places the matching sub-variant of the block.
+	 * Places the block at the target cell, which is either the cell the player
+	 * clicked (for substitutable blocks like flowers, water, fire) or the
+	 * neighbour across the clicked face (for solid blocks). Placement only
+	 * proceeds when the target cell is empty or holds a substitutable block
+	 * (fire, fluids, flowers) and the block's own placement rules pass. The
+	 * exact click position on the face is forwarded so blocks can react to
+	 * where precisely they were placed. The block's metadata is taken from the
+	 * item's damage (clamped via {@link #getMetadata}) so that placing a
+	 * damaged item stack places the matching sub-variant of the block.
 	 */
 	@Override
 	public final boolean onItemUse(ItemStack stack, World world, int x, int y, int z, int side, float xWithinFace, float yWithinFace, float zWithinFace) {
-		int[] target = neighbourAcrossFace(side, x, y, z);
-		x = target[0];
-		y = target[1];
-		z = target[2];
-		if (stack.stackSize == 0) {
+		Block clickedBlock = Block.blocksList[world.getBlockId(x, y, z)];
+		if(stack.stackSize == 0) {
 			return false;
-		} else {
-			Block existingBlock = Block.blocksList[world.getBlockId(x, y, z)];
-			AxisAlignedBB placementBox = Block.blocksList[this.blockID].getCollisionBoundingBoxFromPool(x, y, z);
-			if ((this.blockID > 0 && existingBlock == null) || existingBlock == Block.waterMoving || existingBlock == Block.waterStill || existingBlock == Block.lavaMoving || existingBlock == Block.lavaStill || existingBlock == Block.fire) {
-				Block blockToPlace = Block.blocksList[this.blockID];
-				if ((placementBox == null || world.checkIfAABBIsClear1(placementBox)) && blockToPlace.canPlaceBlockAt(world, x, y, z) && world.setBlockAndMetadataWithNotify(x, y, z, this.blockID, this.getMetadata(stack.itemDamage))) {
-					blockToPlace.onBlockPlaced(world, x, y, z, side, xWithinFace, yWithinFace, zWithinFace);
-					world.playSoundEffect((double) ((float) x + 0.5F), (double) ((float) y + 0.5F), (double) ((float) z + 0.5F), blockToPlace.stepSound.getStepSound(), (blockToPlace.stepSound.stepSoundVolume + 1.0F) / 2.0F, blockToPlace.stepSound.stepSoundPitch * 0.8F);
-					--stack.stackSize;
-				}
-			}
-
-			return true;
 		}
+
+		int targetX = x;
+		int targetY = y;
+		int targetZ = z;
+
+		// If the clicked block is substitutable (flower, fire, fluid), place
+		// into its cell instead of the neighbour across the face.
+		if(clickedBlock == null || !clickedBlock.canBeSubstituted()) {
+			int[] target = neighbourAcrossFace(side, x, y, z);
+			targetX = target[0];
+			targetY = target[1];
+			targetZ = target[2];
+		}
+
+		Block targetBlock = Block.blocksList[world.getBlockId(targetX, targetY, targetZ)];
+		if(targetBlock == null || targetBlock.canBeSubstituted()) {
+			Block blockToPlace = Block.blocksList[this.blockID];
+			AxisAlignedBB placementBox = blockToPlace.getCollisionBoundingBoxFromPool(targetX, targetY, targetZ);
+			if((placementBox == null || world.checkIfAABBIsClear1(placementBox)) && blockToPlace.canPlaceBlockAt(world, targetX, targetY, targetZ)) {
+				world.setBlockAndMetadataWithNotify(targetX, targetY, targetZ, this.blockID, this.getMetadata(stack.itemDamage));
+				blockToPlace.onBlockPlaced(world, targetX, targetY, targetZ, side, xWithinFace, yWithinFace, zWithinFace);
+				world.playSoundEffect(
+					(double)((float)targetX + 0.5F),
+					(double)((float)targetY + 0.5F),
+					(double)((float)targetZ + 0.5F),
+					blockToPlace.stepSound.getStepSound(),
+					(blockToPlace.stepSound.stepSoundVolume + 1.0F) / 2.0F,
+					blockToPlace.stepSound.stepSoundPitch * 0.8F);
+				--stack.stackSize;
+			}
+		}
+
+		return true;
 	}
 }

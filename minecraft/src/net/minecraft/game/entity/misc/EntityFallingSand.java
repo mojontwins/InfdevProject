@@ -4,7 +4,6 @@ import com.mojang.nbt.NBTTagCompound;
 import net.minecraft.game.entity.Entity;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.Block;
-import net.minecraft.game.world.block.BlockFlower;
 import net.minecraft.game.world.block.BlockSand;
 import util.MathHelper;
 
@@ -82,10 +81,8 @@ public class EntityFallingSand extends Entity {
 
 	private boolean canBlockBePlacedAt(int x, int y, int z) {
 		Block existingBlock = Block.blocksList[this.worldObj.getBlockId(x, y, z)];
-		if(existingBlock == Block.waterMoving || existingBlock == Block.waterStill || existingBlock == Block.lavaMoving || existingBlock == Block.lavaStill || existingBlock == Block.fire || existingBlock instanceof BlockFlower) {
-			existingBlock = null;
-		}
-		return existingBlock == null && Block.blocksList[this.blockID].canPlaceBlockAt(this.worldObj, x, y, z);
+		boolean cellIsClear = existingBlock == null || existingBlock.canBeSubstituted();
+		return cellIsClear && Block.blocksList[this.blockID].canPlaceBlockAt(this.worldObj, x, y, z);
 	}
 
 	@Override

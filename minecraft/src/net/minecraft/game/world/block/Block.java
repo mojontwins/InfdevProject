@@ -338,6 +338,38 @@ public class Block {
 	}
 
 	/**
+	 * Whether this block is air-equivalent for the purposes of placing or
+	 * dropping another block in its cell. A block is substitutable when the
+	 * player meaningfully "puts a block there" — i.e. the cell can take a new
+	 * block, and the existing one disappears without conflict.
+	 *
+	 * <p>The default is true for fire and for any block made of
+	 * {@link net.minecraft.game.world.material.Material#water} or
+	 * {@link net.minecraft.game.world.material.Material#lava}. Subclasses of
+	 * {@link BlockFlower} (flowers, mushrooms, saplings, crops) override to
+	 * return true so right-clicking a flower with a block places the new
+	 * block <em>in the flower's cell</em> (replacing it) instead of next to
+	 * it.
+	 *
+	 * <p>Used by:
+	 * <ul>
+	 *   <li>{@link net.minecraft.game.world.block.BlockSand#canFallBelow}
+	 *       (sand falling through a cell occupied by a substitutable block);</li>
+	 *   <li>{@code EntityFallingSand.canBlockBePlacedAt} (a sand entity
+	 *       settling into a cell occupied by a substitutable block);</li>
+	 *   <li>{@link net.minecraft.game.item.ItemBlock#onItemUse} (player
+	 *       right-click placement when pointing at a substitutable block).</li>
+	 * </ul>
+	 *
+	 * @return {@code true} if placing another block in this block's cell is safe
+	 */
+	public boolean canBeSubstituted() {
+		return this == Block.fire
+			|| this.blockMaterial == net.minecraft.game.world.material.Material.water
+			|| this.blockMaterial == net.minecraft.game.world.material.Material.lava;
+	}
+
+	/**
 	 * How readily this block encourages fire to spread to its neighbours
 	 * (a 0-300 rating used by {@link BlockFire#updateTick}). Higher means
 	 * fire spreads onto this block more eagerly. The default of 0 means

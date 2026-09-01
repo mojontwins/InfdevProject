@@ -93,4 +93,10 @@ public class BlockFlower extends Block {
 	public int damageDropped(int metadata) {
 		return metadata;
 	}
+
+	/** Flowers (and all plant subclasses) are ephemeral: right-clicking them with a block replaces them. */
+	@Override
+	public boolean canBeSubstituted() {
+		return true;
+	}
 }

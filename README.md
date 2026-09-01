@@ -4,6 +4,29 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 
 ## Diary
 
+### 2026-09-02 — `Block.canBeSubstituted()` and the click-on-flower fix (#2, #7, and a new bug)
+
+Added a virtual method on `Block`:
+```java
+public boolean canBeSubstituted() {
+    return this == Block.fire
+        || this.blockMaterial == Material.water
+        || this.blockMaterial == Material.lava;
+}
+```
+
+A block is *substitutable* when the player meaningfully "puts a block there" — i.e. the cell can take a new block, and the existing one disappears without conflict. The default covers fire, water, lava. `BlockFlower` (covers flowers, mushrooms, saplings, crops via the hierarchy) overrides to return `true`. Solid decorations like cogs default to `false`, so they stay opaque to placement.
+
+Three call sites are routed through it:
+
+- **`BlockSand.canFallBelow`** (proposal #2): the static helper previously listed air, fire, water, lava by id and material. Now `block == null || block.canBeSubstituted()`.
+- **`EntityFallingSand.canBlockBePlacedAt`** (proposal #7): the `instanceof BlockFlower` check and the four water/lava id checks collapse to `existingBlock == null || existingBlock.canBeSubstituted()`.
+- **`ItemBlock.onItemUse`** (new behaviour, this commit): right-clicking a flower (or any substitutable block) with a block item now places the new block **in the clicked cell, replacing the flower**, instead of placing in the cell across the clicked face. Before the fix, the player had to right-click *next to* a flower to place a block on its cell — the bug is in vanilla Infdev 2010 too.
+
+`canPlaceBlockAt` is still called on the new block at the target cell, so the placement rules (e.g. need a plant-supporting block below) are not bypassed. The "where" and the "is the cell clear" questions are now both answered by the same hook, with no enumeration of block ids or materials at the call sites.
+
+Full-tree `javac -source 1.8 -target 1.8` compile passed (`EXIT: 0`).
+
 ### 2026-09-02 — Six more de-hardcoding passes (#4, #5, #6, #8, #9, #11)
 
 A batch of small, focused refactors that move id checks onto the block
