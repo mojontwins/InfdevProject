@@ -4,6 +4,20 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 
 ## Diary
 
+### 2026-09-02 — Backport `EntityCow` from a1.1.2
+
+Cows now exist in the world. Backported from `minecraft_a1.1.2/src/net/minecraft/src/EntityCow.java`.
+
+- `EntityCow extends EntityAnimal`: `texture = "/mob/cow.png"`, `setSize(0.9F, 1.3F)`, `getLivingSound` / `getHurtSound` / `getDeathSound` set to `mob.cow` / `mob.cowhurt` / `mob.cowhurt`. `getDroppedItem()` returns `Item.leather.shiftedIndex` (the existing `EntityLiving.onDeath` scatter is 0-2 drops). The `interact` method is a stub (no right-click handler wired in this codebase yet).
+- `ModelCow extends ModelBase` (not `ModelQuadruped`): the working-src `ModelRenderer.rotationPoint*` fields are private and `ModelQuadruped.render` is final, so the cow's extra parts (horns, udders) cannot piggy-back on the base class. The legs are constructed inline with the same offsets the a1.1.2 reference would have produced via the in-place `--leg1.rotationPointX` mutations.
+- `RenderCow extends RenderLiving`: thin class — `RenderLiving` already does the work; the subclass exists so the renderer registry can name a model and shadow size.
+- `Item.java` adds `leather` (id 67), `bucketEmpty` (id 68), `bucketMilk` (id 69) at the end of the register sequence (so no existing ids shift). These are needed for the cow's drop (`leather`) and the stub milking interaction (`bucketEmpty` / `bucketMilk`).
+- `EntityList` adds `addMapping(EntityCow.class, "Cow")`. The save-format string is new and so does not collide with anything in older worlds.
+- `World.animalSpawner` adds `EntityCow.class` to the spawnable-animals array.
+- `RenderManager` adds `new RenderCow(new ModelCow(), 0.7F)`.
+
+Full-tree `javac -source 1.8 -target 1.8` EXIT=0, 294 files.
+
 ### 2026-09-02 — `Block.canBeSubstituted()` and the click-on-flower fix (#2, #7, and a new bug)
 
 Added a virtual method on `Block`:

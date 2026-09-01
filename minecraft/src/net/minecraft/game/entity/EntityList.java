@@ -3,6 +3,7 @@ package net.minecraft.game.entity;
 import com.mojang.nbt.NBTTagCompound;
 import java.util.HashMap;
 import java.util.Map;
+import net.minecraft.game.entity.animal.EntityCow;
 import net.minecraft.game.entity.animal.EntityPig;
 import net.minecraft.game.entity.animal.EntitySheep;
 import net.minecraft.game.entity.misc.EntityFallingSand;
@@ -69,6 +70,7 @@ public final class EntityList {
 		addMapping(EntityZombie.class, "Zombie");
 		addMapping(EntityPig.class, "Pig");
 		addMapping(EntitySheep.class, "Sheep");
+		addMapping(EntityCow.class, "Cow");
 		addMapping(EntityTNT.class, "PrimedTnt");
 		addMapping(EntityFallingSand.class, "FallingSand");
 	}

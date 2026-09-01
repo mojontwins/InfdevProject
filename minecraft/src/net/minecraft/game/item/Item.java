@@ -91,6 +91,9 @@ public class Item {
 	public static Item porkCooked;
 	public static Item painting;
 	public static Item appleGold;
+	public static Item leather;
+	public static Item bucketEmpty;
+	public static Item bucketMilk;
 
 	/** The item's id in {@link #itemsList} (= the register order plus the 256 shift). */
 	public final int shiftedIndex;
@@ -253,6 +256,9 @@ public class Item {
 		porkCooked = register(new ItemFood(64, 8), 88);
 		painting = register(new ItemPainting(65), 26);
 		appleGold = register(new ItemFood(66, 42), 11);
+		leather = register(new Item(67), 112);
+		bucketEmpty = register(new Item(68), 117);
+		bucketMilk = register(new Item(69), 122);
 	}
 
 	/**

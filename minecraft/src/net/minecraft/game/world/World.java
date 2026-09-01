@@ -12,6 +12,7 @@ import net.minecraft.game.entity.Entity;
 import net.minecraft.game.entity.EntityLiving;
 import net.minecraft.game.entity.misc.EntityItem;
 import net.minecraft.game.entity.animal.EntityAnimal;
+import net.minecraft.game.entity.animal.EntityCow;
 import net.minecraft.game.entity.animal.EntityPig;
 import net.minecraft.game.entity.animal.EntitySheep;
 import net.minecraft.game.entity.monster.EntityCreeper;
@@ -142,7 +143,7 @@ public class World implements IBlockAccess {
 		this.monsterSpawner = new MobSpawner(this, 100, EntityMonster.class,
 				new Class<?>[]{EntityZombie.class, EntitySkeleton.class, EntityCreeper.class, EntitySpider.class});
 		this.animalSpawner = new MobSpawner(this, 50, EntityAnimal.class,
-				new Class<?>[]{EntitySheep.class, EntityPig.class});
+				new Class<?>[]{EntitySheep.class, EntityPig.class, EntityCow.class});
 		this.isNewWorld = false;
 		this.worldAccesses = new ArrayList<>();
 		this.randomSeed = 0L;
