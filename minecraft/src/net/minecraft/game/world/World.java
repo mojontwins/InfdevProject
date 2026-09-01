@@ -463,16 +463,16 @@ public class World implements IBlockAccess {
 
 	/**
 	 * Internal recursive helper for {@link #getBlockLightValue}. The first
-	 * call (with {@code firstCall = true}) checks if the block is a stair
-	 * or tilled field, which have their effective light value taken from
-	 * the brightest neighbour. Subsequent calls just read the chunk's
-	 * light value.
+	 * call (with {@code firstCall = true}) checks if the block takes its light
+	 * from the brightest neighbour (single slabs, farmland — see
+	 * {@link Block#takesLightFromAbove}). Subsequent calls just read the
+	 * chunk's light value.
 	 */
 	private int getBlockLightValue_do(int x, int y, int z, boolean firstCall) {
 		int lightValue;
 		if(firstCall) {
-			lightValue = this.getBlockId(x, y, z);
-			if(lightValue == Block.stairSingle.blockID || lightValue == Block.tilledField.blockID) {
+			Block block = this.getBlock(x, y, z);
+			if(block != null && block.takesLightFromAbove()) {
 				lightValue = this.getBlockLightValue_do(x, y + 1, z, false);
 				int eastValue  = this.getBlockLightValue_do(x + 1, y, z, false);
 				int westValue  = this.getBlockLightValue_do(x - 1, y, z, false);

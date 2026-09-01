@@ -119,10 +119,23 @@ public class BlockFluid extends Block {
 	};
 
 	/**
-	 * Lava meeting water hardens: a lava source becomes obsidian (this block set
-	 * has no crying variant, so obsidian is the only reward), any flowing lava
-	 * within four decay levels turns to cobblestone. Only the lava side reacts;
-	 * water flowing over lava does nothing.
+	 * The block this liquid hardens into when meeting the other fluid type.
+	 * Water does not harden; lava hardens into cobblestone (decay 1–4) or
+	 * obsidian (decay 0, a source block). The base default is {@code null}
+	 * for water; the lava override at the bottom of this class returns the
+	 * right block. Used by {@link #checkForHarden}.
+	 *
+	 * @param decay  the flow-decay level of the cell (0 = source, 1–7 = flow)
+	 * @return the hardened block, or {@code null} if this liquid does not harden
+	 */
+	protected Block hardenedBlock(int decay) {
+		return this.blockMaterial == Material.lava ? (decay == 0 ? Block.obsidian : (decay <= 4 ? Block.cobblestone : null)) : null;
+	}
+
+	/**
+	 * Lava meeting water hardens: a lava source becomes obsidian, any flowing
+	 * lava within four decay levels turns to cobblestone. Only the lava side
+	 * reacts; water flowing over lava does nothing.
 	 */
 	private void checkForHarden(World world, int x, int y, int z) {
 		if(world.getBlockId(x, y, z) != this.blockID || this.blockMaterial != Material.lava) {
@@ -136,10 +149,9 @@ public class BlockFluid extends Block {
 		}
 
 		int decay = world.getBlockMetadata(x, y, z);
-		if(decay == 0) {
-			world.setBlockWithNotify(x, y, z, Block.obsidian.blockID);
-		} else if(decay <= 4) {
-			world.setBlockWithNotify(x, y, z, Block.cobblestone.blockID);
+		Block hardened = this.hardenedBlock(decay);
+		if(hardened != null) {
+			world.setBlockWithNotify(x, y, z, hardened.blockID);
 		}
 		this.triggerLavaMixEffects(world, x, y, z);
 	}

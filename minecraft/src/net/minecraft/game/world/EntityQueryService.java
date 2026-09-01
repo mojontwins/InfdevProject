@@ -134,8 +134,8 @@ final class EntityQueryService {
 		for(int x = minX; x < maxX; ++x) {
 			for(int y = minY; y < maxY; ++y) {
 				for(int z = minZ; z < maxZ; ++z) {
-					int blockID = world.getBlockId(x, y, z);
-					if(blockID == Block.fire.blockID || blockID == Block.lavaMoving.blockID || blockID == Block.lavaStill.blockID) {
+					Block block = world.getBlock(x, y, z);
+					if(block != null && block.isBurning()) {
 						return true;
 					}
 				}

@@ -49,4 +49,10 @@ public final class BlockGrass extends Block {
 	public boolean canGrowPlants(int metadata) {
 		return true;
 	}
+
+	/** Grass is the canonical animal-friendly ground: full 10-point bonus. */
+	@Override
+	public float getAnimalPathBonus() {
+		return 10.0F;
+	}
 }

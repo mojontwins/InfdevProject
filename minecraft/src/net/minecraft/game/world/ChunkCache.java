@@ -70,10 +70,10 @@ public class ChunkCache implements IBlockAccess {
 		int lightValue;
 
 		if (isCenterBlock) {
-			// Slabs and farmland take their light from the brightest of the
-			// five neighbouring cells instead of their own (too dark) cell.
-			lightValue = this.getBlockId(x, y, z);
-			if (lightValue == Block.stairSingle.blockID || lightValue == Block.tilledField.blockID) {
+			// Single slabs and farmland take their light from the brightest of
+			// the five neighbouring cells instead of their own (too dark) cell.
+			Block block = Block.blocksList[this.getBlockId(x, y, z)];
+			if (block != null && block.takesLightFromAbove()) {
 				int above = this.getLightValueExt(x, y + 1, z, false);
 				int east = this.getLightValueExt(x + 1, y, z, false);
 				int west = this.getLightValueExt(x - 1, y, z, false);

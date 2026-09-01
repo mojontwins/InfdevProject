@@ -95,4 +95,9 @@ public final class BlockFarmland extends Block {
 	public boolean canGrowCrops(int metadata) {
 		return true;
 	}
+
+	@Override
+	public final boolean takesLightFromAbove() {
+		return true;
+	}
 }

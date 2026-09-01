@@ -15,13 +15,17 @@ import util.TextureAtlas;
  * to the sides that are actually connected, and climbs one block up the sides
  * of the blocks neighbouring a vertical connection.
  *
- * The canonical wire id is 55 and {@code canProvidePower()} does not exist in
- * this version, so the power-connection test below only links a wire to other
- * wires. The block-access test {@code isBlockNormalCube} is not part of the
+ * The canonical wire id is {@link #REDSTONE_WIRE_ID} and
+ * {@code canProvidePower()} does not exist in this version, so the
+ * power-connection test below only links a wire to other wires. The
+ * block-access test {@code isBlockNormalCube} is not part of the
  * {@code IBlockAccess} surface here either, so the solid-block test is used
  * instead.
  */
 public final class RenderBlockRedstoneWire implements BlockRenderHandler {
+	/** The block id of the redstone wire (also the slot shared with the cog/gears block). */
+	private static final int REDSTONE_WIRE_ID = 55;
+
 	@Override
 	public final boolean renderBlock(RenderBlocks renderBlocks, Block block, int x, int y, int z) {
 		IBlockAccess blockAccess = renderBlocks.blockAccess;
@@ -143,28 +147,28 @@ public final class RenderBlockRedstoneWire implements BlockRenderHandler {
 		vLo = AtlasUV.v1;
 		vHi = AtlasUV.v2;
 		if(!blockAccess.isSolid(x, y + 1, z)) {
-			if(blockAccess.isSolid(x - 1, y, z) && blockAccess.getBlockId(x - 1, y + 1, z) == 55) {
+			if(blockAccess.isSolid(x - 1, y, z) && blockAccess.getBlockId(x - 1, y + 1, z) == REDSTONE_WIRE_ID) {
 				tessellator.addVertexWithUV((double)((float)x + thickness), (double)((float)(y + 1) + trim), (double)((float)(z + 1) + trim), uHi, vLo);
 				tessellator.addVertexWithUV((double)((float)x + thickness), (double)((float)y - trim), (double)((float)(z + 1) + trim), uLo, vLo);
 				tessellator.addVertexWithUV((double)((float)x + thickness), (double)((float)y - trim), (double)((float)z - trim), uLo, vHi);
 				tessellator.addVertexWithUV((double)((float)x + thickness), (double)((float)(y + 1) + trim), (double)((float)z - trim), uHi, vHi);
 			}
 
-			if(blockAccess.isSolid(x + 1, y, z) && blockAccess.getBlockId(x + 1, y + 1, z) == 55) {
+			if(blockAccess.isSolid(x + 1, y, z) && blockAccess.getBlockId(x + 1, y + 1, z) == REDSTONE_WIRE_ID) {
 				tessellator.addVertexWithUV((double)((float)(x + 1) - thickness), (double)((float)y - trim), (double)((float)(z + 1) + trim), uLo, vHi);
 				tessellator.addVertexWithUV((double)((float)(x + 1) - thickness), (double)((float)(y + 1) + trim), (double)((float)(z + 1) + trim), uHi, vHi);
 				tessellator.addVertexWithUV((double)((float)(x + 1) - thickness), (double)((float)(y + 1) + trim), (double)((float)z - trim), uHi, vLo);
 				tessellator.addVertexWithUV((double)((float)(x + 1) - thickness), (double)((float)y - trim), (double)((float)z - trim), uLo, vLo);
 			}
 
-			if(blockAccess.isSolid(x, y, z - 1) && blockAccess.getBlockId(x, y + 1, z - 1) == 55) {
+			if(blockAccess.isSolid(x, y, z - 1) && blockAccess.getBlockId(x, y + 1, z - 1) == REDSTONE_WIRE_ID) {
 				tessellator.addVertexWithUV((double)((float)(x + 1) + trim), (double)((float)y - trim), (double)((float)z + thickness), uLo, vHi);
 				tessellator.addVertexWithUV((double)((float)(x + 1) + trim), (double)((float)(y + 1) + trim), (double)((float)z + thickness), uHi, vHi);
 				tessellator.addVertexWithUV((double)((float)x - trim), (double)((float)(y + 1) + trim), (double)((float)z + thickness), uHi, vLo);
 				tessellator.addVertexWithUV((double)((float)x - trim), (double)((float)y - trim), (double)((float)z + thickness), uLo, vLo);
 			}
 
-			if(blockAccess.isSolid(x, y, z + 1) && blockAccess.getBlockId(x, y + 1, z + 1) == 55) {
+			if(blockAccess.isSolid(x, y, z + 1) && blockAccess.getBlockId(x, y + 1, z + 1) == REDSTONE_WIRE_ID) {
 				tessellator.addVertexWithUV((double)((float)(x + 1) + trim), (double)((float)(y + 1) + trim), (double)((float)(z + 1) - thickness), uHi, vLo);
 				tessellator.addVertexWithUV((double)((float)(x + 1) + trim), (double)((float)y - trim), (double)((float)(z + 1) - thickness), uLo, vLo);
 				tessellator.addVertexWithUV((double)((float)x - trim), (double)((float)y - trim), (double)((float)(z + 1) - thickness), uLo, vHi);
@@ -176,10 +180,11 @@ public final class RenderBlockRedstoneWire implements BlockRenderHandler {
 	}
 
 	/**
-	 * The canonical wire only links to itself here: id 55 is the redstone wire,
-	 * and no block in this version reports {@code canProvidePower()}.
+	 * The canonical wire only links to itself here: id {@value #REDSTONE_WIRE_ID}
+	 * is the redstone wire, and no block in this version reports
+	 * {@code canProvidePower()}.
 	 */
 	private static boolean isPowerProviderOrWire(IBlockAccess blockAccess, int x, int y, int z) {
-		return blockAccess.getBlockId(x, y, z) == 55;
+		return blockAccess.getBlockId(x, y, z) == REDSTONE_WIRE_ID;
 	}
 }

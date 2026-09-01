@@ -49,7 +49,7 @@ public class Block {
 	public static final Block gravel = (new BlockGravel(13, 19)).setHardness(0.6F).setStepSound(soundGravelFootstep);
 	public static final Block oreGold = (new BlockOre(14, 32)).setHardness(3.0F).setResistance(5.0F).setStepSound(soundStoneFootstep);
 	public static final Block oreIron = (new BlockOre(15, 33)).setHardness(3.0F).setResistance(5.0F).setStepSound(soundStoneFootstep);
-	public static final Block oreCoal = (new BlockOre(16, 34)).setHardness(3.0F).setResistance(5.0F).setStepSound(soundStoneFootstep);
+	public static final Block oreCoal = (new BlockOreCoal(16, 34)).setHardness(3.0F).setResistance(5.0F).setStepSound(soundStoneFootstep);
 	public static final Block wood = (new BlockLog(17)).setHardness(2.0F).setStepSound(soundWoodFootstep);
 	public static final Block leaves = (new BlockLeaves(18, 52)).setHardness(0.2F).setLightOpacity(1).setStepSound(soundGrassFootstep);
 	public static final Block sponge = (new BlockSponge(19)).setHardness(0.6F).setStepSound(soundGrassFootstep);
@@ -70,7 +70,7 @@ public class Block {
 	public static final BlockFire fire = (BlockFire)(new BlockFire(51, 31)).setHardness(0.0F).setLightValue(1.0F).setStepSound(soundWoodFootstep);
 	public static final Block chest = (new BlockChest(54)).setHardness(2.5F).setStepSound(soundWoodFootstep);
 	public static final Block cog = (new BlockGears(55, 62)).setHardness(0.5F).setStepSound(soundMetalFootstep);
-	public static final Block oreDiamond = (new BlockOre(56, 50)).setHardness(3.0F).setResistance(5.0F).setStepSound(soundStoneFootstep);
+	public static final Block oreDiamond = (new BlockOreDiamond(56, 50)).setHardness(3.0F).setResistance(5.0F).setStepSound(soundStoneFootstep);
 	public static final Block blockDiamond = (new BlockOreStorage(57, 40)).setHardness(5.0F).setResistance(10.0F).setStepSound(soundMetalFootstep);
 	public static final Block workbench = (new BlockWorkbench(58)).setHardness(2.5F).setStepSound(soundWoodFootstep);
 	public static final Block crops = (new BlockCrops(59, 88)).setHardness(0.0F).setStepSound(soundGrassFootstep);
@@ -297,6 +297,69 @@ public class Block {
 	 */
 	public boolean canGrowCrops(int metadata) {
 		return false;
+	}
+
+	/**
+	 * Whether this block is on fire / made of burning material. The default is
+	 * true for any block made of {@link net.minecraft.game.world.material.Material#lava}
+	 * (covers both flowing and stationary lava); {@link BlockFire} overrides
+	 * to return {@code true} for itself too. Used by entity AI
+	 * ({@code EntityQueryService.isBoundingBoxBurning}) to test whether an
+	 * entity is touching a burning block.
+	 */
+	public boolean isBurning() {
+		return this.blockMaterial == net.minecraft.game.world.material.Material.lava;
+	}
+
+	/**
+	 * Whether this block takes its light from the cell above it (and its four
+	 * horizontal neighbours) instead of from itself. Single slabs and farmland
+	 * are full-bright-look-through because the cell below them is too dark
+	 * (a slab is half-height; farmland is a thin slice over dirt). Override
+	 * to {@code true} on those blocks; default {@code false}.
+	 *
+	 * <p>Used by {@code World.getBlockLightValue_do} and
+	 * {@code ChunkCache.getLightValueExt} — both of which previously listed
+	 * {@link #stairSingle} and {@link #tilledField} by id.
+	 */
+	public boolean takesLightFromAbove() {
+		return false;
+	}
+
+	/**
+	 * The animal pathfinding bonus this block contributes when directly beneath an
+	 * {@link EntityAnimal}. Used to bias mob spawning and wandering toward
+	 * preferred ground. Default 0.0F; grass overrides to 10.0F.
+	 *
+	 * @return the path bonus value
+	 */
+	public float getAnimalPathBonus() {
+		return 0.0F;
+	}
+
+	/**
+	 * How readily this block encourages fire to spread to its neighbours
+	 * (a 0-300 rating used by {@link BlockFire#updateTick}). Higher means
+	 * fire spreads onto this block more eagerly. The default of 0 means
+	 * the block is fireproof; burnable blocks (planks, wood, leaves, …)
+	 * override this.
+	 *
+	 * @return the encouragement rating, 0-300
+	 */
+	public int getEncouragementToFire() {
+		return 0;
+	}
+
+	/**
+	 * How long this block continues to burn once it has caught fire (a
+	 * 0-300 rating used by {@link BlockFire#tryToCatchBlockOnFire}).
+	 * Higher means the block burns longer. The default of 0 means the
+	 * block is non-flammable; burnable blocks override this.
+	 *
+	 * @return the burn-time rating, 0-300
+	 */
+	public int getAbilityToCatchFire() {
+		return 0;
 	}
 
 	/** Digging strength without knowing the block's state; treats metadata as "any". */

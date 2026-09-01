@@ -52,6 +52,11 @@ public final class BlockFire extends Block {
 	}
 
 	@Override
+	public final boolean isBurning() {
+		return true;
+	}
+
+	@Override
 	public final int getRenderType() {
 		return 3;
 	}

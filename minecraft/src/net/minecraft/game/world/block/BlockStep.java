@@ -57,4 +57,9 @@ public final class BlockStep extends Block {
 		boolean renderSide = super.shouldSideBeRendered(blockAccess, x, y, z, side);
 		return side == 1 ? true : (!renderSide ? false : (side == 0 ? true : blockAccess.getBlockId(x, y, z) != this.blockID));
 	}
+
+	@Override
+	public final boolean takesLightFromAbove() {
+		return !this.doubleSlab;
+	}
 }

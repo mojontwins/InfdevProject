@@ -4,6 +4,51 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 
 ## Diary
 
+### 2026-09-02 — Six more de-hardcoding passes (#4, #5, #6, #8, #9, #11)
+
+A batch of small, focused refactors that move id checks onto the block
+hierarchy. Each is byte-for-byte behaviour-preserving and follows the same
+pattern: a virtual method on the base class, an override on the specific
+block(s) that need special behaviour, and a redirect at the call site.
+
+- **#4 `Block.isBurning()`** — default is `blockMaterial == Material.lava`,
+  overridden in `BlockFire` to return `true`. Replaces the
+  3-id OR chain in `EntityQueryService.isBoundingBoxBurning`
+  (`Block.fire`, `Block.lavaMoving`, `Block.lavaStill`) with
+  `block.isBurning()`. Same semantics, one virtual dispatch.
+
+- **#5 `Block.takesLightFromAbove()`** — default `false`, overridden in
+  `BlockStep` (only when `!doubleSlab`) and `BlockFarmland`. Replaces the
+  duplicated `id == stairSingle || id == tilledField` check in
+  `World.getBlockLightValue_do` and `ChunkCache.getLightValueExt` with
+  `block.takesLightFromAbove()`. The two call sites are now identical
+  one-liners.
+
+- **#6 `Block.getAnimalPathBonus()`** — default `0.0F`, overridden in
+  `BlockGrass` to `10.0F`. `EntityAnimal.getBlockPathWeight` now asks the
+  block below instead of checking `Block.grass.blockID`. The 10.0F
+  tuning constant moves to where it belongs (the block that earns it).
+
+- **#8 `BlockFluid.hardenedBlock(int decay)`** — protected method on the
+  fluid base that returns `null` for water and (for lava) the right block:
+  obsidian for source (decay 0), cobblestone for flowing (decay 1-4).
+  `checkForHarden` no longer hardcodes `Block.obsidian.blockID` or
+  `Block.cobblestone.blockID`; it just calls `this.hardenedBlock(decay)`.
+
+- **#9 `BlockOreCoal` / `BlockOreDiamond`** — two new subclasses that
+  override `idDropped` to return `Item.coal.shiftedIndex` and
+  `Item.diamod.shiftedIndex` respectively. `Block.oreCoal` and
+  `Block.oreDiamond` are now declared with the new subclasses; the base
+  `BlockOre.idDropped` simplifies to `return this.blockID`. The
+  `this.blockID == Block.oreCoal.blockID` ternary chain is gone.
+
+- **#11 `RenderBlockRedstoneWire.REDSTONE_WIRE_ID`** — extracted the
+  five occurrences of the magic literal `55` into a single named
+  constant at the top of the file, with a javadoc note explaining
+  it shares the slot with the cog/gears block in this version.
+
+Full-tree `javac -source 1.8 -target 1.8` compile passed (`EXIT: 0`).
+
 ### 2026-09-02 — Add `Block.canGrowCrops(int metadata)` hook
 
 De-hardcoded `BlockCrops.updateTick`: the 3×3 neighbourhood scan of farmland used to read `world.getBlockId(tileX, y-1, tileZ) == Block.tilledField.blockID` nine times per random tick and used the metadata inline. Replaced with a virtual method on `Block`:
