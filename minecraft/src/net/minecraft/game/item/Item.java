@@ -34,6 +34,7 @@ public class Item {
 	public static Item diamond = (new Item(8)).setIconIndex(55);
 	public static Item ingotIron = (new Item(9)).setIconIndex(23);
 
+	// ID 10
 	public static Item ingotGold = (new Item(10)).setIconIndex(39);
 	public static Item swordSteel = (new ItemSword(11, 2)).setIconIndex(66);
 	public static Item swordWood = (new ItemSword(12, 0)).setIconIndex(64);
@@ -45,6 +46,7 @@ public class Item {
 	public static Item pickaxeStone = (new ItemPickaxe(18, 1)).setIconIndex(97);
 	public static Item axeStone = (new ItemAxe(19, 1)).setIconIndex(113);
 
+	// ID 20
 	public static Item swordDiamond = (new ItemSword(20, 3)).setIconIndex(67);
 	public static Item shovelDiamond = (new ItemSpade(21, 3)).setIconIndex(83);
 	public static Item pickaxeDiamond = (new ItemPickaxe(22, 3)).setIconIndex(99);
@@ -56,6 +58,7 @@ public class Item {
 	public static Item shovelGold = (new ItemSpade(28, 0)).setIconIndex(84);
 	public static Item pickaxeGold = (new ItemPickaxe(29, 0)).setIconIndex(100);
 
+	// ID 30
 	public static Item axeGold = (new ItemAxe(30, 0)).setIconIndex(116);
 	public static Item silk = (new Item(31)).setIconIndex(8);
 	public static Item feather = (new Item(32)).setIconIndex(24);
@@ -67,6 +70,7 @@ public class Item {
 	public static Item hoeGold = (new ItemHoe(38, 1)).setIconIndex(132);
 	public static Item seeds = (new ItemSeeds(39, Block.crops.blockID)).setIconIndex(9);
 
+	// ID 40
 	public static Item wheat = (new Item(40)).setIconIndex(25);
 	public static Item bread = (new ItemFood(41, 5)).setIconIndex(41);
 	public static Item helmetLeather = (new ItemArmor(42, 0, 0, 0)).setIconIndex(0);
@@ -78,6 +82,7 @@ public class Item {
 	public static Item legsChain = (new ItemArmor(48, 1, 1, 2)).setIconIndex(33);
 	public static Item bootsChain = (new ItemArmor(49, 1, 1, 3)).setIconIndex(49);
 
+	// ID 50
 	public static Item helmetSteel = (new ItemArmor(50, 2, 2, 0)).setIconIndex(2);
 	public static Item plateSteel = (new ItemArmor(51, 2, 2, 1)).setIconIndex(18);
 	public static Item legsSteel = (new ItemArmor(52, 2, 2, 2)).setIconIndex(34);
@@ -89,6 +94,7 @@ public class Item {
 	public static Item helmetGold = (new ItemArmor(58, 1, 4, 0)).setIconIndex(4);
 	public static Item plateGold = (new ItemArmor(59, 1, 4, 1)).setIconIndex(20);
 
+	// ID 60
 	public static Item legsGold = (new ItemArmor(60, 1, 4, 2)).setIconIndex(36);
 	public static Item bootsGold = (new ItemArmor(61, 1, 4, 3)).setIconIndex(52);
 	public static Item flint = (new Item(62)).setIconIndex(6);
@@ -100,8 +106,10 @@ public class Item {
 	public static Item bucketEmpty = (new ItemBucket(68, 0)).setIconIndex(74);
 	public static Item bucketMilk = (new ItemBucket(69, -1)).setIconIndex(77);
 
+	// ID 70
 	public static Item bucketWater = (new ItemBucket(70, Block.waterMoving.blockID)).setIconIndex(75);
 	public static Item bucketLava = (new ItemBucket(71, Block.lavaMoving.blockID)).setIconIndex(76);
+	// ID 72 .. ID 1023: free
 
 	/** The item's id in {@link #itemsList} (= the register order plus the 256 shift). */
 	public final int shiftedIndex;

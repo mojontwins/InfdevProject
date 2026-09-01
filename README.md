@@ -9,10 +9,11 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 `Block.java` and `Item.java` static catalogue sections are now:
 
 - Ordered strictly by id (ascending).
-- Grouped in blocks of 10 with an extra blank line after every group.
-- `Block.java` includes `// ID NNN` placeholder comments for every unoccupied id
-  (e.g. 21–34, 36, 39–40, 50–53, 63–255). `Item.java` has no gaps (ids 0–71
-  are all occupied).
+- Grouped in blocks of 10 with a blank line after every group.
+- `Block.java` has a `// ID NNN` placeholder on its own line for every
+  unoccupied id (0, 21–34, 36, 39–40, 52–53, 63–255), so free slots are
+  obvious at a glance. `Item.java` has no gaps (ids 0–71 are all occupied)
+  and ends with `// ID 72 .. ID 1023: free` to mark the open range.
 
 This makes it easy to scan which ids are free and where to insert new blocks/items.
 
