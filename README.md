@@ -4,6 +4,10 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 
 ## Diary
 
+### 2026-09-01 — Extract `Block.itemStackDropped(int, Random)`
+
+Extracted the `ItemStack` construction out of `dropBlockAsItemWithChance` into a new overridable `itemStackDropped(int metadata, Random rand)` method on `Block`. The default implementation calls `idDropped` and `damageDropped` — behaviour is byte-for-byte identical for every existing block. The refactor enables subclasses to attach extra data (enchantments, NBT, display name) to their drops without touching the drop-chance or entity-spawning logic. It also correctly handles blocks that randomise their item id on each call: the stack is now built per loop iteration instead of once per block.
+
 ### 2026-09-01 — Backport `WorldGenTrees` (small oak-style tree)
 
 Added `WorldGenTrees` — the small oak tree generator from a1.1.2 that was the default tree choice before large variants appeared. The a1.1.2 source used one-letter variable names throughout and had no comments; this backport:

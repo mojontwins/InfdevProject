@@ -256,6 +256,21 @@ public class Block {
 	}
 
 	/**
+	 * Builds the {@link ItemStack} that this block drops when broken. The default
+	 * implementation calls {@link #idDropped} for the item id and {@link #damageDropped}
+	 * for the damage value; both hooks are already overridable. Subclasses that need
+	 * to attach extra data to the dropped stack (enchantments, display name, NBT) can
+	 * override this method without touching the drop-chance or entity-spawning logic.
+	 *
+	 * @param metadata  the block's current metadata (growth stage, colour variant, etc.)
+	 * @param rand      the shared world random, for blocks that randomise their drop
+	 * @return the stack to drop; the caller discards it when the item id is non-positive
+	 */
+	public ItemStack itemStackDropped(int metadata, Random rand) {
+		return new ItemStack(this.idDropped(metadata, rand), 1, this.damageDropped(metadata));
+	}
+
+	/**
 	 * Whether a plant (flower, sapling, mushroom) may grow on this block. Override
 	 * to return {@code true} for dirt, grass and any other block that should be a
 	 * valid plant base. The metadata parameter allows a block to accept or reject
@@ -312,12 +327,12 @@ public class Block {
 
 		for(int i = 0; i < itemCount; ++i) {
 			if(world.rand.nextFloat() <= chance) {
-				int droppedItemID = this.idDropped(metadata, world.rand);
-				if(droppedItemID > 0) {
+				ItemStack drop = this.itemStackDropped(metadata, world.rand);
+				if(drop.itemID > 0) {
 					double offsetX = (double)(world.rand.nextFloat() * 0.7F) + (double)0.15F;
 					double offsetY = (double)(world.rand.nextFloat() * 0.7F) + (double)0.15F;
 					double offsetZ = (double)(world.rand.nextFloat() * 0.7F) + (double)0.15F;
-					EntityItem entityItem = new EntityItem(world, (double)x + offsetX, (double)y + offsetY, (double)z + offsetZ, new ItemStack(droppedItemID, 1, this.damageDropped(metadata)));
+					EntityItem entityItem = new EntityItem(world, (double)x + offsetX, (double)y + offsetY, (double)z + offsetZ, drop);
 					entityItem.delayBeforeCanPickup = 10;
 					world.spawnEntityInWorld(entityItem);
 				}
