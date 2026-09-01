@@ -1,7 +1,6 @@
 package net.minecraft.game.world.biome;
 
 import java.util.Random;
-import java.util.stream.IntStream;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.Block;
 import net.minecraft.game.world.terrain.generate.WorldGenBigTree;
@@ -115,23 +114,22 @@ public final class BiomeGenInfdev extends BiomeGenerator {
 	 * third as much, gold and diamond only when the chunk-local chance hits).
 	 * The chunk provider has already re-seeded {@code rand} so the draw order
 	 * here is reproducible per chunk.
+	 *
+	 * <p>Coal runs 20 times, iron 10 times, gold with 50% chance, diamond with
+	 * 12.5% chance. All four call the inherited {@link BiomeGenerator#placeOreVein}
+	 * with a positive amount (fixed-count) or negative amount (probabilistic).
 	 */
 	@Override
 	public final void populateOres(World world, Random rand, int baseX, int baseZ) {
 		WorldGenMinable coalVein = new WorldGenMinable(Block.oreCoal.blockID);
 		WorldGenMinable ironVein = new WorldGenMinable(Block.oreIron.blockID);
-		IntStream.range(0, 20).forEach(i -> placeOreVein(world, rand, coalVein, 128, baseX, baseZ));
-		IntStream.range(0, 10).forEach(i -> placeOreVein(world, rand, ironVein, 64, baseX, baseZ));
+		placeOreVein(world, rand, coalVein, 128, 20, baseX, baseZ);
+		placeOreVein(world, rand, ironVein, 64, 10, baseX, baseZ);
 
 		WorldGenMinable goldVein = new WorldGenMinable(Block.oreGold.blockID);
 		WorldGenMinable diamondVein = new WorldGenMinable(Block.oreDiamond.blockID);
-		if(rand.nextInt(2) == 0) {
-			placeOreVein(world, rand, goldVein, 32, baseX, baseZ);
-		}
-
-		if(rand.nextInt(8) == 0) {
-			placeOreVein(world, rand, diamondVein, 16, baseX, baseZ);
-		}
+		placeOreVein(world, rand, goldVein, 32, -2, baseX, baseZ);
+		placeOreVein(world, rand, diamondVein, 16, -8, baseX, baseZ);
 	}
 
 	/**
@@ -160,13 +158,5 @@ public final class BiomeGenInfdev extends BiomeGenerator {
 			bigTree.setScale(1.0D, 1.0D, 1.0D);
 			bigTree.generate(world, rand, treeX, world.getHeightValue(treeX, treeZ), treeZ);
 		}
-	}
-
-	/** Drops a single ore vein at a random cell of the chunk's base coordinates. */
-	private final void placeOreVein(World world, Random rand, WorldGenMinable vein, int yUpperBound, int baseX, int baseZ) {
-		int x = baseX + rand.nextInt(16);
-		int y = rand.nextInt(yUpperBound);
-		int z = baseZ + rand.nextInt(16);
-		vein.generate(world, rand, x, y, z);
 	}
 }

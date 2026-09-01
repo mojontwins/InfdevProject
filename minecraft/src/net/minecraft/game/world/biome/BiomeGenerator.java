@@ -3,6 +3,7 @@ package net.minecraft.game.world.biome;
 import java.util.Random;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.Block;
+import net.minecraft.game.world.terrain.generate.WorldGenMinable;
 
 /**
  * Answers the question <em>"what terrain does this biome make?"</em> A
@@ -73,4 +74,38 @@ public abstract class BiomeGenerator {
 	 * in, keeping the noise generator provider-owned.
 	 */
 	public abstract void decorate(World world, Random rand, int baseX, int baseZ, double treeNoise);
+
+	/**
+	 * Attempts to place an ore vein {@code amount} times at random positions
+	 * within the chunk's 16&times;16 base coordinates.
+	 *
+	 * <p>If {@code amount > 0}, the vein is placed exactly {@code amount} times.
+	 * If {@code amount < 0}, the vein is placed with probability 1 / -amount
+	 * (i.e. {@code rand.nextInt(-amount) == 0}), once per call.
+	 *
+	 * @param world the world being generated
+	 * @param rand the RNG seeded for this chunk
+	 * @param vein the generator that writes the vein into the world
+	 * @param yUpperBound the exclusive upper bound for the vein's y coordinate
+	 * @param amount number of times to place (positive) or negative reciprocal probability
+	 * @param baseX chunk's base X coordinate (chunkX * 16)
+	 * @param baseZ chunk's base Z coordinate (chunkZ * 16)
+	 */
+	protected final void placeOreVein(World world, Random rand, WorldGenMinable vein, int yUpperBound, int amount, int baseX, int baseZ) {
+		if (amount > 0) {
+			for (int i = 0; i < amount; ++i) {
+				int x = baseX + rand.nextInt(16);
+				int y = rand.nextInt(yUpperBound);
+				int z = baseZ + rand.nextInt(16);
+				vein.generate(world, rand, x, y, z);
+			}
+		} else if (amount < 0) {
+			if (rand.nextInt(-amount) == 0) {
+				int x = baseX + rand.nextInt(16);
+				int y = rand.nextInt(yUpperBound);
+				int z = baseZ + rand.nextInt(16);
+				vein.generate(world, rand, x, y, z);
+			}
+		}
+	}
 }
