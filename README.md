@@ -4,6 +4,14 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 
 ## Diary
 
+### 2026-09-01 — Backport `WorldGenTrees` (small oak-style tree)
+
+Added `WorldGenTrees` — the small oak tree generator from a1.1.2 that was the default tree choice before large variants appeared. The a1.1.2 source used one-letter variable names throughout and had no comments; this backport:
+- Keeps the algorithm byte-for-byte identical (collision column walk, ground conversion, leaf sphere with radius-2 disc bottom, radius-1 disc top, trunk fill).
+- Replaced `var8 == Block.grass.blockID || var8 == Block.dirt.blockID` with `world.canPlantsGrowOn(x, y-1, z)` so any future plantable block is automatically a valid tree base.
+- Renamed every variable to a meaningful name (`trunkHeight`, `canPlace`, `checkX/Y/Z`, `discRadius`, etc.).
+- Added a class-level overview and per-phase inline comments explaining the collision, ground and placement passes.
+
 ### 2026-09-01 — Extract plant-support check to a extensible Block hook
 
 Introduced `Block.canGrowPlants(int metadata)` returning `false` by default. `BlockDirt` and `BlockGrass` now override it to return `true`, so any new dirt/grass variants can opt in by doing the same.
