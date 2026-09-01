@@ -60,7 +60,7 @@ public final class GameSettings {
 		SHOW_FPS(3, "showFrameRate", OptionType.BOOLEAN, "Show FPS", null, settings -> settings.showFPS, (settings, value) -> settings.showFPS = (Boolean) value, null),
 		RENDER_DISTANCE(4, "viewDistance", OptionType.INTEGER, "Render distance", RENDER_DISTANCES, settings -> settings.renderDistance, (settings, value) -> settings.renderDistance = (Integer) value, null),
 		VIEW_BOBBING(5, "bobView", OptionType.BOOLEAN, "View bobbing", null, settings -> settings.viewBobbing, (settings, value) -> settings.viewBobbing = (Boolean) value, null),
-		FANCY_GRAPHICS(6, "fancyGraphics", OptionType.BOOLEAN, "Fancy graphics", null, settings -> settings.fancyGraphics, (settings, value) -> settings.fancyGraphics = (Boolean) value, settings -> applyFancyGraphics(settings.fancyGraphics)),
+		FANCY_GRAPHICS(6, "fancyGraphics", OptionType.BOOLEAN, "Fancy graphics", null, settings -> settings.fancyGraphics, (settings, value) -> settings.fancyGraphics = (Boolean) value, settings -> settings.applyFancyGraphics(settings.fancyGraphics)),
 		ANAGLYPH(7, "anaglyph3d", OptionType.BOOLEAN, "3d anaglyph", null, settings -> settings.anaglyph, (settings, value) -> settings.anaglyph = (Boolean) value, settings -> settings.mc.renderEngine.refreshTextures()),
 		LIMIT_FRAMERATE(8, "limitFramerate", OptionType.BOOLEAN, "Limit framerate", null, settings -> settings.limitFramerate, (settings, value) -> settings.limitFramerate = (Boolean) value, null),
 		DIFFICULTY(9, "difficulty", OptionType.INTEGER, "Difficulty", DIFFICULTIES, settings -> settings.difficulty, (settings, value) -> settings.difficulty = (Integer) value, null);
@@ -322,18 +322,18 @@ public final class GameSettings {
 	}
 
 	/**
-	 * Broadcasts a fancy-graphics change to every leaf block. Walks the
-	 * {@link Block#blocksList} registry, narrows to {@link BlockLeavesBase}
-	 * and asks each one to switch mode so the next render frame picks the
-	 * right texture and culling behaviour. Leaf blocks already initialise
-	 * themselves to fancy, so the first time this runs leaves only need to
-	 * be touched when the player turns fancy off.
+	 * Broadcasts a fancy-graphics change to every leaf block and forces a
+	 * rebuild of all chunk display lists so the change is visible immediately.
+	 * Walks the {@link Block#blocksList} registry, narrows to
+	 * {@link BlockLeavesBase} and asks each one to switch mode so the next
+	 * render frame picks the right texture and culling behaviour.
 	 */
-	private static void applyFancyGraphics(boolean fancy) {
+	private void applyFancyGraphics(boolean fancy) {
 		for(Block block : Block.blocksList) {
 			if(block instanceof BlockLeavesBase) {
 				((BlockLeavesBase)block).setGraphicsLevel(fancy);
 			}
 		}
+		this.mc.refreshRenderers();
 	}
 }

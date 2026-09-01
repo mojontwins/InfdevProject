@@ -977,6 +977,13 @@ public final class Minecraft implements Runnable {
 		this.theWorld.dropOldChunks();
 	}
 
+	/** Forces every compiled chunk display list to rebuild on the next render tick. */
+	public final void refreshRenderers() {
+		if(this.renderGlobal != null) {
+			this.renderGlobal.updateAllRenderers();
+		}
+	}
+
 	/** Respawns after death: kills the old player entity, recreates it and reloads chunks. */
 	public final void respawn() {
 		if(this.thePlayer != null && this.theWorld != null) {

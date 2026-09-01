@@ -7,6 +7,7 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 ### 2026-09-01 — Wire up a real "Fancy graphics" option
 
 - Added a `FANCY_GRAPHICS` row in the options screen (id 6) that calls `BlockLeavesBase.setGraphicsLevel(boolean)` for every registered leaf block, so toggling the option flips leaves between translucent merged-face "fancy" mode and opaque "fast" mode. The block class already had the two-mode logic; it just had no caller.
+- Toggling also calls `Minecraft.refreshRenderers()` which delegates to `RenderGlobal.updateAllRenderers()`, setting `needsUpdate = true` on every lit chunk renderer. Each chunk rebuilds its compiled OpenGL display list on the next render tick, so the leaf change is visible immediately rather than only on chunks that happen to reload.
 - Apply on load too (`GameSettings` constructor runs `applyFancyGraphics(fancyGraphics)` after `loadOptions()`) so a saved `fancyGraphics:false` in `options.txt` actually takes effect on game start.
 - Fixed the existing `VIEW_BOBBING` row: it was bound to the `fancyGraphics` field (a copy/paste bug from the cleanup), so toggling "View bobbing" did nothing on its own. Gave `viewBobbing` its own `boolean` field and updated the three `EntityRenderer` sites that gate `setupViewBobbing` (lines 381, 560, 574) to check the new field.
 - Renumbered the remaining option ids (`ANAGLYPH=7`, `LIMIT_FRAMERATE=8`, `DIFFICULTY=9`); saves are not affected because `loadOptions` matches by save key.
