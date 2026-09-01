@@ -4,6 +4,19 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 
 ## Diary
 
+### 2026-09-02 — BlockSapling: bit 3 (& 8) is the growth-state flag
+
+`BlockSapling.updateTick` no longer increments metadata 0→15. It now uses bit 3
+(`& 8`) as the "ready to grow" state, matching b1.7.3: the first tick that meets
+the growth conditions sets the bit, the next tick attempts to generate the tree.
+The other metadata bits are left untouched so future sapling subtypes (bits 4–7
+in b1.7.3) can keep their type across growth.
+
+The class Javadoc documents the metadata layout and the future-subtype contract:
+`getBlockTextureFromSideAndMetadata` and any other variant-aware method must mask
+out bit 3 once subtypes are introduced (e.g. `metadata & 0xF0` if subtypes live
+in the upper nibble as in b1.7.3).
+
 ### 2026-09-02 — Organised static Block and Item lists by id, grouped by tens
 
 `Block.java` and `Item.java` static catalogue sections are now:
