@@ -4,29 +4,34 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
+/** NBT tag holding a single signed byte (type id = 1). */
 public final class NBTTagByte extends NBTBase {
-	public byte byteValue;
+    public byte byteValue;
 
-	public NBTTagByte() {
-	}
+    public NBTTagByte() {
+    }
 
-	public NBTTagByte(byte value) {
-		this.byteValue = value;
-	}
+    public NBTTagByte(byte value) {
+        this.byteValue = value;
+    }
 
-	final void writeTagContents(DataOutput output) throws IOException {
-		output.writeByte(this.byteValue);
-	}
+    @Override
+    final void writeTagContents(DataOutput output) throws IOException {
+        output.writeByte(this.byteValue);
+    }
 
-	final void readTagContents(DataInput input) throws IOException {
-		this.byteValue = input.readByte();
-	}
+    @Override
+    final void readTagContents(DataInput input) throws IOException {
+        this.byteValue = input.readByte();
+    }
 
-	public final byte getType() {
-		return (byte)1;
-	}
+    @Override
+    public final byte getType() {
+        return (byte) 1;
+    }
 
-	public final String toString() {
-		return String.valueOf(this.byteValue);
-	}
+    @Override
+    public final String toString() {
+        return String.valueOf(this.byteValue);
+    }
 }

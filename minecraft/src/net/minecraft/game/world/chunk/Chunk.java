@@ -267,16 +267,16 @@ public final class Chunk {
 		}
 	}
 
-	/** Block id at a chunk-local cell (0 = air). */
+	/** Block id at a chunk-local cell (0 = air). Masked to unsigned (0–255). */
 	public final int getBlockID(int x, int y, int z) {
-		return this.blocks[x << X_SHIFT | z << Z_SHIFT | y];
+		return this.blocks[x << X_SHIFT | z << Z_SHIFT | y] & 0xFF;
 	}
 
 	/** Sets a block id and updates height/skylight metadata accordingly; returns true if changed. */
 	public final boolean setBlockID(int x, int y, int z, int blockID) {
 		byte blockByte = (byte)blockID;
 		int height = this.heightMap[z << HEIGHTMAP_Z_SHIFT | x] & 255;
-		int currentBlockID = this.blocks[x << X_SHIFT | z << Z_SHIFT | y] & 255;
+		int currentBlockID = this.blocks[x << X_SHIFT | z << Z_SHIFT | y] & 0xFF;
 		if(currentBlockID == blockID) {
 			return false;
 		}
@@ -289,7 +289,7 @@ public final class Chunk {
 
 		this.blocks[x << X_SHIFT | z << Z_SHIFT | y] = blockByte;
 		this.data.set(x, y, z, 0);
-		if(Block.lightOpacity[blockByte] != 0) {
+		if(Block.lightOpacity[blockID & 0xFF] != 0) {
 			if(y >= height) {
 				this.relightBlock(x, y + 1, z);
 			}

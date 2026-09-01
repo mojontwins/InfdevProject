@@ -2,18 +2,30 @@ package net.minecraft.game.world;
 
 import net.minecraft.game.entity.Entity;
 
+/**
+ * Observer for world events.  Implemented by the renderer so it can react
+ * to block changes, sound playback, particle spawning, and entity
+ * (de)registration without taking a hard dependency on the world.
+ */
 public interface IWorldAccess {
-	void markBlockAndNeighborsNeedsUpdate(int var1, int var2, int var3);
+    /** A single block at (x, y, z) (and its neighbours) has changed. */
+    void markBlockAndNeighborsNeedsUpdate(int x, int y, int z);
 
-	void markBlockRangeNeedsUpdate(int var1, int var2, int var3, int var4, int var5, int var6);
+    /** A range of blocks has changed. */
+    void markBlockRangeNeedsUpdate(int x1, int y1, int z1, int x2, int y2, int z2);
 
-	void playSound(String var1, double var2, double var4, double var6, float var8, float var9);
+    /** A sound effect has been triggered in the world. */
+    void playSound(String sound, double x, double y, double z, float volume, float pitch);
 
-	void spawnParticle(String var1, double var2, double var4, double var6, double var8, double var10, double var12);
+    /** A particle has been spawned. */
+    void spawnParticle(String particle, double x, double y, double z, double dx, double dy, double dz);
 
-	void obtainEntitySkin(Entity var1);
+    /** A new entity has been added; the renderer should load its skin. */
+    void obtainEntitySkin(Entity entity);
 
-	void releaseEntitySkin(Entity var1);
+    /** An entity has been removed; the renderer should release its skin. */
+    void releaseEntitySkin(Entity entity);
 
-	void updateAllRenderers();
+    /** Force every visible chunk renderer to rebuild (used when skylight changes). */
+    void updateAllRenderers();
 }

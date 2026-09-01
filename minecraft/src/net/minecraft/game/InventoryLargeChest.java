@@ -2,47 +2,66 @@ package net.minecraft.game;
 
 import net.minecraft.game.item.ItemStack;
 
+/**
+ * Glues two adjacent chest halves into a single virtual inventory so the
+ * GUI sees one large 54-slot chest instead of two 27-slot ones.
+ *
+ * <p>Reads/writes are forwarded to the {@link #upperChest} for slots in its
+ * range, and to the {@link #lowerChest} for slots beyond it.  Both halves
+ * are notified of any change.
+ */
 public final class InventoryLargeChest implements IInventory {
-	private String name;
-	private IInventory upperChest;
-	private IInventory lowerChest;
+    /** Display name for the combined inventory (e.g. "Large Chest"). */
+    private String name;
+    /** The first half of the chest (slots 0 .. upperChest.getInventorySize() - 1). */
+    private IInventory upperChest;
+    /** The second half of the chest (slots upperChest.getInventorySize() .. end). */
+    private IInventory lowerChest;
 
-	public InventoryLargeChest(String var1, IInventory var2, IInventory var3) {
-		this.name = var1;
-		this.upperChest = var2;
-		this.lowerChest = var3;
-	}
+    public InventoryLargeChest(String name, IInventory upperChest, IInventory lowerChest) {
+        this.name = name;
+        this.upperChest = upperChest;
+        this.lowerChest = lowerChest;
+    }
 
-	public final int getInventorySize() {
-		return this.upperChest.getInventorySize() + this.lowerChest.getInventorySize();
-	}
+    public final int getInventorySize() {
+        int upperSize = this.upperChest.getInventorySize();
+        return upperSize + this.lowerChest.getInventorySize();
+    }
 
-	public final String getInvName() {
-		return this.name;
-	}
+    public final String getInvName() {
+        return this.name;
+    }
 
-	public final ItemStack getStackInSlot(int var1) {
-		return var1 >= this.upperChest.getInventorySize() ? this.lowerChest.getStackInSlot(var1 - this.upperChest.getInventorySize()) : this.upperChest.getStackInSlot(var1);
-	}
+    public final ItemStack getStackInSlot(int slot) {
+        int upperSize = this.upperChest.getInventorySize();
+        return slot >= upperSize
+            ? this.lowerChest.getStackInSlot(slot - upperSize)
+            : this.upperChest.getStackInSlot(slot);
+    }
 
-	public final ItemStack decrStackSize(int var1, int var2) {
-		return var1 >= this.upperChest.getInventorySize() ? this.lowerChest.decrStackSize(var1 - this.upperChest.getInventorySize(), var2) : this.upperChest.decrStackSize(var1, var2);
-	}
+    public final ItemStack decrStackSize(int slot, int amount) {
+        int upperSize = this.upperChest.getInventorySize();
+        return slot >= upperSize
+            ? this.lowerChest.decrStackSize(slot - upperSize, amount)
+            : this.upperChest.decrStackSize(slot, amount);
+    }
 
-	public final void setInventorySlotContents(int var1, ItemStack var2) {
-		if(var1 >= this.upperChest.getInventorySize()) {
-			this.lowerChest.setInventorySlotContents(var1 - this.upperChest.getInventorySize(), var2);
-		} else {
-			this.upperChest.setInventorySlotContents(var1, var2);
-		}
-	}
+    public final void setInventorySlotContents(int slot, ItemStack stack) {
+        int upperSize = this.upperChest.getInventorySize();
+        if (slot >= upperSize) {
+            this.lowerChest.setInventorySlotContents(slot - upperSize, stack);
+        } else {
+            this.upperChest.setInventorySlotContents(slot, stack);
+        }
+    }
 
-	public final int getInventoryStackLimit() {
-		return this.upperChest.getInventoryStackLimit();
-	}
+    public final int getInventoryStackLimit() {
+        return this.upperChest.getInventoryStackLimit();
+    }
 
-	public final void onInventoryChanged() {
-		this.upperChest.onInventoryChanged();
-		this.lowerChest.onInventoryChanged();
-	}
+    public final void onInventoryChanged() {
+        this.upperChest.onInventoryChanged();
+        this.lowerChest.onInventoryChanged();
+    }
 }
