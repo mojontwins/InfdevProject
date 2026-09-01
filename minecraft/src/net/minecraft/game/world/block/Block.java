@@ -55,10 +55,8 @@ public class Block {
 	public static final Block sponge = (new BlockSponge(19)).setHardness(0.6F).setStepSound(soundGrassFootstep);
 	public static final Block glass = (new BlockGlass(20, 49, Material.glass, false)).setHardness(0.3F).setStepSound(soundGlassFootstep);
 	public static final Block cloth = (new BlockCloth(35, 64)).setHardness(0.8F).setStepSound(soundClothFootstep);
-	public static final BlockFlower plantYellow = (BlockFlower)(new BlockFlower(37, 13)).setHardness(0.0F).setStepSound(soundGrassFootstep);
-	public static final BlockFlower plantRed = (BlockFlower)(new BlockFlower(38, 12)).setHardness(0.0F).setStepSound(soundGrassFootstep);
-	public static final BlockFlower mushroomBrown = (BlockFlower)(new BlockMushroom(39, 29)).setHardness(0.0F).setStepSound(soundGrassFootstep).setLightValue(2.0F / 16.0F);
-	public static final BlockFlower mushroomRed = (BlockFlower)(new BlockMushroom(40, 28)).setHardness(0.0F).setStepSound(soundGrassFootstep);
+	public static final BlockFlower flowers = (BlockFlower)(new BlockFlower(37, 12)).setHardness(0.0F).setStepSound(soundGrassFootstep);
+	public static final BlockFlower mushrooms = (BlockFlower)(new BlockMushroom(38, 29)).setHardness(0.0F).setStepSound(soundGrassFootstep);
 	public static final Block blockGold = (new BlockOreStorage(41, 39)).setHardness(3.0F).setResistance(10.0F).setStepSound(soundMetalFootstep);
 	public static final Block blockSteel = (new BlockOreStorage(42, 38)).setHardness(5.0F).setResistance(10.0F).setStepSound(soundMetalFootstep);
 	public static final Block stairDouble = (new BlockStep(43, true)).setHardness(2.0F).setResistance(10.0F).setStepSound(soundStoneFootstep);
@@ -246,6 +244,17 @@ public class Block {
 		return this.blockID;
 	}
 
+	/**
+	 * The item damage that should be attached to the {@link #idDropped dropped}
+	 * item in place of the block's metadata. The default keeps the original
+	 * behaviour — every block drops a damage-0 item regardless of metadata.
+	 * Blocks that consolidate several variants into one id (flowers, mushrooms)
+	 * override this so the dropped item still carries its variant.
+	 */
+	public int damageDropped(int metadata) {
+		return 0;
+	}
+
 	/** Digging strength without knowing the block's state; treats metadata as "any". */
 	public final float blockStrength(EntityPlayer player) {
 		return this.blockStrength(player, -1);
@@ -296,7 +305,7 @@ public class Block {
 					double offsetX = (double)(world.rand.nextFloat() * 0.7F) + (double)0.15F;
 					double offsetY = (double)(world.rand.nextFloat() * 0.7F) + (double)0.15F;
 					double offsetZ = (double)(world.rand.nextFloat() * 0.7F) + (double)0.15F;
-					EntityItem entityItem = new EntityItem(world, (double)x + offsetX, (double)y + offsetY, (double)z + offsetZ, new ItemStack(droppedItemID));
+					EntityItem entityItem = new EntityItem(world, (double)x + offsetX, (double)y + offsetY, (double)z + offsetZ, new ItemStack(droppedItemID, 1, this.damageDropped(metadata)));
 					entityItem.delayBeforeCanPickup = 10;
 					world.spawnEntityInWorld(entityItem);
 				}

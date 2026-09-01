@@ -4,6 +4,7 @@ import java.util.Random;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.Block;
 import net.minecraft.game.world.terrain.generate.WorldGenBigTree;
+import net.minecraft.game.world.terrain.generate.WorldGenFlowers;
 import net.minecraft.game.world.terrain.generate.WorldGenMinable;
 
 /**
@@ -129,15 +130,18 @@ public final class BiomeGenInfdev extends BiomeGenerator {
 		WorldGenMinable goldVein = new WorldGenMinable(Block.oreGold.blockID);
 		WorldGenMinable diamondVein = new WorldGenMinable(Block.oreDiamond.blockID);
 		placeOreVein(world, rand, goldVein, 32, -2, baseX, baseZ);
-		placeOreVein(world, rand, diamondVein, 16, -8, baseX, baseZ);
+placeOreVein(world, rand, diamondVein, 16, -8, baseX, baseZ);
 	}
 
 	/**
-	 * Decoration stage, non-ore portion: the tree line. {@code treeNoise} is the
-	 * provider-computed tree-count noise for this chunk's origin, so the biome
-	 * does not own the noise generator. The seed for {@code rand} was already
-	 * fixed by the provider and the ore draw above has run, so the RNG draw
-	 * order matches the original build exactly.
+	 * Decoration stage, non-ore portion: the tree line, then the flower and
+	 * mushroom patches. {@code treeNoise} is the provider-computed tree-count
+	 * noise for this chunk's origin, so the biome does not own the noise
+	 * generator. The seed for {@code rand} was already fixed by the provider and
+	 * the ore draw above has run, so the RNG draw order matches the original
+	 * build exactly: tree count, tree placements, then the two yellow flower
+	 * patches, the optional red flower, brown mushroom and red mushroom patches
+	 * (see {@code decorate} body for the exact chances).
 	 */
 	@Override
 	public final void decorate(World world, Random rand, int baseX, int baseZ, double treeNoise) {
@@ -157,6 +161,40 @@ public final class BiomeGenInfdev extends BiomeGenerator {
 			int treeZ = baseZ + rand.nextInt(16) + 8;
 			bigTree.setScale(1.0D, 1.0D, 1.0D);
 			bigTree.generate(world, rand, treeX, world.getHeightValue(treeX, treeZ), treeZ);
+		}
+
+		// Flowers and mushrooms, drawn in the same order and with the same
+		// chances as in our 1.1.2 reference: two patches of yellow flowers, then
+		// red flowers at 50 %, brown mushrooms at 25 % and red mushrooms at
+		// 12.5 %. The variant lives in the block metadata instead of separate
+		// block ids, so each patch places the consolidated block with the
+		// matching metadata.
+		for(int pass = 0; pass < 2; ++pass) {
+			int flowerX = baseX + rand.nextInt(16) + 8;
+			int flowerY = rand.nextInt(128);
+			int flowerZ = baseZ + rand.nextInt(16) + 8;
+			new WorldGenFlowers(Block.flowers.blockID, 1).generate(world, rand, flowerX, flowerY, flowerZ);
+		}
+
+		if(rand.nextInt(2) == 0) {
+			int flowerX = baseX + rand.nextInt(16) + 8;
+			int flowerY = rand.nextInt(128);
+			int flowerZ = baseZ + rand.nextInt(16) + 8;
+			new WorldGenFlowers(Block.flowers.blockID, 0).generate(world, rand, flowerX, flowerY, flowerZ);
+		}
+
+		if(rand.nextInt(4) == 0) {
+			int mushroomX = baseX + rand.nextInt(16) + 8;
+			int mushroomY = rand.nextInt(128);
+			int mushroomZ = baseZ + rand.nextInt(16) + 8;
+			new WorldGenFlowers(Block.mushrooms.blockID, 0).generate(world, rand, mushroomX, mushroomY, mushroomZ);
+		}
+
+		if(rand.nextInt(8) == 0) {
+			int mushroomX = baseX + rand.nextInt(16) + 8;
+			int mushroomY = rand.nextInt(128);
+			int mushroomZ = baseZ + rand.nextInt(16) + 8;
+			new WorldGenFlowers(Block.mushrooms.blockID, 1).generate(world, rand, mushroomX, mushroomY, mushroomZ);
 		}
 	}
 }

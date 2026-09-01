@@ -97,4 +97,10 @@ public final class BlockCrops extends BlockFlower {
 		System.out.println("Get resource: " + metadata);
 		return metadata == 7 ? Item.wheat.shiftedIndex : -1;
 	}
+
+	/** Crops drop the plain wheat item, never the growth-stage metadata. */
+	@Override
+	public final int damageDropped(int metadata) {
+		return 0;
+	}
 }

@@ -4,11 +4,28 @@ import java.util.Random;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.terrain.generate.WorldGenBigTree;
 
-/** A sapling: light and time accumulate in its metadata, and at metadata 15 the block turns into a {@link WorldGenBigTree}. */
+/**
+ * A sapling: light and time accumulate in its metadata, and at metadata 15 the
+ * block turns into a {@link WorldGenBigTree}.
+ */
 public final class BlockSapling extends BlockFlower {
 	protected BlockSapling(int blockID, int textureIndex) {
 		super(blockID, textureIndex);
 		this.setBlockBounds(10.0F * 0.01F, 0.0F, 10.0F * 0.01F, 0.9F, 0.8F, 0.9F);
+	}
+
+	/** Saplings always render on tile 15; the parent class's metadata-based
+	 * flower texture swap must not apply. The tile is already green-tinted. */
+	@Override
+	public int getBlockTextureFromSideAndMetadata(int side, int metadata) {
+		return 15;
+	}
+
+	/** The metadata is growth progress, not a variant: a broken sapling always
+	 * drops a fresh, damage-0 sapling item. */
+	@Override
+	public int damageDropped(int metadata) {
+		return 0;
 	}
 
 	@Override

@@ -4,6 +4,15 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 
 ## Diary
 
+### 2026-09-01 — Consolidate flowers and mushrooms into metadata-driven block ids
+
+- Replaced the four separate block ids (`plantYellow` 37, `plantRed` 38, `mushroomBrown` 39, `mushroomRed` 40) with two consolidated blocks: `Block.flowers` (id 37) and `Block.mushrooms` (id 38). The variant now lives in the block metadata: flower metadata 0 = red / 1 = yellow; mushroom metadata 0 = brown / 1 = red.
+- `BlockFlower` gained a `metadataToTexture` lookup array and `getBlockTextureFromSideAndMetadata` maps metadata → atlas tile: flower `{12, 13}`, mushroom `{29, 28}`. Sapling locks to tile 15. Render type 1 now shows the correct variant in the world and in the inventory (the inventory preview previously passed metadata `-1`).
+- World decoration (`BiomeGenInfdev.decorate`) now spawns plants exactly like the a1.1.2 reference: two patches of yellow flowers, red flowers with 50 % chance, brown mushrooms with 25 %, red mushrooms with 12.5 %, each placing the consolidated block with the right metadata. Added `WorldGenFlowers` (a1.1.2 algorithm: 64 scatter attempts in a 16-block box over an air cell that `canBlockStay` accepts).
+- Crafting: mushroom soup now requires one brown (metadata 0) and one red (metadata 1) mushroom, in either order. `Session.registeredBlocksList` lists the two consolidated blocks instead of the four variants.
+- Drops: added the `Block.damageDropped(int metadata)` hook so consolidated blocks drop an item carrying their variant metadata (base class still drops damage-0); flowers/mushrooms pass metadata through, saplings/crops override back to 0.
+- Removed the `getRenderColor` per-variant tint misuse; the plant tiles already carry baked-in colours, and per-variant selection is purely a texture-index swap.
+
 ### 2026-09-01 — Use `ItemStack.itemDamage` as block metadata when placing
 
 - `ItemBlock.onItemUse` now reads the stack's `itemDamage` and writes it to the world as the block's metadata via `World.setBlockAndMetadataWithNotify` (replacing the old `setBlockWithNotify` call), so a damaged block item places with the matching sub-variant — e.g. a damaged cloth item places the matching colour swatch, and a damaged stair item places the matching orientation.

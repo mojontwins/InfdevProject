@@ -30,10 +30,8 @@ public final class Session {
 		registeredBlocksList.add(Block.glass);
 		registeredBlocksList.add(Block.cobblestoneMossy);
 		registeredBlocksList.add(Block.sapling);
-		registeredBlocksList.add(Block.plantYellow);
-		registeredBlocksList.add(Block.plantRed);
-		registeredBlocksList.add(Block.mushroomBrown);
-		registeredBlocksList.add(Block.mushroomRed);
+		registeredBlocksList.add(Block.flowers);
+		registeredBlocksList.add(Block.mushrooms);
 		registeredBlocksList.add(Block.sand);
 		registeredBlocksList.add(Block.gravel);
 		registeredBlocksList.add(Block.sponge);

@@ -41,9 +41,10 @@ public final class CraftingManager {
 		new RecipesWeapons().addRecipe(this);
 		new RecipesIngots().addRecipe(this);
 
-		// Mushroom soup — the mushrooms may sit in either order.
-		this.addRecipe(new ItemStack(Item.bowlSoup), "Y", "X", "#", 'Y', Block.mushroomRed, 'X', Block.mushroomBrown, '#', Item.bowlEmpty);
-		this.addRecipe(new ItemStack(Item.bowlSoup), "Y", "X", "#", 'Y', Block.mushroomBrown, 'X', Block.mushroomRed, '#', Item.bowlEmpty);
+		// Mushroom soup — one brown (metadata 0) and one red (metadata 1)
+		// mushroom may sit in either order.
+		this.addRecipe(new ItemStack(Item.bowlSoup), "Y", "X", "#", 'Y', new ItemStack(Block.mushrooms.blockID, 1, 1), 'X', new ItemStack(Block.mushrooms.blockID, 1, 0), '#', Item.bowlEmpty);
+		this.addRecipe(new ItemStack(Item.bowlSoup), "Y", "X", "#", 'Y', new ItemStack(Block.mushrooms.blockID, 1, 0), 'X', new ItemStack(Block.mushrooms.blockID, 1, 1), '#', Item.bowlEmpty);
 
 		// The storage and craft blocks.
 		this.addRecipe(new ItemStack(Block.chest), "###", "# #", "###", '#', Block.planks);

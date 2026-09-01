@@ -25,7 +25,7 @@ public final class RenderBlockPlant implements BlockRenderHandler {
 		Tessellator tessellator = Tessellator.instance;
 		tessellator.startDrawingQuads();
 		Tessellator.setNormal(0.0F, -1.0F, 0.0F);
-		this.renderBlockPlant(renderBlocks, block, -1, -0.5D, -0.5D, -0.5D);
+		this.renderBlockPlant(renderBlocks, block, metadata, -0.5D, -0.5D, -0.5D);
 		tessellator.draw();
 	}
 
