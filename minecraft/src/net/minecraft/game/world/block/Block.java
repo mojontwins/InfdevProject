@@ -1,14 +1,15 @@
 package net.minecraft.game.world.block;
 
 import java.util.Random;
+
 import net.minecraft.game.entity.Entity;
+import net.minecraft.game.entity.animal.EntityAnimal;
 import net.minecraft.game.entity.misc.EntityItem;
 import net.minecraft.game.entity.player.EntityPlayer;
 import net.minecraft.game.entity.player.InventoryPlayer;
 import net.minecraft.game.item.Item;
 import net.minecraft.game.item.ItemBlock;
 import net.minecraft.game.item.ItemBlockWithSubtypes;
-import net.minecraft.game.world.block.IBlockWithSubtypes;
 import net.minecraft.game.item.ItemStack;
 import net.minecraft.game.physics.AxisAlignedBB;
 import net.minecraft.game.physics.MovingObjectPosition;

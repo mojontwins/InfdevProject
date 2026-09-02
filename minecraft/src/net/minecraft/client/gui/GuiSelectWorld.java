@@ -16,7 +16,7 @@ public class GuiSelectWorld extends GuiScreen {
 		this.parentScreen = parentScreen;
 	}
 
-	/** Creates a button per save slot, showing "empty" or the world name with its size on disk. */
+	/** Creates a button per save slot, showing "empty" or the world name with its real size on disk. */
 	public final void initGui() {
 		File appDir = this.mc.getAppDir();
 
@@ -26,9 +26,13 @@ public class GuiSelectWorld extends GuiScreen {
 				this.controlList.add(new GuiButton(slotNumber, this.width / 2 - 100, this.height / 6 + slotNumber * 24, "- empty -"));
 			} else {
 				String buttonText = "World " + (slotNumber + 1);
-				long sizeOnDisk = worldTag.getLong("SizeOnDisk");
-				// Show the disk usage in MB (divide by 1024 twice, preserving two decimals).
+				long sizeOnDisk = World.getWorldSize(appDir, "World" + (slotNumber + 1));
+				// Show the real disk usage in MB (divide by 1024 twice, preserving two decimals).
 				buttonText = buttonText + " (" + (float)(sizeOnDisk / 1024L * 100L / 1024L) / 100.0F + " MB)";
+				if(World.isLegacyWorldFormat(appDir, "World" + (slotNumber + 1))) {
+					// Keep the pre-256-height saves clearly labelled so the new format is easy to spot.
+					buttonText = buttonText + " (OLD)";
+				}
 				this.controlList.add(new GuiButton(slotNumber, this.width / 2 - 100, this.height / 6 + slotNumber * 24, buttonText));
 			}
 		}

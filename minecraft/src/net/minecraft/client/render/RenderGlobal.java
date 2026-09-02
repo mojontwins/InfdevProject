@@ -162,7 +162,7 @@ public final class RenderGlobal implements IWorldAccess {
 		}
 
 		this.renderChunksWide = chunkSpan;
-		this.renderChunksTall = 8;
+		this.renderChunksTall = 16;
 		this.renderChunksDeep = chunkSpan;
 		this.worldRenderers = new WorldRenderer[this.renderChunksWide * this.renderChunksTall * this.renderChunksDeep];
 		this.sortedWorldRenderers = new WorldRenderer[this.renderChunksWide * this.renderChunksTall * this.renderChunksDeep];
@@ -180,7 +180,7 @@ public final class RenderGlobal implements IWorldAccess {
 		}
 		this.worlRenderersToUpdate.clear();
 
-		// Create one renderer (owning 3 call lists) per 16x128x16 chunk column.
+		// Create one renderer (owning 3 call lists) per 16x256x16 chunk column.
 		for(int chunkX = 0; chunkX < this.renderChunksWide; ++chunkX) {
 			for(int chunkY = 0; chunkY < this.renderChunksTall; ++chunkY) {
 				for(int chunkZ = 0; chunkZ < this.renderChunksDeep; ++chunkZ) {
@@ -739,6 +739,12 @@ public final class RenderGlobal implements IWorldAccess {
 		maxX >>= 4;
 		maxY >>= 4;
 		maxZ >>= 4;
+		if(minY < 0) {
+			minY = 0;
+		}
+		if(maxY >= this.renderChunksTall) {
+			maxY = this.renderChunksTall - 1;
+		}
 
 		for(; minX <= maxX; ++minX) {
 			int chunkX = minX % this.renderChunksWide;

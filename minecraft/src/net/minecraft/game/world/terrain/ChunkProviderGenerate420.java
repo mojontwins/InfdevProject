@@ -42,6 +42,15 @@ public final class ChunkProviderGenerate420 extends ChunkProviderGenerate {
 	private static final int GRID_DEPTH = 5;
 	private static final int NOISE_ARRAY_SIZE = GRID_WIDTH * GRID_HEIGHT * GRID_DEPTH; // 425
 	private static final int SEA_LEVEL = 64;
+	/**
+	 * Vertical extent of the flat up-sampled terrain buffer this generator fills
+	 * ({@code generateTerrain} stamps a full 16&times;16&times;128 array and
+	 * {@link Chunk} slices it into the bottom 8 subchunks). This is the terrain
+	 * generation height, independent of the {@link Chunk#SECTION_HEIGHT} a player
+	 * can build to, and must stay 128: the noise grid and every block index in the
+	 * buffer's packing scheme are tuned to it.
+	 */
+	private static final int TERRAIN_HEIGHT = 128;
 
 	private NoiseGeneratorOctaves noiseGen1;
 	private NoiseGeneratorOctaves noiseGen2;
@@ -176,7 +185,7 @@ public final class ChunkProviderGenerate420 extends ChunkProviderGenerate {
 								}
 
 								blocks[blockIndex] = (byte) block;
-								blockIndex += 128;
+								blockIndex += TERRAIN_HEIGHT;
 							}
 						}
 					}
