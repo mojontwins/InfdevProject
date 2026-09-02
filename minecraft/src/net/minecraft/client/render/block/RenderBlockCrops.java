@@ -23,8 +23,9 @@ public final class RenderBlockCrops implements BlockRenderHandler {
 	}
 
 	@Override
-	public final void renderBlockOnInventory(RenderBlocks renderBlocks, Block block, int metadata) {
+	public final void renderBlockOnInventory(RenderBlocks renderBlocks, Block block, int metadata, float brightness) {
 		Tessellator tessellator = Tessellator.instance;
+		tessellator.setColorOpaque_F(brightness, brightness, brightness);
 		tessellator.startDrawingQuads();
 		Tessellator.setNormal(0.0F, -1.0F, 0.0F);
 		this.renderBlockCrops(renderBlocks, block, -1, -0.5D, -0.5D, -0.5D);

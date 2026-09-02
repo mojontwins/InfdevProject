@@ -16,9 +16,11 @@ public interface BlockRenderHandler {
 
 	/**
 	 * Renders the block as a 3D preview inside an inventory slot. The
-	 * {@code metadata} value lets colour-aware blocks (cloth) pick a swatch.
-	 * Defaults to nothing.
+	 * {@code metadata} value lets colour-aware blocks (cloth) pick a swatch, and
+	 * {@code brightness} (in [0, 1]) scales the result to the surrounding light,
+	 * so a held or dropped block dims with the ambient light level. Defaults to
+	 * nothing.
 	 */
-	default void renderBlockOnInventory(RenderBlocks renderBlocks, Block block, int metadata) {
+	default void renderBlockOnInventory(RenderBlocks renderBlocks, Block block, int metadata, float brightness) {
 	}
 }

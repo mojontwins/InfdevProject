@@ -42,13 +42,13 @@ public final class RenderBlockNormal implements BlockRenderHandler {
 	}
 
 	@Override
-	public final void renderBlockOnInventory(RenderBlocks renderBlocks, Block block, int metadata) {
+	public final void renderBlockOnInventory(RenderBlocks renderBlocks, Block block, int metadata, float brightness) {
 		Tessellator tessellator = Tessellator.instance;
 		GL11.glTranslatef(-0.5F, -0.5F, -0.5F);
 		int color = block.getRenderColor(metadata);
-		float tintR = ((color >> 16) & 0xFF) / 255.0F;
-		float tintG = ((color >> 8) & 0xFF) / 255.0F;
-		float tintB = (color & 0xFF) / 255.0F;
+		float tintR = ((color >> 16) & 0xFF) / 255.0F * brightness;
+		float tintG = ((color >> 8) & 0xFF) / 255.0F * brightness;
+		float tintB = (color & 0xFF) / 255.0F * brightness;
 
 		for(int side = 0; side < 6; ++side) {
 			tessellator.startDrawingQuads();

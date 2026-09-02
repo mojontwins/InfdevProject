@@ -35,7 +35,7 @@ public final class RenderItem extends Render {
 				GL11.glRotatef(210.0F, 1.0F, 0.0F, 0.0F);
 				GL11.glRotatef(45.0F, 0.0F, 1.0F, 0.0F);
 				GL11.glColor4f(1.0F, 1.0F, 1.0F, 1.0F);
-				this.renderBlocks.renderBlockOnInventory(block, itemStack.itemDamage);
+				this.renderBlocks.renderBlockOnInventory(block, itemStack.itemDamage, 1.0F);
 				GL11.glPopMatrix();
 			} else {
 				if(itemStack.getItem().getIconFromDamage(itemStack.itemDamage) >= 0) {
@@ -154,7 +154,7 @@ public final class RenderItem extends Render {
 					GL11.glTranslatef(offsetX, offsetY, offsetZ);
 				}
 
-				this.renderBlocks.renderBlockOnInventory(Block.blocksList[itemStack.itemID], itemStack.itemDamage);
+				this.renderBlocks.renderBlockOnInventory(Block.blocksList[itemStack.itemID], itemStack.itemDamage, item.getEntityBrightness(partialTick));
 				GL11.glPopMatrix();
 			}
 		} else {

@@ -800,3 +800,31 @@ kept printing until the client closed.
   dropped controller init entirely.
 
 Full-tree `javac -source 1.8 -target 1.8` compile EXIT=0.
+
+### 2026-09-02 — Held block items now dim with the ambient light
+
+The 3D block held in hand (and dropped block items) were rendered fully lit at
+night. Root cause: `RenderBlockNormal.renderBlockOnInventory` set a per-vertex
+colour (`setColorOpaque_F`) from the block tint, which overrode the brightness
+`glColor4f`/`glColor3f` already applied at the call site — so the ambient light
+level was lost on the way to the vertex array.
+
+- `renderBlockOnInventory` (and every `BlockRenderHandler` implementation) now
+  takes an explicit `brightness` parameter in [0, 1] — mirroring a1.1.2/b1.7.3,
+  which pass the entity brightness through the same path.
+- `RenderBlockNormal` multiplies the block tint by the brightness; the crops /
+  plant / torch handlers apply the brightness directly.
+- Callers updated: the first-person item passes the player's world brightness
+  (a `worldBrightness` snapshot, kept separate from the swing-animation scratch
+  value); dropped entity items pass `getEntityBrightness`; GUI slots, falling
+  sand and TNT stay at full brightness (1.0) as before.
+
+Full-tree `javac -source 1.8 -target 1.8` compile EXIT=0.
+
+### 2026-09-02 — Saplings grow normal or big trees
+
+Saplings were hard-wired to grow a {@code WorldGenBigTree}. They now grow either
+a regular {@code WorldGenTrees} or, with a 1-in-10 chance, a {@code WorldGenBigTree},
+declaring the generator as the {@code WorldGenerator} base type and updating the
+class javadoc accordingly. Full-tree `javac -source 1.8 -target 1.8` compile
+EXIT=0.

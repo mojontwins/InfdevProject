@@ -20,7 +20,7 @@ public final class RenderFallingSand extends Render {
 		GL11.glTranslatef((float)posX, (float)posY, (float)posZ);
 		this.loadTexture("/terrain.png");
 		Block block = Block.blocksList[fallingSand.blockID];
-		this.blockRenderer.renderBlockOnInventory(block, 0);
+		this.blockRenderer.renderBlockOnInventory(block, 0, 1.0F);
 		GL11.glPopMatrix();
 	}
 }

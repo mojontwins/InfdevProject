@@ -37,7 +37,8 @@ public final class ItemRenderer {
 		RenderHelper.enableStandardItemLighting();
 		GL11.glPopMatrix();
 		float brightness = this.mc.theWorld.getBrightness(MathHelper.floor_double(player.posX), MathHelper.floor_double(player.posY), MathHelper.floor_double(player.posZ));
-		GL11.glColor4f(brightness, brightness, brightness, 1.0F);
+		float worldBrightness = brightness;
+		GL11.glColor4f(worldBrightness, worldBrightness, worldBrightness, 1.0F);
 		float swingProgress;
 		float swingSin;
 		if(this.itemToRender != null) {
@@ -64,7 +65,7 @@ public final class ItemRenderer {
 			GL11.glScalef(0.4F, 0.4F, 0.4F);
 			if(this.itemToRender.itemID < 256 && Block.blocksList[this.itemToRender.itemID].getRenderType() == 0) {
 				GL11.glBindTexture(GL11.GL_TEXTURE_2D, this.mc.renderEngine.getTexture("/terrain.png"));
-				this.renderBlocksInstance.renderBlockOnInventory(Block.blocksList[this.itemToRender.itemID], this.itemToRender.itemDamage);
+				this.renderBlocksInstance.renderBlockOnInventory(Block.blocksList[this.itemToRender.itemID], this.itemToRender.itemDamage, worldBrightness);
 			} else {
 				if(this.itemToRender.itemID < 256) {
 					GL11.glBindTexture(GL11.GL_TEXTURE_2D, this.mc.renderEngine.getTexture("/terrain.png"));

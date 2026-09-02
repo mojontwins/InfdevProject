@@ -3,10 +3,13 @@ package net.minecraft.game.world.block;
 import java.util.Random;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.terrain.generate.WorldGenBigTree;
+import net.minecraft.game.world.terrain.generate.WorldGenTrees;
+import net.minecraft.game.world.terrain.generate.WorldGenerator;
 
 /**
  * A sapling: light and time accumulate in its metadata, and at metadata 15 the
- * block turns into a {@link WorldGenBigTree}.
+ * block grows into a tree — usually a regular {@link WorldGenTrees}, with a
+ * small chance of a {@link WorldGenBigTree}.
  *
  * <h2>Metadata layout</h2>
  * <ul>
@@ -74,7 +77,7 @@ public final class BlockSapling extends BlockFlower {
 				return;
 			}
 			world.setTileNoUpdate(x, y, z, 0);
-			WorldGenBigTree treeGenerator = new WorldGenBigTree();
+			WorldGenerator treeGenerator = random.nextInt(10) == 0 ? new WorldGenBigTree() : new WorldGenTrees();
 			if(!treeGenerator.generate(world, random, x, y, z)) {
 				world.setTileNoUpdate(x, y, z, this.blockID);
 			}
