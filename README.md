@@ -732,3 +732,71 @@ Verified with a headless probe against the compiled classes: real block
 `slipperiness` is `0.6F`, the friction/accel equivalence holds within float
 error, and the pillar-cell predicate only matches the feet cell. Full-tree
 `javac -source 1.8 -target 1.8` compile EXIT=0.
+
+### 2026-09-02 — First-frame lighting flash fix (regression, re-applied)
+
+The night-save "fully lit for one frame" flash resurfaced. The 2026-08-31 diary
+entry documented the fix (compute `skylightSubtracted` right after `worldTime`
+is read from `level.dat`), but the actual method no longer existed in the code —
+it was lost during the later `World`-split refactor, so a night-time world again
+rendered one bright frame before `tick()` set the correct ambient value.
+
+- Added `World.computeSkylightSubtracted()` which returns the day-factor
+  derived `skylightSubtracted` for the current `worldTime`, using the exact
+  formula the tick pass uses.
+- `World.tick()` now calls the shared helper instead of duplicating the formula
+  inline (single source of truth).
+- The `World` constructor calls it right after `worldTime` is loaded from
+  `level.dat`, so the very first rendered frame of a night-time save is already
+  dark (e.g. worldTime ≈ 18000 → `skylightSubtracted` 13, instead of the
+  constructor's `0`).
+
+Verified by computing the formula headlessly: day times yield `skylightSubtracted`
+`0` (light 15), night times `13` (light 2), matching the in-game mapping.
+Full-tree `javac -source 1.8 -target 1.8` compile EXIT=0.
+
+### 2026-09-02 — Align sky day/night timing with a1.1.2/b1.7.3
+
+The F3 `Time` read-out, added earlier with a `+6000` clock offset, did not
+correspond to this version's actual sky. Compared across versions:
+
+| Version | celestial offset | sun overhead (noon) | midnight |
+|---|---|---|---|
+| Infdev 20100420 | `0.15` | worldTime ≈ 3600 | ≈ 15600 |
+| a1.1.2 / b1.7.3 | `0.25` | worldTime ≈ 6000 | ≈ 18000 |
+
+The `0.15 -> 0.25` change landed between Infdev and Alpha, so 20100420's sun
+reached its peak 2.4 in-game hours earlier than the later convention (the
+Infdev noon, worldTime 3600, read `09:36` on the `+6000` clock).
+
+- `AtmosphereCalculator.getCelestialAngle` now subtracts `0.25` (was `0.15`)
+  and wraps the result into [0, 1), matching a1.1.2/b1.7.3 exactly. With this
+  the sun is overhead at worldTime 6000 (noon) and opposite at 18000
+  (midnight), so the existing `+6000` F3 clock now lines up with the sky
+  (worldTime 0 = dawn 06:00, 6000 = 12:00, 12000 = 18:00, 18000 = 00:00).
+- `World.computeSkylightSubtracted()` reads the same angle, so the first-frame
+  fix and the whole sky/fog/cloud rendering follow the corrected timing
+  automatically.
+
+Verified headlessly with the new formula: worldTime 6000 → rotation `0°`, sun
+overhead, `skylightSubtracted` `0` (bright); worldTime 18000 → rotation `180°`,
+dark `13`. Full-tree `javac -source 1.8 -target 1.8` compile EXIT=0.
+
+### 2026-09-02 — Stop controller init to silence jinput poll spam
+
+When the game window lost focus, the console was flooded every poll cycle with
+`net.java.games.input.ControllerEnvironment ... Failed to poll device ...` and
+kept printing until the client closed.
+
+- Root cause: startup called `Controllers.create()` (LWJGL's jinput bridge).
+  That spawns jinput's background poll thread, which keeps querying the game
+  controller every ~25 ms even when the window is unfocused. On focus switch the
+  Windows device handle briefly becomes invalid (error `8007000c`), and jinput
+  logs "Failed to poll device" once per cycle — hence the unending spam.
+- The client never reads any controller input (no `Controllers.poll()`/button
+  reads anywhere), so the init existed only to start the noisy poll thread.
+- Removed the `Controllers.create()` call (and its try/catch) plus the now-unused
+  `org.lwjgl.input.Controllers` import. This matches a1.1.2/b1.7.3, which both
+  dropped controller init entirely.
+
+Full-tree `javac -source 1.8 -target 1.8` compile EXIT=0.

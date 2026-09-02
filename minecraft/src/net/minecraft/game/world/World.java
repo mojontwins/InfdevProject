@@ -247,6 +247,11 @@ public class World implements IBlockAccess {
 			}
 		}
 
+		// Pick the correct ambient brightness now that worldTime is known, so the
+		// first rendered frame of a night-time save is dark rather than flashing
+		// fully lit until tick() runs.
+		this.skylightSubtracted = this.computeSkylightSubtracted();
+
 		if(this.randomSeed == 0L) {
 			this.randomSeed = randomSeed;
 			this.spawnX = 0;
@@ -931,6 +936,26 @@ public class World implements IBlockAccess {
 	}
 
 	/**
+	 * Computes {@code skylightSubtracted} for the current {@link #worldTime} using
+	 * the same day-factor formula as {@code tick()}. Called right after the saved
+	 * {@code worldTime} is loaded so the renderer uses the correct ambient
+	 * brightness on the very first frame instead of the midnight/noon constructor
+	 * default (which caused a one-frame "fully lit" flash on night-time saves).
+	 */
+	final int computeSkylightSubtracted() {
+		float dayFactor = 1.0F;
+		dayFactor = this.getCelestialAngle(1.0F);
+		dayFactor = 1.0F - (MathHelper.cos(dayFactor * (float)Math.PI * 2.0F) * 2.0F + 0.5F);
+		if(dayFactor < 0.0F) {
+			dayFactor = 0.0F;
+		}
+		if(dayFactor > 1.0F) {
+			dayFactor = 1.0F;
+		}
+		return (int)(dayFactor * 13.0F);
+	}
+
+	/**
 	 * Returns the cloud-color RGB. Same formula as {@link #getSkyColor} but
 	 * with an asymmetric tint (clouds are slightly warmer at night).
 	 */
@@ -1150,17 +1175,7 @@ public class World implements IBlockAccess {
 		this.monsterSpawner.tick();
 		this.animalSpawner.tick();
 
-		float dayFactor = 1.0F;
-		dayFactor = this.getCelestialAngle(1.0F);
-		dayFactor = 1.0F - (MathHelper.cos(dayFactor * (float)Math.PI * 2.0F) * 2.0F + 0.5F);
-		if(dayFactor < 0.0F) {
-			dayFactor = 0.0F;
-		}
-		if(dayFactor > 1.0F) {
-			dayFactor = 1.0F;
-		}
-
-		int newSkylight = (int)(dayFactor * 13.0F);
+		int newSkylight = this.computeSkylightSubtracted();
 		if(newSkylight != this.skylightSubtracted) {
 			this.skylightSubtracted = newSkylight;
 			for(int i = 0; i < this.worldAccesses.size(); ++i) {
