@@ -38,7 +38,7 @@ public final class RenderItem extends Render {
 				this.renderBlocks.renderBlockOnInventory(block, itemStack.itemDamage);
 				GL11.glPopMatrix();
 			} else {
-				if(itemStack.getItem().getIconFromDamage() >= 0) {
+				if(itemStack.getItem().getIconFromDamage(itemStack.itemDamage) >= 0) {
 					GL11.glDisable(GL11.GL_LIGHTING);
 					if(itemStack.itemID < 256) {
 						RenderEngine.bindTexture(renderEngine.getTexture("/terrain.png"));
@@ -46,8 +46,14 @@ public final class RenderItem extends Render {
 						RenderEngine.bindTexture(renderEngine.getTexture("/gui/items.png"));
 					}
 
-					int iconX = itemStack.getItem().getIconFromDamage() % 16 << 4;
-					int iconY = itemStack.getItem().getIconFromDamage() / 16 << 4;
+					int icon = itemStack.getItem().getIconFromDamage(itemStack.itemDamage);
+					int iconX = icon % 16 << 4;
+					int iconY = icon / 16 << 4;
+					int tintColor = itemStack.getItem().getColorFromDamage(itemStack.itemDamage);
+					float tr = ((tintColor >> 16) & 0xFF) / 255.0F;
+					float tg = ((tintColor >> 8) & 0xFF) / 255.0F;
+					float tb = (tintColor & 0xFF) / 255.0F;
+					GL11.glColor3f(tr, tg, tb);
 					Tessellator tessellator = Tessellator.instance;
 					tessellator.startDrawingQuads();
 					tessellator.addVertexWithUV((double)x, (double)(y + 16), 0.0D, (double)((float)iconX * 0.00390625F), (double)((float)(iconY + 16) * 0.00390625F));
@@ -55,6 +61,7 @@ public final class RenderItem extends Render {
 					tessellator.addVertexWithUV((double)(x + 16), (double)y, 0.0D, (double)((float)(iconX + 16) * 0.00390625F), (double)((float)iconY * 0.00390625F));
 					tessellator.addVertexWithUV((double)x, (double)y, 0.0D, (double)((float)iconX * 0.00390625F), (double)((float)iconY * 0.00390625F));
 					tessellator.draw();
+					GL11.glColor3f(1.0F, 1.0F, 1.0F);
 					GL11.glEnable(GL11.GL_LIGHTING);
 				}
 
@@ -73,7 +80,7 @@ public final class RenderItem extends Render {
 				GL11.glEnable(GL11.GL_DEPTH_TEST);
 			}
 
-			if(itemStack.itemDamage > 0) {
+			if(itemStack.itemDamage > 0 && !itemStack.getItem().getHasSubTypes()) {
 				int damagedLength = 13 - itemStack.itemDamage * 13 / itemStack.getMaxDamage();
 				int damageColor = 255 - itemStack.itemDamage * 255 / itemStack.getMaxDamage();
 				GL11.glDisable(GL11.GL_LIGHTING);
@@ -152,7 +159,11 @@ public final class RenderItem extends Render {
 			}
 		} else {
 			GL11.glScalef(0.5F, 0.5F, 0.5F);
-			int icon = itemStack.getItem().getIconFromDamage();
+			int icon = itemStack.getItem().getIconFromDamage(itemStack.itemDamage);
+			int tintColor = itemStack.getItem().getColorFromDamage(itemStack.itemDamage);
+			float tr = ((tintColor >> 16) & 0xFF) / 255.0F;
+			float tg = ((tintColor >> 8) & 0xFF) / 255.0F;
+			float tb = (tintColor & 0xFF) / 255.0F;
 			if(itemStack.itemID < 256) {
 				this.loadTexture("/terrain.png");
 			} else {
@@ -178,6 +189,7 @@ public final class RenderItem extends Render {
 				}
 
 				GL11.glRotatef(180.0F - this.renderManager.playerViewY, 0.0F, 1.0F, 0.0F);
+				GL11.glColor3f(tr, tg, tb);
 				tessellator.startDrawingQuads();
 				Tessellator.setNormal(0.0F, 1.0F, 0.0F);
 				tessellator.addVertexWithUV(-0.5D, -0.25D, 0.0D, (double)texU1, (double)texV2);
@@ -187,6 +199,7 @@ public final class RenderItem extends Render {
 				tessellator.draw();
 				GL11.glPopMatrix();
 			}
+			GL11.glColor3f(1.0F, 1.0F, 1.0F);
 		}
 
 		GL11.glDisable(GL11.GL_NORMALIZE);

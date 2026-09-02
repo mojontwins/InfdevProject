@@ -234,46 +234,35 @@ public final int getIconFromDamage(int damage) {
 }
 ```
 
+The item type is determined **automatically** by the static initialiser at the end of
+`Block.java`. No per-block setter call is needed.
+
 #### `net/minecraft/game/world/block/Block.java`
 
-**1. `setHasSubtypes()` setter** — added to the class, swaps the `ItemBlock` for the
-subtyped variant at registration time:
+**1. Static init** — after all block fields are initialised, the `static {}` block at the
+bottom of the class iterates `blocksList` and creates the correct `ItemBlock` type:
 
 ```java
-protected final Block setHasSubtypes() {
-    Item.itemsList[this.blockID] = new ItemBlockWithSubtypes(this.blockID);
-    return this;
+static {
+    (new BlockSource(52, waterMoving.blockID)).setHardness(0.0F).setStepSound(soundWoodFootstep);
+    (new BlockSource(53, lavaMoving.blockID)).setHardness(0.0F).setStepSound(soundWoodFootstep);
+
+    for(int blockID = 0; blockID < 256; ++blockID) {
+        if(blocksList[blockID] != null) {
+            if(blocksList[blockID] instanceof IBlockWithSubtypes) {
+                Item.itemsList[blockID] = new ItemBlockWithSubtypes(blockID - 256);
+            } else {
+                Item.itemsList[blockID] = new ItemBlock(blockID - 256);
+            }
+        }
+    }
 }
 ```
 
-This is called from the static catalogue (see 2 below), not from the constructor, so
-that the decision to use a subtyped item is explicit at the catalogue site and does
-not require a new constructor or factory method.
-
-**2. Static catalogue changes** — `.setHasSubtypes()` chained onto variant blocks:
-
-```java
-// Before
-public static final BlockFlower flowers = (BlockFlower)
-    (new BlockFlower(37, 12)).setHardness(0.0F).setStepSound(soundGrassFootstep);
-public static final BlockFlower mushrooms = (BlockFlower)
-    (new BlockMushroom(38, 29)).setHardness(0.0F).setStepSound(soundGrassFootstep);
-public static final Block sapling = (new BlockSapling(6, 15)).setHardness(0.0F).setStepSound(soundGrassFootstep);
-
-// After
-public static final BlockFlower flowers = (BlockFlower)
-    (new BlockFlower(37, 12)).setHardness(0.0F).setStepSound(soundGrassFootstep).setHasSubtypes();
-public static final BlockFlower mushrooms = (BlockFlower)
-    (new BlockMushroom(38, 29)).setHardness(0.0F).setStepSound(soundGrassFootstep).setHasSubtypes();
-public static final Block sapling = (new BlockSapling(6, 15)).setHardness(0.0F).setStepSound(soundGrassFootstep).setHasSubtypes();
-```
-
-`Block.crops` and `Block.tilledField` are **not** given `.setHasSubtypes()` — they
-are state-based, not variant-based.
-
-**3. `IBlockWithSubtypes` default** — `Block` implicitly satisfies the interface via
-its default `getBlockTextureFromSideAndMetadata`. No explicit `implements` needed on
-`Block` itself; only subclasses that want the subtyped behaviour declare it.
+A block gets `ItemBlockWithSubtypes` **automatically** if it (or any of its superclasses)
+declares `implements IBlockWithSubtypes`. No catalogue-level change is needed for new
+subtyped blocks. The import for `IBlockWithSubtypes` is added alongside the existing item
+imports.
 
 #### `net/minecraft/game/world/block/BlockFlower.java`
 
@@ -285,21 +274,9 @@ public class BlockFlower extends Block { ... }
 public class BlockFlower extends Block implements IBlockWithSubtypes { ... }
 ```
 
-`BlockMushroom extends BlockFlower`, so it inherits the interface declaration
-implicitly — no separate change needed for mushrooms.
-
-#### `net/minecraft/game/world/block/BlockSapling.java`
-
-```java
-// Before
-public class BlockSapling extends Block { ... }
-
-// After
-public class BlockSapling extends Block implements IBlockWithSubtypes { ... }
-```
-
-`BlockSapling` already overrides `getBlockTextureFromSideAndMetadata(int, int)`, so
-only the interface declaration is added.
+`BlockMushroom extends BlockFlower` and `BlockSapling extends BlockFlower`, so both
+inherit the interface declaration implicitly — no separate change needed for either
+of them.
 
 #### `net/minecraft/game/client/render/entity/RenderItem.java`
 

@@ -6,9 +6,6 @@
 /*
 !/.gitignore
 !/minecraft
-!/chunk_and_entities.md
-!/biome_system.md
-!/256_blocks_high.md
 !/docs
 
 # Ignore everything inside minecraft/ except the working sources.

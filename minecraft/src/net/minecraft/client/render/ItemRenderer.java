@@ -75,11 +75,16 @@ public final class ItemRenderer {
 				Tessellator tessellator = Tessellator.instance;
 				// Block items are cut from the terrain atlas, everything else from the item atlas.
 				TextureAtlas itemAtlas = this.itemToRender.itemID < 256 ? TextureAtlas.TERRAIN : TextureAtlas.ITEMS;
-				AtlasUV.calc(this.itemToRender.getItem().getIconFromDamage(), itemAtlas);
+				AtlasUV.calc(this.itemToRender.getItem().getIconFromDamage(this.itemToRender.itemDamage), itemAtlas);
 				float texU1 = (float)AtlasUV.u1;
 				float texU2 = (float)AtlasUV.u2;
 				float texV1 = (float)AtlasUV.v1;
 				float texV2 = (float)AtlasUV.v2;
+				int tintColor = this.itemToRender.getItem().getColorFromDamage(this.itemToRender.itemDamage);
+				float tr = ((tintColor >> 16) & 0xFF) / 255.0F;
+				float tg = ((tintColor >> 8) & 0xFF) / 255.0F;
+				float tb = (tintColor & 0xFF) / 255.0F;
+				GL11.glColor3f(tr * brightness, tg * brightness, tb * brightness);
 				GL11.glEnable(GL11.GL_NORMALIZE);
 				GL11.glTranslatef(0.0F, -0.3F, 0.0F);
 				GL11.glScalef(1.5F, 1.5F, 1.5F);
@@ -154,6 +159,7 @@ public final class ItemRenderer {
 				}
 
 				tessellator.draw();
+				GL11.glColor3f(brightness, brightness, brightness);
 				GL11.glDisable(GL11.GL_NORMALIZE);
 			}
 

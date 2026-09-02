@@ -10,8 +10,8 @@ import net.minecraft.game.world.block.Block;
  * below zero by one item slot (see {@link Block}); the icon reuses the block's
  * own side texture so block icons match their terrain sprite.
  */
-public final class ItemBlock extends Item {
-	private final int blockID;
+public class ItemBlock extends Item {
+	protected final int blockID;
 
 	public ItemBlock(int itemID) {
 		super(itemID);

@@ -7,6 +7,8 @@ import net.minecraft.game.entity.player.EntityPlayer;
 import net.minecraft.game.entity.player.InventoryPlayer;
 import net.minecraft.game.item.Item;
 import net.minecraft.game.item.ItemBlock;
+import net.minecraft.game.item.ItemBlockWithSubtypes;
+import net.minecraft.game.world.block.IBlockWithSubtypes;
 import net.minecraft.game.item.ItemStack;
 import net.minecraft.game.physics.AxisAlignedBB;
 import net.minecraft.game.physics.MovingObjectPosition;
@@ -75,8 +77,10 @@ public class Block {
 	// ID 34
 	public static final Block cloth = (new BlockCloth(35, 64)).setHardness(0.8F).setStepSound(soundClothFootstep);
 	// ID 36
-	public static final BlockFlower flowers = (BlockFlower)(new BlockFlower(37, 12)).setHardness(0.0F).setStepSound(soundGrassFootstep);
-	public static final BlockFlower mushrooms = (BlockFlower)(new BlockMushroom(38, 29)).setHardness(0.0F).setStepSound(soundGrassFootstep);
+	public static final BlockFlower flowers = (BlockFlower)
+		(new BlockFlower(37, 12)).setHardness(0.0F).setStepSound(soundGrassFootstep);
+	public static final BlockFlower mushrooms = (BlockFlower)
+		(new BlockMushroom(38, 29)).setHardness(0.0F).setStepSound(soundGrassFootstep);
 	// ID 39
 	
 	// ID 40
@@ -659,15 +663,18 @@ public class Block {
 		}
 	}
 
-	static {
+static {
 		(new BlockSource(52, waterMoving.blockID)).setHardness(0.0F).setStepSound(soundWoodFootstep);
 		(new BlockSource(53, lavaMoving.blockID)).setHardness(0.0F).setStepSound(soundWoodFootstep);
 
 		for(int blockID = 0; blockID < 256; ++blockID) {
 			if(blocksList[blockID] != null) {
-				Item.itemsList[blockID] = new ItemBlock(blockID - 256);
+				if(blocksList[blockID] instanceof IBlockWithSubtypes) {
+					Item.itemsList[blockID] = new ItemBlockWithSubtypes(blockID - 256);
+				} else {
+					Item.itemsList[blockID] = new ItemBlock(blockID - 256);
+				}
 			}
 		}
-
 	}
 }

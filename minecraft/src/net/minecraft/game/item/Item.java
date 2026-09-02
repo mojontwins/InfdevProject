@@ -107,6 +107,7 @@ public class Item {
 	public final int shiftedIndex;
 	protected int maxStackSize = 64;
 	protected int maxDamage = 32;
+	protected boolean hasSubTypes = false;
 	private int iconIndex;
 
 	protected Item(int itemID) {
@@ -124,8 +125,21 @@ public class Item {
 		return this;
 	}
 
-	public final int getIconFromDamage() {
+	public int getIconFromDamage(int damage) {
 		return this.iconIndex;
+	}
+
+	public final boolean getHasSubTypes() {
+		return this.hasSubTypes;
+	}
+
+	public final Item setHasSubTypes(boolean hasSubTypes) {
+		this.hasSubTypes = hasSubTypes;
+		return this;
+	}
+
+	public int getColorFromDamage(int damage) {
+		return 0xFFFFFF;
 	}
 
 	/**

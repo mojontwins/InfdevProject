@@ -15,7 +15,7 @@ import net.minecraft.game.world.material.Material;
  * The base flower maps metadata 0 to the red flower tile (12) and metadata 1
  * to the yellow flower tile (13).
  */
-public class BlockFlower extends Block {
+public class BlockFlower extends Block implements IBlockWithSubtypes {
 	/** Maps metadata to the atlas tile index. Subclasses override this. */
 	protected int[] metadataToTexture;
 
