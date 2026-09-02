@@ -4,6 +4,37 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 
 ## Diary
 
+### 2026-09-02 — Subtyped block items: `IBlockWithSubtypes` + `ItemBlockWithSubtypes`
+
+Subtyped blocks (flowers, mushrooms, saplings) now display and tint correctly
+in the inventory, the held item, dropped items, and break particles.
+
+- `Item.hasSubTypes` (`false` by default) — when `true`, the durability bar is
+  never drawn and `getIconFromDamage(int)` / `getColorFromDamage(int)` may
+  return different values per metadata. New `getHasSubTypes()` / `setHasSubTypes()`
+  helpers.
+- `Item.getIconFromDamage()` is now `getIconFromDamage(int damage)`, returning
+  `this.iconIndex` by default. `Item.getColorFromDamage(int)` returns `0xFFFFFF`
+  by default.
+- New `IBlockWithSubtypes` marker interface in `net.minecraft.game.world.block`.
+  `Block` already provides the default `getBlockTextureFromSideAndMetadata`, so
+  subclasses only need to add `implements IBlockWithSubtypes`. `BlockFlower`
+  declares it; `BlockMushroom` and `BlockSapling` inherit it via `extends BlockFlower`.
+- New `ItemBlockWithSubtypes extends ItemBlock` (constructed in `Block`'s
+  static init) sets `hasSubTypes=true` and overrides `getIconFromDamage` /
+  `getColorFromDamage` to delegate to the wrapped block's metadata-sensitive
+  methods. Blocks whose class implements the interface are automatically wired
+  to it — no per-block catalogue change needed.
+- `RenderItem` and `ItemRenderer` pass `itemDamage` to `getIconFromDamage` and
+  apply tint via `getColorFromDamage` (preserving the brightness multiplier in
+  the first-person hand). The damage-bar overlay in
+  `RenderItem.renderItemOverlayIntoGUI` is gated on `!getHasSubTypes()`.
+- `EffectRenderer` passes the block's metadata to `EntityDiggingFX`, which now
+  uses `block.getBlockTextureFromSideAndMetadata(2, metadata)` for the crack
+  sprite and `block.getRenderColor(metadata)` for the particle tint (the
+  hard-coded `0.6F` dark gray is gone).
+- `docs/blocks_with_subtypes_interface.md` documents the design.
+
 ### 2026-09-02 — BlockSapling: bit 3 (& 8) is the growth-state flag
 
 `BlockSapling.updateTick` no longer increments metadata 0→15. It now uses bit 3
