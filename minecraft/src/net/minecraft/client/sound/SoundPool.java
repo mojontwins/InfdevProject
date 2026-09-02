@@ -13,8 +13,6 @@ public final class SoundPool {
 	private final Map<String, List<SoundPoolEntry>> nameToSoundPoolEntriesMapping = new ConcurrentHashMap<>();
 
 	public final SoundPoolEntry addSound(String soundName, File file) {
-		String fullName = soundName;
-
 		int dot = soundName.indexOf('.');
 		if(dot >= 0) {
 			soundName = soundName.substring(0, dot);

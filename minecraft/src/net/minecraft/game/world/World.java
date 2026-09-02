@@ -10,7 +10,6 @@ import java.util.Random;
 import net.minecraft.client.LoadingScreenRenderer;
 import net.minecraft.game.entity.Entity;
 import net.minecraft.game.entity.EntityLiving;
-import net.minecraft.game.entity.misc.EntityItem;
 import net.minecraft.game.entity.animal.EntityAnimal;
 import net.minecraft.game.entity.animal.EntityCow;
 import net.minecraft.game.entity.animal.EntityPig;

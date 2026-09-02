@@ -22,7 +22,6 @@ import util.MathHelper;
  * it to collect it as an item again.
  */
 public class EntityArrow extends Entity {
-	private static final boolean ARROW_DEBUG = false;
 	private int xTile = -1;
 	private int yTile = -1;
 	private int zTile = -1;
