@@ -708,3 +708,27 @@ The overlay was redesigned into a compact read-out:
 Supporting change: `World.getSeed()` now exposes the exact generation seed
 (`randomSeed`), shown right-aligned on the entities line (`Seed: …`).
 Full-tree `javac -source 1.8 -target 1.8` compile EXIT=0.
+
+### 2026-09-02 — Modernized horizontal friction to the a1.1.2/b1.7.3 model
+
+Modernize `EntityLiving` horizontal movement to the per-block **slipperiness**
+model used by a1.1.2/b1.7.3.
+
+- `Block` gains a `slipperiness` field (default `0.6F`, the value used for every
+  current block) — the hook a later ice-like block would use to let the player
+  slide further.
+- `EntityLiving.onLivingUpdate` replaces the legacy fixed-damping pass (hard
+  `0.91`/`0.6` multipliers) with the reference model: `friction =
+  Block.blocksList[block at feet].slipperiness * 0.91F`, ground acceleration
+  `0.1F * (0.16277136F / friction³)`, then `motionX/Z *= friction`. The two
+  models are numerically identical at `slipperiness = 0.6` (both give ~0.546
+  per-tick ground friction and `0.1F` ground accel), so this is a behavior-neutral
+  normalization that also keeps ladder support: added an inert `isOnLadder()`
+  stub (Infdev has no ladder block yet) wired exactly like the reference
+  (fall reset, descent clamp, climb on horizontal collision). `Entity.fallDistance`
+  was widened to `protected` (as in a1.1.2) so the climb block compiles.
+
+Verified with a headless probe against the compiled classes: real block
+`slipperiness` is `0.6F`, the friction/accel equivalence holds within float
+error, and the pillar-cell predicate only matches the feet cell. Full-tree
+`javac -source 1.8 -target 1.8` compile EXIT=0.

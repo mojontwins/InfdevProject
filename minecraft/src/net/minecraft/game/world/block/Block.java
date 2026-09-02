@@ -124,6 +124,8 @@ public class Block {
 	public StepSound stepSound;
 	public float blockParticleGravity;
 	public final Material blockMaterial;
+	/** How much horizontal slide this block allows a walking entity (0.6 = normal, 0.98 = ice-like). */
+	public float slipperiness = 0.6F;
 
 	protected Block(int blockID, Material material) {
 		this.stepSound = soundPowderFootstep;

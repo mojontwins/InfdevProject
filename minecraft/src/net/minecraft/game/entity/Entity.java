@@ -73,7 +73,7 @@ public abstract class Entity {
 	/** Whether this entity paces out footsteps and plant/walk contacts over solid ground. */
 	protected boolean entityWalks = true;
 	/** Metres built up during a fall; applied through {@link #fall} on landing. */
-	private float fallDistance = 0.0F;
+	protected float fallDistance = 0.0F;
 	private int nextStepDistance = 1;
 	public double lastTickPosX;
 	public double lastTickPosY;
