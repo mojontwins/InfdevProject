@@ -8,11 +8,14 @@ import util.TexelScale;
 import util.TextureAtlas;
 
 public final class EntityDiggingFX extends EntityFX {
-	public EntityDiggingFX(World world, double x, double y, double z, double speedX, double speedY, double speedZ, Block block) {
+	public EntityDiggingFX(World world, double x, double y, double z, double speedX, double speedY, double speedZ, Block block, int metadata) {
 		super(world, x, y, z, speedX, speedY, speedZ);
-		this.particleTextureIndex = block.blockIndexInTexture;
+		this.particleTextureIndex = block.getBlockTextureFromSideAndMetadata(2, metadata);
 		this.particleGravity = block.blockParticleGravity;
-		this.particleRed = this.particleGreen = this.particleBlue = 0.6F;
+		int blockColor = block.getRenderColor(metadata);
+		this.particleRed = ((blockColor >> 16) & 0xFF) / 255.0F;
+		this.particleGreen = ((blockColor >> 8) & 0xFF) / 255.0F;
+		this.particleBlue = (blockColor & 0xFF) / 255.0F;
 		this.particleScale /= 2.0F;
 	}
 

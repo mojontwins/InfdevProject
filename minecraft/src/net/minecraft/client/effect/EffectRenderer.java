@@ -118,6 +118,7 @@ public final class EffectRenderer {
 		int blockId = this.worldObj.getBlockId(x, y, z);
 		if(blockId != 0) {
 			Block block = Block.blocksList[blockId];
+			int metadata = this.worldObj.getBlockMetadata(x, y, z);
 
 			for(int dx = 0; dx < 4; ++dx) {
 				for(int dy = 0; dy < 4; ++dy) {
@@ -125,7 +126,7 @@ public final class EffectRenderer {
 						double posX = (double)x + ((double)dx + 0.5D) / 4.0D;
 						double posY = (double)y + ((double)dy + 0.5D) / 4.0D;
 						double posZ = (double)z + ((double)dz + 0.5D) / 4.0D;
-						this.addEffect(new EntityDiggingFX(this.worldObj, posX, posY, posZ, posX - (double)x - 0.5D, posY - (double)y - 0.5D, posZ - (double)z - 0.5D, block));
+						this.addEffect(new EntityDiggingFX(this.worldObj, posX, posY, posZ, posX - (double)x - 0.5D, posY - (double)y - 0.5D, posZ - (double)z - 0.5D, block, metadata));
 					}
 				}
 			}
@@ -166,7 +167,7 @@ public final class EffectRenderer {
 				posX = (double)x + block.maxX + (double)0.1F;
 			}
 
-			EntityDiggingFX fx = new EntityDiggingFX(this.worldObj, posX, posY, posZ, 0.0D, 0.0D, 0.0D, block);
+			EntityDiggingFX fx = new EntityDiggingFX(this.worldObj, posX, posY, posZ, 0.0D, 0.0D, 0.0D, block, this.worldObj.getBlockMetadata(x, y, z));
 			fx.motionX *= (double)0.2F;
 			fx.motionY = (fx.motionY - (double)0.1F) * (double)0.2F + (double)0.1F;
 			fx.motionZ *= (double)0.2F;
