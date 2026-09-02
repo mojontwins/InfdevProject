@@ -727,6 +727,11 @@ public final class Minecraft implements Runnable {
 											player.movementInput.checkKeyForMovementInput(keyCode, keyDown);
 										} while(!Keyboard.getEventKeyState());
 
+										if(Keyboard.getEventKey() == Keyboard.KEY_F3) {
+											// Toggle the debug HUD; pressing F3 again turns it off.
+											this.gameSettings.showFPS = !this.gameSettings.showFPS;
+										}
+
 										if(Keyboard.getEventKey() == Keyboard.KEY_F11) {
 											this.toggleFullscreen();
 										} else {

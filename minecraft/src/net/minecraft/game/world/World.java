@@ -1054,6 +1054,11 @@ public class World implements IBlockAccess {
 		return "All: " + this.entityManager.getLoadedEntityList().size();
 	}
 
+	/** The world's generation seed, exactly as used to seed terrain generation. */
+	public final long getSeed() {
+		return this.randomSeed;
+	}
+
 	public final Entity getPlayerEntity() {
 		return this.playerEntity;
 	}

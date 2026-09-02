@@ -687,3 +687,24 @@ bottom four surface bands (sane heights, `getSubchunkCount=8`); placing a block
 at y=200 materializes subchunk 12 and survives an NBT write/read round-trip;
 legacy flat chunks re-map byte-for-byte to the original column-major layout.
 Full-tree `javac -source 1.8 -target 1.8` compile EXIT=0.
+
+### 2026-09-02 — F3 debug HUD with redesigned info
+
+Add an in-game debug overlay toggled by the **F3** key (press again to turn it
+off), wired like the existing F5/F11 toggles and gated on the same `showFPS`
+setting (which itself remains an options-screen toggle, persisted to options.txt).
+
+The overlay was redesigned into a compact read-out:
+
+- **Header / memory** — `Minecraft Infdev (fps, chunk updates)` on the left,
+  `Used: X% (NN MB) of XXXX MB` right-aligned (used = allocated − free).
+- **Entities** — `Entities: A:Animal | M:Mob | O:Other | T:Total`, using the
+  cached monster/animal counters plus the total list size (other = total − A − M).
+- **Position** — `Pos: X Y Z (N 273)`: integer coords plus the compass facing
+  (derived from `rotationYaw * 4 / 360`) and the integer yaw.
+- **Time** — `Time: HH:MM`: 24 virtual hours to the day (24000 ticks) with the
+  +6000 dawn offset, so worldTime 6000 reads 06:00.
+
+Supporting change: `World.getSeed()` now exposes the exact generation seed
+(`randomSeed`), shown right-aligned on the entities line (`Seed: …`).
+Full-tree `javac -source 1.8 -target 1.8` compile EXIT=0.
