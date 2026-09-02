@@ -63,4 +63,16 @@ public class EntitySpider extends EntityMonster {
 	protected final int getDroppedItem() {
 		return Item.silk.shiftedIndex;
 	}
+
+	/**
+	 * Spiders climb any vertical surface they are pressed against. The
+	 * {@link net.minecraft.game.entity.EntityLiving} ladder plumbing (no fall
+	 * damage, downward speed cap, upward {@code motionY = 0.2} on horizontal
+	 * collision) is already wired in; this override activates it for spiders.
+	 * Taken from b1.7.3.
+	 */
+	@Override
+	public boolean isOnLadder() {
+		return this.isCollidedHorizontally;
+	}
 }

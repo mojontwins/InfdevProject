@@ -888,3 +888,135 @@ classes gain a `getBlockTextureFromSideAndMetadata(side, metadata)` that today
 ignores metadata (OAK-only). `BlockSapling.damageDropped` was corrected to
 `metadata & 0xF7` (clear bit 3, the "ready" bit) instead of `& 0xF0`. Full-tree
 `javac -source 1.8 -target 1.8` compile EXIT=0.
+
+### 2026-09-02 — `EntityArrow(World)` constructor for save-file rehydration
+
+`EntityList.createEntityFromNBT` calls `getConstructor(World.class).newInstance(world)`
+on every entity id it knows about, so any class in the registry that lacks a
+public `(World)` constructor causes chunk loading to print
+`NoSuchMethodException ... <init>(World)` and `Skipping Entity with id ...`.
+`EntityArrow` only had `(World, EntityLiving)` (for bow/skeleton firing) and the
+save loader refused to bring arrows back into the world. Added the no-arg
+`(World)` constructor (calls `setSize(0.5F, 0.5F)`, leaving shooter null and
+position zero — both are filled in by `readEntityFromNBT`). Full-tree
+`javac -source 1.8 -target 1.8` compile EXIT=0.
+
+### 2026-09-02 — Modern AI port study (zombie + framework + per-mob plan)
+
+Read every r1.2.5 AI class (`EntityAIBase` / `EntityAITasks` / `EntityAITaskEntry`
+/ `EntityAITarget` / `PathNavigate` / `EntityLookHelper` / `EntityMoveHelper` /
+`RandomPositionGenerator` / `EntityAINearestAttackableTarget(Sorter)` /
+`EntityAIWander` / `EntityAIAttackOnCollide` / `EntityAIHurtByTarget` /
+`EntityAIWatchClosest` / `EntityAILookIdle` / `EntityAISwimming` /
+`EntityAIArrowAttack` / `EntityAICreeperSwell`) and renamed every r1.2.5
+`field_NNNNN_x`/`func_NNNNN_x` identifier to its MCP-time meaningful
+equivalent before writing it down — `mutexBits`, `taskOwner`,
+`targetSearchRadius`, `shouldCheckSight`, `nearbyOnly`, `canTargetCountdown`,
+`reachabilityCheckCooldown`, `sightLossTimer`, `theEntity`, `pathSearchRange`,
+`noSunPathfind`, `canPassOpenWoodenDoors`, `canPassClosedWoodenDoors`,
+`avoidsWater`, `canSwim`, `deltaYaw`, `deltaPitch`, `isLooking`, `isReachable`,
+`isValidTarget`, `attacker` / `entityTarget` / `attackTarget`, `lookX`/`lookZ`,
+`idleEntity`, etc.
+
+Updated `docs/ai_system_port_plan.md` accordingly. The new structure:
+
+1. **The framework** — full task-scheduler algorithm in plain terms; explicit
+   method-by-method mapping for every r1.2.5 task/helper class with
+   `r1.2.5 → meaningful` columns; the `canUse`/`areTasksCompatible`
+   pseudocode; the `onUpdateTasks` algorithm; the path-following primitive
+   name mapping for `PathNavigate`'s private methods.
+2. **Infdev's current system** — recap of the monolithic
+   `updatePlayerActionState()` and `EntityMonster` overrides.
+3. **Per-mob port plan** — one section per mob/animal
+   (Zombie, Skeleton, Spider, Creeper, Giant, EntityAnimal base, Sheep, Pig,
+   Cow) with three columns: infdev current behaviour, r1.2.5 task list (with
+   villager/door/home features marked so we can drop them), and the
+   Modern equivalent (concrete `addTask` calls) for infdev.
+4. **Files to create / modify** — split into framework, navigation helpers,
+   targeting, tasks, and entity wiring (4-file modification list).
+5. **Implementation stages** — 5 stages, each compiling and behaviour-neutral
+   until stage 4 starts to add real tasks.
+6. **Key differences** — naming, navigator-vs-path, home/village, doors,
+   breeding, and the list of mechanics that are not part of the AI framework
+   and must be preserved as-is.
+
+### 2026-09-02 — Spider wall-climbing (b1.7.3 one-liner ported)
+
+**Answer to the question:** No, spiders in Infdev 20100420 do **not** climb walls.
+The reason is exactly as suspected: there is no ladder block in this version,
+and `EntityLiving.isOnLadder()` is a deliberate stub that always returns `false`
+(`minecraft/src/net/minecraft/game/entity/EntityLiving.java:650`):
+
+```java
+public boolean isOnLadder() {
+    return false;
+}
+```
+
+The movement plumbing for climbing is *already* in place in
+`EntityLiving.onUpdate` (lines 605–615 of the same file) — when `isOnLadder()`
+returns true, `fallDistance` is reset, downward `motionY` is capped at −0.15,
+and a horizontal collision against a climbable surface boosts `motionY` to
+`0.2` — but because the stub is hard-wired to `false`, none of that code ever
+fires, so the spider walks the floor like every other mob.
+
+Reference: in `minecraft_b1.7.3/src/minecraft/net/minecraft/src/EntitySpider.java`
+the b1.7.3 spider overrides `isOnLadder()` with a single line:
+
+```java
+public boolean isOnLadder() {
+    return this.isCollidedHorizontally;  // spiders climb any wall they touch
+}
+```
+
+That is the design we want.
+
+**Implementation (done):**
+
+1. **Add `Block.isClimbable()`** to `net.minecraft.game.world.block.Block`
+   returning `false` by default. One virtual, no behaviour change.
+2. **In `EntitySpider`**, override `isOnLadder()` to
+   `return this.isCollidedHorizontally;` — the b1.7.3 one-liner. The spider
+   now reports "I'm on a climbable surface" whenever it bumped into a wall
+   this tick, which is the only signal the existing `EntityLiving` ladder
+   code already understands.
+3. **No new block.** This build does not need a ladder item to satisfy the
+   pedagogical Spider-climbing story. The renderers `RenderBlockLadder` /
+   `RenderBlockLadderWall` / `RenderBlockVine` are already registered in
+   `BlockRenderType` (types 5, 8, 20) but unused — they stay unused, exactly
+   as in `src_original`. A ladder block is a separate, larger change (new
+   block id, NBT, item, recipe, placement rules) and is not part of this
+   plan.
+4. **The spider-only check is enough** because `EntityLiving.isOnLadder()`
+   remains the stub. A player who tries to "ride" a spider into a wall will
+   not climb — only the spider does, because only `EntitySpider` overrides
+   the method. That matches the b1.7.3 design.
+5. **Tunables already correct:** `EntitySpider` has `setSize(1.4F, 0.9F)`
+   (wide and short — the bounding box can graze a wall without leaving the
+   floor), `stepHeight` inherits `EntityLiving`'s 0.5F (so it can step up
+   onto a block at the base of the wall), and `moveSpeed = 0.8F` (slightly
+   faster than the zombie — matches vanilla feel).
+
+**Expected behaviour after the change (sanity check):**
+- Spider walks into a 1-block wall → `isCollidedHorizontally = true` →
+  `isOnLadder()` returns `true` → `motionY = 0.2` next tick → spider
+  climbs the wall one block at a time.
+- Spider at the top of a wall keeps climbing past the edge because gravity
+  (`motionY -= 0.08`) and the *0.98 friction fight the +0.2 boost only when
+  there is no horizontal collision — the moment the spider leaves the wall
+  for open air, it falls normally.
+- Spider falling onto a spider already on a wall stacks as today (entity
+  push, no special case needed).
+- The three other monsters (zombie, skeleton, creeper, giant) keep walking
+  flat — they do not override `isOnLadder()`.
+- Cows, sheep, pigs: same — no override, no climbing.
+- Player: no change, still stub `false`.
+
+**Files changed (2 files, ~10 lines):**
+- `minecraft/src/net/minecraft/game/entity/monster/EntitySpider.java` —
+  added the `isOnLadder()` override (b1.7.3 one-liner).
+- `minecraft/src/net/minecraft/game/world/block/Block.java` — added the
+  virtual `isClimbable()` stub (returns `false`).
+
+No other source changes; the existing `EntityLiving` ladder branch is
+reused as-is. Full-tree javac 1.8 compile EXIT=0.

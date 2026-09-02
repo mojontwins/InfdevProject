@@ -348,6 +348,17 @@ public class Block {
 	}
 
 	/**
+	 * Whether entities can climb this block. Default {@code false}; override
+	 * on ladder and vine blocks. Used by {@code EntityLiving.isOnLadder()}
+	 * in versions that have a real ladder block. Spiders climb any solid wall
+	 * regardless (they override {@code isOnLadder} directly), so this hook is
+	 * here to support future ladder/vine blocks without further entity changes.
+	 */
+	public boolean isClimbable() {
+		return false;
+	}
+
+	/**
 	 * Whether this block takes its light from the cell above it (and its four
 	 * horizontal neighbours) instead of from itself. Single slabs and farmland
 	 * are full-bright-look-through because the cell below them is too dark
