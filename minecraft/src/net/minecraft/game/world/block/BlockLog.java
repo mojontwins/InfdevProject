@@ -11,7 +11,9 @@ import net.minecraft.game.world.material.Material;
  * it, so each of those leaves re-verifies its trunk connection the next time it
  * ticks (see {@link BlockLeaves#updateTick}).
  */
-public final class BlockLog extends Block {
+public final class BlockLog extends Block implements IBlockWithSubtypes {
+	public static final int OAK = 0;
+
 	/** How far around a removed log to flag leaves for a re-check. */
 	private static final int DECAY_FLAG_RADIUS = 4;
 
@@ -40,5 +42,10 @@ public final class BlockLog extends Block {
 	@Override
 	public final int getBlockTextureFromSide(int side) {
 		return side == 1 ? this.blockIndexInTexture + 1 : (side == 0 ? this.blockIndexInTexture + 1 : this.blockIndexInTexture);
+	}
+
+	@Override
+	public final int getBlockTextureFromSideAndMetadata(int side, int metadata) {
+		return this.getBlockTextureFromSide(side);
 	}
 }

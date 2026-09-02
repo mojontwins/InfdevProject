@@ -1,8 +1,11 @@
 package net.minecraft.game.world.block;
 
 import java.util.Random;
+import net.minecraft.game.item.Item;
+import net.minecraft.game.item.ItemStack;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.material.Material;
+import net.minecraft.game.world.terrain.generate.EnumTreeType;
 
 /**
  * Leaves: the crown blocks of a tree. They decay when cut off from their trunk.
@@ -22,7 +25,9 @@ import net.minecraft.game.world.material.Material;
  * precomputed once at class load into {@link #PROBE_DX}/{@link #PROBE_DY}/
  * {@link #PROBE_DZ}/{@link #PROBE_CURSOR}.
  */
-public final class BlockLeaves extends BlockLeavesBase {
+public final class BlockLeaves extends BlockLeavesBase implements IBlockWithSubtypes {
+	public static final int OAK = 0;
+
 	/** Metadata bit a log stamps onto a leaf to make it re-verify its trunk next tick. */
 	public static final int DECAY_CHECK_BIT = 8;
 
@@ -122,12 +127,25 @@ public final class BlockLeaves extends BlockLeavesBase {
 	}
 
 	@Override
+	public final int getBlockTextureFromSideAndMetadata(int side, int metadata) {
+		return this.blockIndexInTexture;
+	}
+
+	@Override
 	public final int quantityDropped(Random random) {
 		return random.nextInt(10) == 0 ? 1 : 0;
 	}
 
 	@Override
-	public final int idDropped(int metadata, Random random) {
-		return Block.sapling.blockID;
+	public final ItemStack itemStackDropped(int metadata, Random random) {
+		if(random.nextInt(50) == 0) {
+			return new ItemStack(Item.apple.shiftedIndex, 1, 0);
+		} else if(random.nextInt(10) == 0) {
+			return new ItemStack(Item.stick.shiftedIndex, 1, 0);
+		}
+
+		EnumTreeType tree = EnumTreeType.findTreeTypeFromLeaves(this.blockID, metadata);
+		BlockState sapling = tree.getSapling();
+		return new ItemStack(sapling.getBlockID(), 1, sapling.getMetadata());
 	}
 }

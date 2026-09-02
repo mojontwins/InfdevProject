@@ -18,7 +18,12 @@ import util.MathHelper;
  * branch wood and finally paints the leaf discs.
  */
 public final class WorldGenBigTree extends WorldGenerator {
-	private static final byte[] otherCoordPairs = new byte[]{(byte) 2, (byte) 0, (byte) 0, (byte) 1, (byte) 2, (byte) 1};
+	/**
+	 * For a given "major" axis (0 = X, 1 = Y, 2 = Z) this maps to the two other
+	 * axes, so {@code otherCoordPairs[maxAxis]} and {@code otherCoordPairs[maxAxis + 3]}
+	 * give the two minor axes. These are axis indices (0–2), not coordinates.
+	 */
+	private static final int[] otherCoordPairs = new int[]{2, 0, 0, 1, 2, 1};
 	private Random rand = new Random();
 	private World worldObj;
 	private int[] basePos = new int[]{0, 0, 0};
@@ -51,9 +56,9 @@ public final class WorldGenBigTree extends WorldGenerator {
 		}
 
 		if(delta[maxAxis] != 0) {
-			byte axisB = otherCoordPairs[maxAxis];
-			byte axisC = otherCoordPairs[maxAxis + 3];
-			byte step = delta[maxAxis] > 0 ? (byte) 1 : (byte) -1;
+			int axisB = otherCoordPairs[maxAxis];
+			int axisC = otherCoordPairs[maxAxis + 3];
+			int step = delta[maxAxis] > 0 ? 1 : -1;
 			double slopeB = (double) delta[axisB] / (double) delta[maxAxis];
 			double slopeC = (double) delta[axisC] / (double) delta[maxAxis];
 			int[] pos = new int[]{0, 0, 0};
@@ -86,9 +91,9 @@ public final class WorldGenBigTree extends WorldGenerator {
 		if(delta[maxAxis] == 0) {
 			return -1;
 		} else {
-			byte axisB = otherCoordPairs[maxAxis];
-			byte axisC = otherCoordPairs[maxAxis + 3];
-			byte step = delta[maxAxis] > 0 ? (byte) 1 : (byte) -1;
+			int axisB = otherCoordPairs[maxAxis];
+			int axisC = otherCoordPairs[maxAxis + 3];
+			int step = delta[maxAxis] > 0 ? 1 : -1;
 			double slopeB = (double) delta[axisB] / (double) delta[maxAxis];
 			double slopeC = (double) delta[axisC] / (double) delta[maxAxis];
 			int[] pos = new int[]{0, 0, 0};

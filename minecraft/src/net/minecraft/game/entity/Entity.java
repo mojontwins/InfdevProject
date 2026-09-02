@@ -391,7 +391,7 @@ public abstract class Entity {
 			double travelledX = this.posX - startX;
 			double travelledZ = this.posZ - startZ;
 			this.distanceWalkedModified = (float)((double)this.distanceWalkedModified + (double)MathHelper.sqrt_double(travelledX * travelledX + travelledZ * travelledZ) * 0.6D);
-			if(this.entityWalks) {
+			if(this.entityWalks && !groundedSneak) {
 				int footX = MathHelper.floor_double(this.posX);
 				int footY = MathHelper.floor_double(this.posY - (double)0.2F - (double)this.yOffset);
 				int footZ = MathHelper.floor_double(this.posZ);

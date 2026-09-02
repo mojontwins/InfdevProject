@@ -23,6 +23,7 @@ import net.minecraft.game.physics.AxisAlignedBB;
 import net.minecraft.game.physics.MovingObjectPosition;
 import net.minecraft.game.physics.Vec3D;
 import net.minecraft.game.world.block.Block;
+import net.minecraft.game.world.block.BlockState;
 import net.minecraft.game.world.block.tileentity.TileEntity;
 import net.minecraft.game.world.biome.BiomeGenerator;
 import net.minecraft.game.world.chunk.Chunk;
@@ -405,6 +406,14 @@ public class World implements IBlockAccess {
 	public Block getBlock(int x, int y, int z) {
 		int id = this.getBlockId(x, y, z);
 		return id == 0 ? null : Block.blocksList[id];
+	}
+
+	/**
+	 * Returns a {@link BlockState} holding the block and metadata at the given
+	 * coordinates.
+	 */
+	public BlockState getBlockState(int x, int y, int z) {
+		return new BlockState(this.getBlockId(x, y, z), this.getBlockMetadata(x, y, z));
 	}
 
 	/**

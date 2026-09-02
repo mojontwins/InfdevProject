@@ -828,3 +828,63 @@ a regular {@code WorldGenTrees} or, with a 1-in-10 chance, a {@code WorldGenBigT
 declaring the generator as the {@code WorldGenerator} base type and updating the
 class javadoc accordingly. Full-tree `javac -source 1.8 -target 1.8` compile
 EXIT=0.
+
+### 2026-09-02 — WorldGenBigTree: `int` axis indices (drop misleading `byte`s)
+
+`WorldGenBigTree` stored its line-drawing axis lookup (`otherCoordPairs`) and
+the derived `axisB`/`axisC`/`step` locals as `byte`. Those hold axis indices
+(`0`/`1`/`2`) and a `±1` step — never `X`/`Y`/`Z` coordinates — so big trees
+were already safe above y=127 (all coordinates live in `int[]`). Converted them
+to `int` and documented the lookup so the decompiler-artifact `byte`s can't be
+mistaken for coordinate storage. Full-tree `javac -source 1.8 -target 1.8`
+compile EXIT=0.
+
+### 2026-09-02 — Footstep accumulator no longer runs while airborne
+
+Moving horizontally through the air kept accumulating `distanceWalkedModified`
+(because the gate only checked `entityWalks`), so every footstep skipped
+mid-flight was banked and fired back-to-back the moment the player landed. The
+a1.1.2 and b1.7.3 originals guard the whole block with `!onGround && isSneaking`
+decompiled as `!var18`/`!z18`), which the modernisation had dropped. Restored it
+as `entityWalks && !groundedSneak`. Full-tree `javac -source 1.8 -target 1.8`
+compile EXIT=0.
+
+### 2026-09-02 — Added `BlockState` (block + metadata value object)
+
+Introduced `net.minecraft.game.world.block.BlockState`, an immutable pairing of
+a `Block` and its metadata. It offers two constructors (`Block, int` and
+`blockID, int`), getters, `getBlockID`, an `equals`/`hashCode` on id+metadata, a
+`[blockID:metadata]` `toString`, and the `BlockState.air` singleton. Support for
+drop-in use by future block/render code. Full-tree `javac -source 1.8 -target 1.8` compile
+EXIT=0.
+
+### 2026-09-02 — Tree types dehardcoded via `EnumTreeType`
+
+Introduced `EnumTreeType` enum (`net.minecraft.game.world.block`) carrying the three
+`BlockState` fields that define a tree (leaves, wood, sapling), a `needsFourSaplings`
+flag, and a `getGenerator(Random)` method. The single `OAK` variant keeps the
+historical 1-in-10 big-tree chance. Three `HashMap<BlockState, EnumTreeType>`
+back the O(1) `findTreeTypeFromLeaves/Sapling/Wood` static lookups (all fall back
+to OAK). `BlockSapling` gained `OAK = 0`, `damageDropped` now returns the
+upper-nibble subtype (`metadata & 0xF0`), a public `growTree` method (called by
+`updateTick`; also callable externally), and a private `sameSapling` helper with
+2x2 placement logic. `BlockLeaves` gained `OAK = 0` and overrides `itemStackDropped`
+to drop the correct sapling variant. `BlockLog` gained `OAK = 0`. The three debug
+`println`s in `BlockSapling.updateTick` were removed. `docs/dehardcoding_trees.md`
+was rewritten to reflect the current design. Full-tree `javac -source 1.8 -target 1.8`
+compile EXIT=0.
+
+### 2026-09-02 — Tree dehardcoding: leaf drops, subtypes interface, package move
+
+`EnumTreeType` was moved from `net.minecraft.game.world.block` to
+`net.minecraft.game.world.terrain.generate` (next to the tree generators) with
+the cross-package `BlockState`/`BlockLeaves`/`BlockLog`/`BlockSapling` imports.
+`BlockLeaves.itemStackDropped` now rolls 1-in-50 for an `Item.apple`, 1-in-10 for
+an `Item.stick`, and otherwise falls back to the tree-type sapling (matching the
+historical 1-in-10 drop rate gated by `quantityDropped`). `BlockLeaves` and
+`BlockLog` now both implement `IBlockWithSubtypes` so future subtypes will
+automatically receive `ItemBlockWithSubtypes` instead of plain `ItemBlock`. Both
+classes gain a `getBlockTextureFromSideAndMetadata(side, metadata)` that today
+ignores metadata (OAK-only). `BlockSapling.damageDropped` was corrected to
+`metadata & 0xF7` (clear bit 3, the "ready" bit) instead of `& 0xF0`. Full-tree
+`javac -source 1.8 -target 1.8` compile EXIT=0.
