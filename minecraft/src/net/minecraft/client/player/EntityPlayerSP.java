@@ -44,7 +44,7 @@ public class EntityPlayerSP extends EntityPlayer {
 	}
 
 	/** Takes the movement values straight off the keyboard/mouse input. */
-	public final void updatePlayerActionState() {
+	public final void updateEntityActionState() {
 		this.moveStrafing = this.movementInput.moveStrafe;
 		this.moveForward = this.movementInput.moveForward;
 		this.isJumping = this.movementInput.jump;

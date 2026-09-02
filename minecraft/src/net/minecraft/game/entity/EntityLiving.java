@@ -525,7 +525,7 @@ public class EntityLiving extends Entity {
 	/**
 	 * Per-tick living behaviour hook: despawns creatures that wandered too far
 	 * from the player (128 blocks out, or 32+ blocks and idle too long), then
-	 * either lets the subclass steer ({@link #updatePlayerActionState}) or lies
+	 * either lets the subclass steer ({@link #updateEntityActionState}) or lies
 	 * still while dying. Ends with the actual movement pass.
 	 */
 	public void onLivingUpdate() {
@@ -555,7 +555,7 @@ public class EntityLiving extends Entity {
 			this.moveForward = 0.0F;
 			this.randomYawVelocity = 0.0F;
 		} else {
-			this.updatePlayerActionState();
+			this.updateEntityActionState();
 		}
 
 		boolean inWater = this.handleWaterMovement();
@@ -671,7 +671,7 @@ public class EntityLiving extends Entity {
 	 * pace and turn, and almost never jumps — unless it is in water or lava,
 	 * where it swims restlessly.
 	 */
-	protected void updatePlayerActionState() {
+	protected void updateEntityActionState() {
 		if(this.rand.nextFloat() < 0.07F) {
 			this.moveStrafing = (this.rand.nextFloat() - 0.5F) * this.moveSpeed;
 			this.moveForward = this.rand.nextFloat() * this.moveSpeed;

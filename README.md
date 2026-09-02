@@ -1020,3 +1020,31 @@ That is the design we want.
 
 No other source changes; the existing `EntityLiving` ladder branch is
 reused as-is. Full-tree javac 1.8 compile EXIT=0.
+
+### 2026-09-02 — Renamed `updatePlayerActionState` → `updateEntityActionState`
+
+The 2010 method name `updatePlayerActionState` was a 2010 alpha artifact: the
+function is called on every living entity, not just the player, and the
+misleading name was a holdover from the early Infdev "player" vocabulary.
+Renamed it to `updateEntityActionState` to match the r1.2.5 / b1.7.3
+vocabulary and the r1.2.5 AI plan (`docs/ai_system_port_plan.md` §7.1).
+
+Pure refactor — visibility, behaviour, and call sites are unchanged. 9 call
+sites touched across 4 files:
+
+- `minecraft/src/net/minecraft/game/entity/EntityLiving.java` — the base
+  method declaration (line 674), the per-tick call in `onLivingUpdate`
+  (line 558), and the javadoc reference on the `onLivingUpdate` class doc
+  (line 528).
+- `minecraft/src/net/minecraft/game/entity/EntityCreature.java` — the
+  override (line 36) and the `super.updateEntityActionState()` call from
+  `EntityCreeper` (line 135).
+- `minecraft/src/net/minecraft/game/entity/monster/EntityCreeper.java` —
+  the override (line 31), the class-doc reference (line 13), and the
+  `super.updateEntityActionState()` call (line 41).
+- `minecraft/src/net/minecraft/client/player/EntityPlayerSP.java` — the
+  override (line 47).
+
+`docs/ai_system_port_plan.md` updated to use the new name throughout
+(14 references swept, plus §7.1 now documents the rename as part of the
+broader naming-alignment effort). Full-tree javac 1.8 compile EXIT=0.

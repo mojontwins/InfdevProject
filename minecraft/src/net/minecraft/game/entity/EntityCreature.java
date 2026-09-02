@@ -33,7 +33,7 @@ public class EntityCreature extends EntityLiving {
 	 * with neither target nor path, fall through to the base wander behaviour.
 	 */
 	@Override
-	protected void updatePlayerActionState() {
+	protected void updateEntityActionState() {
 		this.hasAttacked = false;
 		if(this.playerToAttack == null) {
 			this.playerToAttack = this.findPlayerToAttack();
@@ -132,7 +132,7 @@ public class EntityCreature extends EntityLiving {
 				}
 
 			} else {
-				super.updatePlayerActionState();
+				super.updateEntityActionState();
 				this.pathToEntity = null;
 			}
 		}

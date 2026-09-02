@@ -10,7 +10,7 @@ import net.minecraft.game.world.World;
  *
  * <p>The fuse state is kept to {-1, 1} between ticks: -1 means idle, 1 means
  * the fuse has been lit. The transient 2 stamped at the start of
- * {@code updatePlayerActionState} merely marks "was ignited" and collapses
+	 * {@code updateEntityActionState} merely marks "was ignited" and collapses
  * back to -1 by the end of the tick.
  */
 public class EntityCreeper extends EntityMonster {
@@ -28,7 +28,7 @@ public class EntityCreeper extends EntityMonster {
 		this.texture = "/mob/creeper.png";
 	}
 
-	protected final void updatePlayerActionState() {
+	protected final void updateEntityActionState() {
 		this.lastActiveTime = this.timeSinceIgnited;
 		if(this.timeSinceIgnited > 0 && this.fuseState < 0) {
 			--this.timeSinceIgnited;
@@ -38,7 +38,7 @@ public class EntityCreeper extends EntityMonster {
 			this.fuseState = 2;
 		}
 
-		super.updatePlayerActionState();
+		super.updateEntityActionState();
 		if(this.fuseState != 1) {
 			this.fuseState = -1;
 		}

@@ -1,7 +1,7 @@
 # Modern AI System — r1.2.5 Analysis and Port Plan
 
 This document studies the r1.2.5 task-scheduler AI framework and lays out a
-plan to replace the inline `updatePlayerActionState()` of every infdev mob
+plan to replace the inline `updateEntityActionState()` of every infdev mob
 and animal with an equivalent list of `EntityAIBase` tasks. The same class
 and field names are used everywhere to keep the mental model consistent.
 
@@ -295,7 +295,7 @@ this.getLookHelper().onUpdateLook();        // 5. turn head
 
 ## 2. Infdev's current system
 
-### 2.1 `EntityCreature.updatePlayerActionState()`
+### 2.1 `EntityCreature.updateEntityActionState()`
 
 All creature AI lives in one method. Every tick it:
 
@@ -329,7 +329,7 @@ All creature AI lives in one method. Every tick it:
 ## 3. Per-mob port plan
 
 For each mob the table shows:
-- **infdev current behaviour** — what the existing `updatePlayerActionState()` does.
+- **infdev current behaviour** — what the existing `updateEntityActionState()` does.
 - **r1.2.5 task list** — the exact `addTask` calls from r1.2.5 (skipping
   villager/saddle/door/home/village features not present in infdev).
 - **Modern equivalent** — the concrete tasks to register in the infdev port,
@@ -501,7 +501,7 @@ targetTasks.addTask(2, new EntityAINearestAttackableTarget(
 **infdev current behaviour:**
 - No target acquisition (`findPlayerToAttack()` is never called — `playerToAttack`
   stays null). The creeper has no active movement or wandering.
-- `updatePlayerActionState()`: manages the fuse state (`fuseState` and
+- `updateEntityActionState()`: manages the fuse state (`fuseState` and
   `timeSinceIgnited`) and calls the parent.
 - `attackEntity()`: called by the parent's path-following when the player comes
   within range. Lights the fuse when distance < 3 m (or < 7 m if already lit).
@@ -754,8 +754,8 @@ New package: `net.minecraft.game.entity.ai`.
 
 | File | Change |
 |---|---|
-| `EntityLiving.java` | Add fields: `navigator` (`PathNavigate`), `lookHelper` (`EntityLookHelper`), `moveHelper` (`EntityMoveHelper`), `attackTarget` (`EntityLiving`), `entityAge` (already present as `livingSoundTime` — rename). Add getters/setters: `getNavigator()`, `getLookHelper()`, `getMoveHelper()`, `getAttackTarget()`, `setAttackTarget(EntityLiving)`, `getRNG()`. `isAIEnabled()` returns `false` initially (existing `updatePlayerActionState()` stays as fallback). In `onLivingUpdate()` add the task/navigation tick calls. |
-| `EntityCreature.java` | Add `tasks` and `targetTasks`. Override `isAIEnabled()` returning `true`. `EntityCreature` opts into the new AI. The existing `updatePlayerActionState()` runs only when `!isAIEnabled()`. `getNavigator()` returns the new navigator. `getAttackTarget()`/`setAttackTarget()` delegating to the living field. |
+| `EntityLiving.java` | Add fields: `navigator` (`PathNavigate`), `lookHelper` (`EntityLookHelper`), `moveHelper` (`EntityMoveHelper`), `attackTarget` (`EntityLiving`), `entityAge` (already present as `livingSoundTime` — rename). Add getters/setters: `getNavigator()`, `getLookHelper()`, `getMoveHelper()`, `getAttackTarget()`, `setAttackTarget(EntityLiving)`, `getRNG()`. `isAIEnabled()` returns `false` initially (existing `updateEntityActionState()` stays as fallback). In `onLivingUpdate()` add the task/navigation tick calls. |
+| `EntityCreature.java` | Add `tasks` and `targetTasks`. Override `isAIEnabled()` returning `true`. `EntityCreature` opts into the new AI. The existing `updateEntityActionState()` runs only when `!isAIEnabled()`. `getNavigator()` returns the new navigator. `getAttackTarget()`/`setAttackTarget()` delegating to the living field. |
 | `EntityMonster.java` | Remove `findPlayerToAttack()` (replaced by `EntityAINearestAttackableTarget`). Remove `playerToAttack` field (replaced by `attackTarget` on `EntityLiving`). Keep `attackEntity()`, `getBlockPathWeight()`, `tryBurnInDaylight()`, `onLivingUpdate()` burn timer, `getCanSpawnHere()`. |
 | `EntityZombie.java` | Strip all inline AI. Add task registrations in the constructor (see §3.2). |
 
@@ -804,12 +804,12 @@ features that infdev does not have and can be layered on later.
 | r1.2.5 | Infdev |
 |---|---|
 | `PathNavigate navigator` field | `pathToEntity` field directly on `EntityCreature` |
-| `navigator.tryMoveToXYZ(x, y, z, speed)` | `pathToEntity = world.pathFinder.createEntityPathToXYZ(...)` + manual path-following in `updatePlayerActionState()` |
+| `navigator.tryMoveToXYZ(x, y, z, speed)` | `pathToEntity = world.pathFinder.createEntityPathToXYZ(...)` + manual path-following in `updateEntityActionState()` |
 | `navigator.noPath()` | `pathToEntity == null || pathToEntity.isFinished()` |
 
 `PathNavigate` delegates to the existing infdev `World.pathFinder` for all path
 creation and wraps the path-following loop that currently lives in
-`EntityCreature.updatePlayerActionState()`. The existing `PathFinder` and
+`EntityCreature.updateEntityActionState()`. The existing `PathFinder` and
 `PathEntity` are reused unchanged.
 
 ### 6.3 Home / village features
@@ -848,23 +848,27 @@ tasks:
 
 ## 7. How the new framework relates to the existing inline methods
 
-### 7.1 The naming split: infdev vs. r1.2.5
+### 7.1 The method name: `updateEntityActionState`
 
-The old method is called `updatePlayerActionState` in infdev (and
-`updateEntityActionState` in r1.2.5). The two names refer to the same concept.
+The infdev method was historically named `updatePlayerActionState` (a 2010
+artifact of the early-alpha "player" naming). It has been renamed to
+`updateEntityActionState` to match the r1.2.5 / b1.7.3 vocabulary and to
+reflect what it actually does — drive any living entity, not just the player.
+The rename is a pure refactor: behaviour, visibility, and call sites are
+unchanged.
 
 ### 7.2 Does the new framework run by itself?
 
 **Yes, once `isAIEnabled()` returns `true`.** The new `EntityAITasks` framework
-is fully self-contained and does not call the old `updatePlayerActionState()`
+is fully self-contained and does not call the old `updateEntityActionState()`
 under any code path. Each task is a small, composable object that reads from and
 writes to the entity's public movement fields (`moveForward`, `moveStrafing`,
 `isJumping`, `rotationYaw`, `rotationYawHead`, `attackTarget`) — the same
 fields the old inline method writes.
 
-However, the old `updatePlayerActionState()` is still **called** in the entity's
+However, the old `updateEntityActionState()` is still **called** in the entity's
 tick loop unless it is explicitly disabled. The infdev `EntityLiving.onLivingUpdate()`
-at line 558 unconditionally calls `this.updatePlayerActionState()` for every
+at line 558 unconditionally calls `this.updateEntityActionState()` for every
 living entity. After migration, `EntityCreature` will override `isAIEnabled()` to
 return `true`, and `onLivingUpdate()` will be modified (in Stage 1 of the
 implementation plan) to gate the old call behind `!isAIEnabled()` — the same
@@ -906,14 +910,14 @@ This means:
 
 **Yes, but only for subclasses that fully migrate to the task system.**
 
-The old methods that override `updatePlayerActionState` in infdev are:
+The old methods that override `updateEntityActionState` in infdev are:
 
 | Class | What it does | Can deprecate? |
 |---|---|---|
 | `EntityLiving` (base) | Idle random strafe/walk for non-creatures | No — `EntityPlayer` needs it (player drives `moveForward`/`moveStrafing` directly; `isAIEnabled()` stays `false` for `EntityPlayer`). |
 | `EntityCreature` | Inline creature AI: target, attack, path-follow, wander | **Yes** once all `EntityCreature` subclasses (zombie, skeleton, spider, creeper, giant) register their tasks. The method body becomes dead code under `isAIEnabled() == true`. Mark `@Deprecated` with javadoc: *"Only runs when `isAIEnabled() == false`; set to `true` in the constructor to use the task framework instead."* |
-| `EntityCreeper` | Fuse state (`fuseState`, `timeSinceIgnited`) management | **Yes** — the fuse state machine stays in the entity (called from `onLivingUpdate`); the `updatePlayerActionState` body becomes a no-op stub. |
-| `EntityMonster` | **No override** of `updatePlayerActionState` — it only overrides `findPlayerToAttack`, `attackEntity`, `getBlockPathWeight`, `tryBurnInDaylight`. Those methods are replaced by tasks or stay as entity-level methods. No deprecation needed here. |
+| `EntityCreeper` | Fuse state (`fuseState`, `timeSinceIgnited`) management | **Yes** — the fuse state machine stays in the entity (called from `onLivingUpdate`); the `updateEntityActionState` body becomes a no-op stub. |
+| `EntityMonster` | **No override** of `updateEntityActionState` — it only overrides `findPlayerToAttack`, `attackEntity`, `getBlockPathWeight`, `tryBurnInDaylight`. Those methods are replaced by tasks or stay as entity-level methods. No deprecation needed here. |
 
 The deprecation pattern for `EntityCreature` and `EntityCreeper` after migration:
 
@@ -925,27 +929,27 @@ The deprecation pattern for `EntityCreature` and `EntityCreeper` after migration
  */
 @Deprecated
 @Override
-protected void updatePlayerActionState() {
+protected void updateEntityActionState() {
     // Empty: behaviour moved to tasks.
 }
 ```
 
 `EntityPlayer` is never touched — it keeps `isAIEnabled() == false` (the default)
-and relies on `updatePlayerActionState()` for the base idle strafe when no input
+and relies on `updateEntityActionState()` for the base idle strafe when no input
 is being given.
 
 ### 7.5 Summary
 
 - The new `EntityAITasks` framework is **self-contained** and drives all AI without
-  any call to `updatePlayerActionState()`.
+  any call to `updateEntityActionState()`.
 - `isAIEnabled()` is the gate: `true` → new framework runs; `false` → old
   inline method runs. Both are never active simultaneously.
-- After full migration, `EntityCreature.updatePlayerActionState()` and
-  `EntityCreeper.updatePlayerActionState()` can be marked `@Deprecated` and made
+- After full migration, `EntityCreature.updateEntityActionState()` and
+  `EntityCreeper.updateEntityActionState()` can be marked `@Deprecated` and made
   into empty stubs — their behaviour is now in tasks.
-- `EntityLiving.updatePlayerActionState()` stays **un-deprecated** because
+- `EntityLiving.updateEntityActionState()` stays **un-deprecated** because
   `EntityPlayer` depends on it.
-- `EntityMonster` has no `updatePlayerActionState` override and needs none;
+- `EntityMonster` has no `updateEntityActionState` override and needs none;
   its AI methods (`findPlayerToAttack`, `attackEntity`, etc.) are replaced by
   task wiring or stay as entity-level helpers.
 
