@@ -45,7 +45,6 @@ import net.minecraft.game.world.block.Block;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.Sys;
-import org.lwjgl.input.Controllers;
 import org.lwjgl.input.Cursor;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
@@ -296,12 +295,6 @@ public final class Minecraft implements Runnable {
 			Keyboard.create();
 			Mouse.create();
 			this.mouseHelper = new MouseHelper(this.mcCanvas);
-
-			try {
-				Controllers.create();
-			} catch (Exception e) {
-				e.printStackTrace();
-			}
 
 			// Baseline GL state for the 2010 fixed-function pipeline.
 			GL11.glEnable(GL11.GL_TEXTURE_2D);
@@ -726,6 +719,11 @@ public final class Minecraft implements Runnable {
 											boolean keyDown = Keyboard.getEventKeyState();
 											player.movementInput.checkKeyForMovementInput(keyCode, keyDown);
 										} while(!Keyboard.getEventKeyState());
+
+										if(Keyboard.getEventKey() == Keyboard.KEY_F3) {
+											// Toggle the debug HUD; pressing F3 again turns it off.
+											this.gameSettings.showFPS = !this.gameSettings.showFPS;
+										}
 
 										if(Keyboard.getEventKey() == Keyboard.KEY_F11) {
 											this.toggleFullscreen();

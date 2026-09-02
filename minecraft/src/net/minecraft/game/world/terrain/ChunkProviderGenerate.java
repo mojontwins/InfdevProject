@@ -56,12 +56,17 @@ public abstract class ChunkProviderGenerate implements IChunkProvider {
 	public final Chunk provideChunk(int chunkX, int chunkZ) {
 		this.rand.setSeed((long) chunkX * 341873128712L + (long) chunkZ * 132897987541L);
 		byte[] blocks = new byte[-Short.MIN_VALUE];
-		Chunk chunk = new Chunk(this.worldObj, blocks, chunkX, chunkZ);
+		// The chunk is built empty first (so it can hold the biome grid), the raw terrain volume
+		// is generated into the flat buffer, and only then is the buffer loaded into the chunk's
+		// subchunks — generateTerrain and replaceBlocks write to the flat buffer, so loading must
+		// happen after both.
+		Chunk chunk = new Chunk(this.worldObj, chunkX, chunkZ);
 		// Stash the biome grid before the surface pass: replaceBlocks consults
 		// the per-column biome, and the grid is later persisted with the chunk.
 		this.fillBiomeArray(chunk, chunkX, chunkZ);
 		this.generateTerrain(chunkX, chunkZ, blocks);
 		this.replaceBlocks(chunkX, chunkZ, blocks, chunk);
+		chunk.loadFlatBlocks(blocks);
 		chunk.generateHeightMap();
 		return chunk;
 	}

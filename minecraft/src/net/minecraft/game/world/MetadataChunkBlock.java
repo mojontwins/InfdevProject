@@ -1,6 +1,7 @@
 package net.minecraft.game.world;
 
 import net.minecraft.game.world.block.Block;
+import net.minecraft.game.world.chunk.Chunk;
 
 public final class MetadataChunkBlock {
 	private static final int MAX_BOX_VOLUME = 32768;
@@ -57,7 +58,7 @@ public final class MetadataChunkBlock {
 
 	public void updateLight(World world) {
 		int startY = Math.max(this.minY, 0);
-		int endY = Math.min(this.maxY, 127);
+		int endY = Math.min(this.maxY, Chunk.SECTION_HEIGHT - 1);
 		if(startY > endY) {
 			return;
 		}

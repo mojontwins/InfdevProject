@@ -580,16 +580,44 @@ public class EntityLiving extends Entity {
 		} else if(inLava) {
 			this.moveInFluid(0.5F);
 		} else {
-			this.moveFlying(strafeInput, forwardInput, this.onGround ? 0.1F : 0.02F);
-			this.moveEntity(this.motionX, this.motionY, this.motionZ);
-			this.motionX *= (double)0.91F;
-			this.motionY *= (double)0.98F;
-			this.motionZ *= (double)0.91F;
-			this.motionY -= 0.08D;
+			// Per-tick horizontal friction: on the ground it depends on the block's
+			// slipperiness (0.6 normal, icing blocks let the entity slide further).
+			float friction = 0.91F;
 			if(this.onGround) {
-				this.motionX *= (double)0.6F;
-				this.motionZ *= (double)0.6F;
+				int blockBelow = this.worldObj.getBlockId(MathHelper.floor_double(this.posX), MathHelper.floor_double(this.boundingBox.minY) - 1, MathHelper.floor_double(this.posZ));
+				if(blockBelow > 0) {
+					friction = Block.blocksList[blockBelow].slipperiness * 0.91F;
+				}
 			}
+
+			// Ground acceleration is tuned so that at the default friction the
+			// entity reaches (and the applied damping exactly cancels) walk speed.
+			float groundAccel = 0.16277136F / (friction * friction * friction);
+			this.moveFlying(strafeInput, forwardInput, this.onGround ? 0.1F * groundAccel : 0.02F);
+			friction = 0.91F;
+			if(this.onGround) {
+				int blockBelow = this.worldObj.getBlockId(MathHelper.floor_double(this.posX), MathHelper.floor_double(this.boundingBox.minY) - 1, MathHelper.floor_double(this.posZ));
+				if(blockBelow > 0) {
+					friction = Block.blocksList[blockBelow].slipperiness * 0.91F;
+				}
+			}
+
+			if(this.isOnLadder()) {
+				this.fallDistance = 0.0F;
+				if(this.motionY < -0.15D) {
+					this.motionY = -0.15D;
+				}
+			}
+
+			this.moveEntity(this.motionX, this.motionY, this.motionZ);
+			if(this.isCollidedHorizontally && this.isOnLadder()) {
+				this.motionY = 0.2D;
+			}
+
+			this.motionY -= 0.08D;
+			this.motionY *= (double)0.98F;
+			this.motionX *= (double)friction;
+			this.motionZ *= (double)friction;
 		}
 
 		this.prevLimbSwing = this.limbSwing;
@@ -612,6 +640,15 @@ public class EntityLiving extends Entity {
 			});
 		}
 
+	}
+
+	/**
+	 * True when the entity is standing inside a climbable ladder. Infdev 20100420
+	 * has no ladder block yet, so this is an inert stub (always false) kept so the
+	 * movement pass already accounts for ladders the way later versions do.
+	 */
+	public boolean isOnLadder() {
+		return false;
 	}
 
 	/** Applies one tick of swimming in water ({@code damping} 0.8) or lava (0.5). */

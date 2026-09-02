@@ -10,6 +10,7 @@ import net.minecraft.client.render.entity.RenderItem;
 import net.minecraft.game.entity.player.InventoryPlayer;
 import net.minecraft.game.item.ItemStack;
 import org.lwjgl.opengl.GL11;
+import util.MathHelper;
 
 /** The in-game HUD overlay: draws the hotbar, hearts/armour, air, chat messages and debug info. */
 public final class GuiIngame extends Gui {
@@ -159,18 +160,35 @@ public final class GuiIngame extends Gui {
 		RenderHelper.disableStandardItemLighting();
 		GL11.glDisable(GL11.GL_NORMALIZE);
 		if(this.mc.gameSettings.showFPS) {
+			// Categorise all loaded entities into animals, monsters and everything else.
+			int animalCount = this.mc.theWorld.getAnimalCount();
+			int monsterCount = this.mc.theWorld.getMonsterCount();
+			int totalCount = this.mc.theWorld.getLoadedEntityList().size();
+			int otherCount = totalCount - animalCount - monsterCount;
+
+			// Work out the compass direction the player is facing from the yaw,
+			// then show that plus the integer yaw, e.g. "Pos: 100 64 300 (W 273)".
+			int facing = MathHelper.floor_double((double)(this.mc.thePlayer.rotationYaw * 4.0F / 360.0F) + 0.5D) & 3;
+			String facingName = facing == 0 ? "S" : (facing == 1 ? "W" : (facing == 2 ? "N" : "E"));
+
+			// In-game time as a 24-hour clock: a full day is 24000 ticks, with the
+			// +6000 offset so dawn falls at 06:00, e.g. "Time: 13:45".
+			long adjustedTime = (this.mc.theWorld.worldTime + 6000L) % 24000L;
+			String timeText = String.format("%02d:%02d", adjustedTime / 1000L, (adjustedTime % 1000L) * 60L / 1000L);
+
 			fontRenderer.drawStringWithShadow("Minecraft Infdev (" + this.mc.debug + ")", 2, 2, 16777215);
-			fontRenderer.drawStringWithShadow(this.mc.renderGlobal.getDebugInfoRenders(), 2, 12, 16777215);
-			fontRenderer.drawStringWithShadow(this.mc.renderGlobal.getDebugInfoEntities(), 2, 22, 16777215);
-			fontRenderer.drawStringWithShadow("P: " + this.mc.effectRenderer.getStatistics() + ". T: " + this.mc.theWorld.getDebugLoadedEntities(), 2, 32, 16777215);
+			fontRenderer.drawStringWithShadow("Entities: A:" + animalCount + " | M:" + monsterCount + " | O:" + otherCount + " | T:" + totalCount, 2, 12, 16777215);
+			fontRenderer.drawStringWithShadow("Pos: " + (int)this.mc.thePlayer.posX + " " + (int)this.mc.thePlayer.posY + " " + (int)this.mc.thePlayer.posZ + " (" + facingName + " " + (int)this.mc.thePlayer.rotationYaw + ")", 2, 22, 16777215);
+			fontRenderer.drawStringWithShadow("Time: " + timeText, 2, 32, 16777215);
+
 			long maxMemory = Runtime.getRuntime().maxMemory();
 			long totalMemory = Runtime.getRuntime().totalMemory();
 			long freeMemory = Runtime.getRuntime().freeMemory();
-			long usedMemory = maxMemory - freeMemory;
-			String freeText = "Free memory: " + usedMemory * 100L / maxMemory + "% of " + maxMemory / 1024L / 1024L + "MB";
-			drawString(fontRenderer, freeText, scaledWidth - fontRenderer.getStringWidth(freeText) - 2, 2, 14737632);
-			freeText = "Allocated memory: " + totalMemory * 100L / maxMemory + "% (" + totalMemory / 1024L / 1024L + "MB)";
-			drawString(fontRenderer, freeText, scaledWidth - fontRenderer.getStringWidth(freeText) - 2, 12, 14737632);
+			long usedMemory = totalMemory - freeMemory;
+			String usedText = "Used: " + usedMemory * 100L / maxMemory + "% (" + usedMemory / 1024L / 1024L + "MB) of " + maxMemory / 1024L / 1024L + "MB";
+			drawString(fontRenderer, usedText, scaledWidth - fontRenderer.getStringWidth(usedText) - 2, 2, 14737632);
+			String seedText = "Seed: " + this.mc.theWorld.getSeed();
+			drawString(fontRenderer, seedText, scaledWidth - fontRenderer.getStringWidth(seedText) - 2, 12, 14737632);
 		} else {
 			fontRenderer.drawStringWithShadow("Minecraft Infdev", 2, 2, 16777215);
 		}

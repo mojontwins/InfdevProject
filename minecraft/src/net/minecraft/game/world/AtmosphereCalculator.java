@@ -22,12 +22,22 @@ final class AtmosphereCalculator {
 
 	/**
 	 * Returns the world time in [0, 1) by combining the world time tick (mod
-	 * 24000, the length of one in-game day) with the render partial tick.
-	 * Subtracts 0.15 to roughly align the 0 with sunrise.
+	 * 24000, the length of one in-game day) with the render partial tick, and
+	 * wrapping into [0, 1). Subtracts 0.25 so the sky is aligned with the
+	 * a1.1.2/b1.7.3 convention: the sun is overhead (noon) at world time 6000
+	 * and midnight falls at 18000. Infdev 20100420 originally used 0.15 (noon
+	 * at 3600); the 0.15 -> 0.25 change landed between Infdev and Alpha.
 	 */
 	static float getCelestialAngle(long worldTime, float partialTick) {
 		int timeOfDay = (int) (worldTime % 24000L);
-		return ((float) timeOfDay + partialTick) / 24000.0F - 0.15F;
+		float celestialAngle = ((float) timeOfDay + partialTick) / 24000.0F - 0.25F;
+		if (celestialAngle < 0.0F) {
+			++celestialAngle;
+		}
+		if (celestialAngle > 1.0F) {
+			--celestialAngle;
+		}
+		return celestialAngle;
 	}
 
 	/**

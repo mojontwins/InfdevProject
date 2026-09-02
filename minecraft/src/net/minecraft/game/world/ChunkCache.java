@@ -41,7 +41,7 @@ public class ChunkCache implements IBlockAccess {
 		// ocean, the top is void.
 		if(y <= 0) {
 			return Block.lavaStill.blockID;
-		} else if(y >= 128) {
+		} else if(y >= Chunk.SECTION_HEIGHT) {
 			return 0;
 		} else {
 			int chunkOffsetX = (x >> 4) - this.chunkX;
@@ -101,7 +101,7 @@ public class ChunkCache implements IBlockAccess {
 
 		if (y < 0) {
 			return 0;
-		} else if (y >= 128) {
+		} else if (y >= Chunk.SECTION_HEIGHT) {
 			lightValue = 15 - this.worldObj.skylightSubtracted;
 			if (lightValue < 0) {
 				lightValue = 0;
@@ -121,7 +121,7 @@ public class ChunkCache implements IBlockAccess {
 	public int getBlockMetadata(int x, int y, int z) {
 		if(y < 0) {
 			return 0;
-		} else if(y >= 128) {
+		} else if(y >= Chunk.SECTION_HEIGHT) {
 			return 0;
 		} else {
 			int chunkOffsetX = (x >> 4) - this.chunkX;

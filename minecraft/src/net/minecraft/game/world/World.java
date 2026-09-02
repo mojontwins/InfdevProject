@@ -53,7 +53,8 @@ public class World implements IBlockAccess {
 	private int updateLCG;
 	private int distHashSeed;
 	static float[] lightBrightnessTable = new float[16];
-	private static final int blocksToTickPerFrame = 80;
+	/** Random-tick probes taken per materialized subchunk (8 subchunks x 10 = the original 80). */
+	private static final int tickProbesPerSubchunk = 10;
 	public static long autosavePeriod = 3600L;
 	public Entity playerEntity;
 	public int difficultySetting;
@@ -116,6 +117,77 @@ public class World implements IBlockAccess {
 		}
 	}
 
+	/**
+	 * The real on-disk footprint of the world save folder (saves/&lt;worldName&gt;/), measured by
+	 * summing every file's length beneath it, including the chunk sub-folders and level.dat.
+	 * This is recomputed on demand so the level-select screen always reports the true size, not
+	 * the possibly stale {@link #sizeOnDisk} guess that level.dat caches.
+	 */
+	public static long getWorldSize(File savesDirectory, String worldName) {
+		File worldFolder = new File(new File(savesDirectory, "saves"), worldName);
+		if(!worldFolder.exists()) {
+			return 0L;
+		}
+		return totalSize(worldFolder.listFiles());
+	}
+
+	private static long totalSize(File[] files) {
+		long total = 0L;
+		if(files != null) {
+			for(File file : files) {
+				if(file.isDirectory()) {
+					total += totalSize(file.listFiles());
+				} else {
+					total += file.length();
+				}
+			}
+		}
+		return total;
+	}
+
+	/**
+	 * Whether a world was saved in the old 128-high flat format rather than the newer
+	 * per-subchunk {@code Height}/{@code SubchunkMask} layout introduced with the 256-block
+	 * world. {@code writeChunkNBTData} tags every chunk it writes with {@code SubchunkMask}, so
+	 * a legacy chunk lacks it. A single chunk sample is enough: every chunk of a save was
+	 * written by the same build. Returns false when no chunk file exists yet (a fresh slot).
+	 */
+	public static boolean isLegacyWorldFormat(File savesDirectory, String worldName) {
+		File worldFolder = new File(new File(savesDirectory, "saves"), worldName);
+		if(!worldFolder.exists()) {
+			return false;
+		}
+		File chunkFile = findChunkFile(worldFolder.listFiles());
+		if(chunkFile == null) {
+			return false;
+		}
+		try {
+			NBTTagCompound root = LoadingScreenRenderer.read(new FileInputStream(chunkFile));
+			NBTTagCompound level = root.getCompoundTag("Level");
+			return !level.hasKey("SubchunkMask");
+		} catch(Exception ex) {
+			return false;
+		}
+	}
+
+	/** Returns the first {@code c.*.dat} chunk file under the world folder (recursive), or null. */
+	private static File findChunkFile(File[] files) {
+		if(files == null) {
+			return null;
+		}
+		for(File file : files) {
+			if(file.isDirectory()) {
+				File found = findChunkFile(file.listFiles());
+				if(found != null) {
+					return found;
+				}
+			} else if(file.getName().endsWith(".dat")) {
+				return file;
+			}
+		}
+		return null;
+	}
+
 	public World(File workingDirectory, String worldName) {
 		this(workingDirectory, worldName, (new Random()).nextLong(), new WorldOptions(), WorldType.WORLDTYPE_420);
 	}
@@ -174,6 +246,11 @@ public class World implements IBlockAccess {
 				ex.printStackTrace();
 			}
 		}
+
+		// Pick the correct ambient brightness now that worldTime is known, so the
+		// first rendered frame of a night-time save is dark rather than flashing
+		// fully lit until tick() runs.
+		this.skylightSubtracted = this.computeSkylightSubtracted();
 
 		if(this.randomSeed == 0L) {
 			this.randomSeed = randomSeed;
@@ -246,16 +323,16 @@ public class World implements IBlockAccess {
 
 	/**
 	 * Returns the block id at the given world coordinates. Bedrock (y &lt;= 0)
-	 * is reported as still lava; out-of-range heights (y &gt;= 128) report
-	 * air (0).
+	 * is reported as still lava; out-of-range heights (y &gt;=
+	 * {@link Chunk#SECTION_HEIGHT}) report air (0).
 	 */
 	public final int getBlockId(int x, int y, int z) {
-		return y <= 0 ? Block.lavaStill.blockID : (y >= 128 ? 0 : this.getChunkFromChunkCoords(x >> 4, z >> 4).getBlockID(x & 15, y, z & 15));
+		return y <= 0 ? Block.lavaStill.blockID : (y >= Chunk.SECTION_HEIGHT ? 0 : this.getChunkFromChunkCoords(x >> 4, z >> 4).getBlockID(x & 15, y, z & 15));
 	}
 
 	/** True if there is a generated chunk covering (x, z) and y is in the world height range. */
 	public final boolean blockExists(int x, int y, int z) {
-		return y >= 0 && y < 128 ? this.chunkExists(x >> 4, z >> 4) : false;
+		return y >= 0 && y < Chunk.SECTION_HEIGHT ? this.chunkExists(x >> 4, z >> 4) : false;
 	}
 
 	boolean chunkExists(int chunkX, int chunkZ) {
@@ -268,7 +345,7 @@ public class World implements IBlockAccess {
 	 * before entity AABB queries so we can early-out on an unloaded world.
 	 */
 	public final boolean checkChunksExist(int x1, int y1, int z1, int x2, int y2, int z2) {
-		if(y2 >= 0 && y1 < 128) {
+		if(y2 >= 0 && y1 < Chunk.SECTION_HEIGHT) {
 			x1 >>= 4;
 			y1 >>= 4;
 			z1 >>= 4;
@@ -295,7 +372,7 @@ public class World implements IBlockAccess {
 	public final boolean setTileNoUpdate(int x, int y, int z, int blockID) {
 		if(y < 0) {
 			return false;
-		} else if(y >= 128) {
+		} else if(y >= Chunk.SECTION_HEIGHT) {
 			return false;
 		} else {
 			Chunk chunk = this.getChunkFromChunkCoords(x >> 4, z >> 4);
@@ -311,7 +388,7 @@ public class World implements IBlockAccess {
 	public final int getBlockMetadata(int x, int y, int z) {
 		if(y < 0) {
 			return 0;
-		} else if(y >= 128) {
+		} else if(y >= Chunk.SECTION_HEIGHT) {
 			return 0;
 		} else {
 			Chunk chunk = this.getChunkFromChunkCoords(x >> 4, z >> 4);
@@ -351,7 +428,7 @@ public class World implements IBlockAccess {
 	private boolean setBlockMetadata(int x, int y, int z, int metadata) {
 		if(y < 0) {
 			return false;
-		} else if(y >= 128) {
+		} else if(y >= Chunk.SECTION_HEIGHT) {
 			return false;
 		} else {
 			Chunk chunk = this.getChunkFromChunkCoords(x >> 4, z >> 4);
@@ -366,7 +443,7 @@ public class World implements IBlockAccess {
 	public final boolean setBlockAndMetadata(int x, int y, int z, int blockID, int metadata) {
 		if(y < 0) {
 			return false;
-		} else if(y >= 128) {
+		} else if(y >= Chunk.SECTION_HEIGHT) {
 			return false;
 		} else {
 			Chunk chunk = this.getChunkFromChunkCoords(x >> 4, z >> 4);
@@ -488,7 +565,7 @@ public class World implements IBlockAccess {
 
 		if(y < 0) {
 			return 0;
-		} else if(y >= 128) {
+		} else if(y >= Chunk.SECTION_HEIGHT) {
 			lightValue = 15 - this.skylightSubtracted;
 			if(lightValue < 0) {
 				lightValue = 0;
@@ -505,7 +582,7 @@ public class World implements IBlockAccess {
 	public final boolean canExistingBlockSeeTheSky(int x, int y, int z) {
 		if(y < 0) {
 			return false;
-		} else if(y >= 128) {
+		} else if(y >= Chunk.SECTION_HEIGHT) {
 			return true;
 		} else if(!this.chunkExists(x >> 4, z >> 4)) {
 			return false;
@@ -566,7 +643,7 @@ public class World implements IBlockAccess {
 	}
 
 	public final int getSavedLightValue(EnumSkyBlock lightType, int x, int y, int z) {
-		if(y < 0 || y >= 128) {
+		if(y < 0 || y >= Chunk.SECTION_HEIGHT) {
 			return lightType.defaultLightValue;
 		}
 
@@ -859,6 +936,26 @@ public class World implements IBlockAccess {
 	}
 
 	/**
+	 * Computes {@code skylightSubtracted} for the current {@link #worldTime} using
+	 * the same day-factor formula as {@code tick()}. Called right after the saved
+	 * {@code worldTime} is loaded so the renderer uses the correct ambient
+	 * brightness on the very first frame instead of the midnight/noon constructor
+	 * default (which caused a one-frame "fully lit" flash on night-time saves).
+	 */
+	final int computeSkylightSubtracted() {
+		float dayFactor = 1.0F;
+		dayFactor = this.getCelestialAngle(1.0F);
+		dayFactor = 1.0F - (MathHelper.cos(dayFactor * (float)Math.PI * 2.0F) * 2.0F + 0.5F);
+		if(dayFactor < 0.0F) {
+			dayFactor = 0.0F;
+		}
+		if(dayFactor > 1.0F) {
+			dayFactor = 1.0F;
+		}
+		return (int)(dayFactor * 13.0F);
+	}
+
+	/**
 	 * Returns the cloud-color RGB. Same formula as {@link #getSkyColor} but
 	 * with an asymmetric tint (clouds are slightly warmer at night).
 	 */
@@ -982,6 +1079,11 @@ public class World implements IBlockAccess {
 		return "All: " + this.entityManager.getLoadedEntityList().size();
 	}
 
+	/** The world's generation seed, exactly as used to seed terrain generation. */
+	public final long getSeed() {
+		return this.randomSeed;
+	}
+
 	public final Entity getPlayerEntity() {
 		return this.playerEntity;
 	}
@@ -1043,7 +1145,7 @@ public class World implements IBlockAccess {
 	 * and notifies the renderer of the changed cell.
 	 */
 	final void setLightValue(EnumSkyBlock lightType, int x, int y, int z, int lightValue) {
-		if(y >= 0 && y < 128 && this.chunkExists(x >> 4, z >> 4)) {
+		if(y >= 0 && y < Chunk.SECTION_HEIGHT && this.chunkExists(x >> 4, z >> 4)) {
 			Chunk chunk = this.getChunkFromChunkCoords(x >> 4, z >> 4);
 			chunk.setLightValue(lightType, x & 15, y, z & 15, lightValue);
 			for(int i = 0; i < this.worldAccesses.size(); ++i) {
@@ -1073,17 +1175,7 @@ public class World implements IBlockAccess {
 		this.monsterSpawner.tick();
 		this.animalSpawner.tick();
 
-		float dayFactor = 1.0F;
-		dayFactor = this.getCelestialAngle(1.0F);
-		dayFactor = 1.0F - (MathHelper.cos(dayFactor * (float)Math.PI * 2.0F) * 2.0F + 0.5F);
-		if(dayFactor < 0.0F) {
-			dayFactor = 0.0F;
-		}
-		if(dayFactor > 1.0F) {
-			dayFactor = 1.0F;
-		}
-
-		int newSkylight = (int)(dayFactor * 13.0F);
+		int newSkylight = this.computeSkylightSubtracted();
 		if(newSkylight != this.skylightSubtracted) {
 			this.skylightSubtracted = newSkylight;
 			for(int i = 0; i < this.worldAccesses.size(); ++i) {
@@ -1117,15 +1209,21 @@ public class World implements IBlockAccess {
 				if(this.chunkExists(chunkX, chunkZ)) {
 					Chunk chunk = this.getChunkFromChunkCoords(chunkX, chunkZ);
 
-					for(int tick = 0; tick < blocksToTickPerFrame; ++tick) {
-						this.updateLCG = this.updateLCG * 3 + this.distHashSeed;
-						int tIndex = this.updateLCG >> 2;
-						int x = tIndex & 15;
-						int z = tIndex >> 8 & 15;
-						int y = tIndex >> 16 & 127;
-						int blockID = chunk.getBlockID(x, y, z);
-						if(Block.tickOnLoad[blockID]) {
-							Block.blocksList[blockID].updateTick(this, x + chunk.xPosition * 16, y, z + chunk.zPosition * 16, this.rand);
+					// One random-tick probe budget per materialized subchunk: a fresh terrain
+					// chunk has 8 of them, so this is exactly the historical 80 draws — and a
+					// column built up into the top half pays proportionally, keeping the per-
+					// cell tick rate constant whichever height the player builds at.
+					for(int subchunkIdx = 0; subchunkIdx < chunk.getSubchunkCount(); ++subchunkIdx) {
+						for(int tick = 0; tick < tickProbesPerSubchunk; ++tick) {
+							this.updateLCG = this.updateLCG * 3 + this.distHashSeed;
+							int tIndex = this.updateLCG >> 2;
+							int x = tIndex >> 2 & 15;
+							int z = tIndex >> 6 & 15;
+							int y = (subchunkIdx << 4) + (tIndex >> 10 & 15);
+							int blockID = chunk.getBlockID(x, y, z);
+							if(Block.tickOnLoad[blockID]) {
+								Block.blocksList[blockID].updateTick(this, x + chunk.xPosition * 16, y, z + chunk.zPosition * 16, this.rand);
+							}
 						}
 					}
 				}

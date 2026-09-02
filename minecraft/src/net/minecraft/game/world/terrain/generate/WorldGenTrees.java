@@ -3,6 +3,7 @@ package net.minecraft.game.world.terrain.generate;
 import java.util.Random;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.Block;
+import net.minecraft.game.world.chunk.Chunk;
 
 /**
  * Places a small oak-style tree: a straight trunk 4–7 blocks tall, topped
@@ -11,9 +12,9 @@ import net.minecraft.game.world.block.Block;
  *
  * <p>The algorithm has three phases:
  * <ol>
- *   <li><b>Collision check</b> — walks the column above the origin and aborts
- *       if any block other than air or leaves is found, or if the column
- *       extends beyond y=127.</li>
+*   <li><b>Collision check</b> — walks the column above the origin and aborts
+	 *       if any block other than air or leaves is found, or if the column
+	 *       extends beyond the world height.</li>
  *   <li><b>Ground check</b> — the block directly below the origin must be
  *       plantable (grass or dirt); if so it is replaced with plain dirt so
  *       the tree never floats on a grass block.</li>
@@ -61,7 +62,7 @@ public final class WorldGenTrees extends WorldGenerator {
 
 			for(int checkX = x - radius; checkX <= x + radius && canPlace; ++checkX) {
 				for(int checkZ = z - radius; checkZ <= z + radius && canPlace; ++checkZ) {
-					if(checkY < 0 || checkY >= 128) {
+					if(checkY < 0 || checkY >= Chunk.SECTION_HEIGHT) {
 						// Outside the world — abort.
 						canPlace = false;
 					} else {
@@ -83,7 +84,7 @@ public final class WorldGenTrees extends WorldGenerator {
 		// The block directly below the origin must be plantable.  If it is, the
 		// generator always converts it to plain dirt — this matches the original
 		// behaviour and prevents a tree from sitting on top of a grass block.
-		if(!world.canPlantsGrowOn(x, y - 1, z) || y >= 128 - trunkHeight - 1) {
+		if(!world.canPlantsGrowOn(x, y - 1, z) || y >= Chunk.SECTION_HEIGHT - trunkHeight - 1) {
 			return false;
 		}
 		world.setTileNoUpdate(x, y - 1, z, Block.dirt.blockID);

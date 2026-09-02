@@ -2,6 +2,7 @@ package net.minecraft.game.world;
 
 import net.minecraft.game.entity.Entity;
 import net.minecraft.game.entity.EntityLiving;
+import net.minecraft.game.world.chunk.Chunk;
 import net.minecraft.game.world.material.Material;
 import util.MathHelper;
 
@@ -23,8 +24,8 @@ public final class MobSpawner {
     /** Half-width of the spawn area; entities spawn within ±128 blocks of the player. */
     private static final int SPAWN_HORIZONTAL_SPREAD = 128;
 
-    /** Vertical range for spawn attempts (0 to 127 blocks). */
-    private static final int SPAWN_VERTICAL_RANGE = 128;
+    /** Vertical range for spawn attempts (0 to world height). */
+    private static final int SPAWN_VERTICAL_RANGE = Chunk.SECTION_HEIGHT;
 
     /** Squared exclusion radius: no spawn within 16 blocks of the player/spawn point. */
     private static final double MIN_SPAWN_DISTANCE_SQ = 256.0D;

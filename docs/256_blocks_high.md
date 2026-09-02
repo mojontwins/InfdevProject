@@ -1,6 +1,6 @@
 # Extending World Height to 256 Blocks
 
-> **Status:** Planned — not yet implemented.
+> **Status:** Implemented (branch `feature/256-world-height`).
 > **Target version:** Infdev 20100420 (Java 8 refactor).
 
 ---
@@ -31,22 +31,32 @@ NibbleArray   skyLight    — 2048 bytes
 NibbleArray   blockLight  — 2048 bytes
 ```
 
-Total per subchunk: **8 192 bytes** of block + metadata + light data.
+Total per subchunk: **10 240 bytes** (4096 blocks + 3 × 2048 nibble planes).
+(The earlier draft's "8 192 B" figure silently dropped the blockLight plane —
+all four planes are materialized together with each subchunk.)
 
 Subchunk index `s` covers world y = `s * 16` to `s * 16 + 15`.
 
 | Subchunks | y range    | When allocated |
 |-----------|------------|----------------|
 | 0–7       | 0–127      | Always, on chunk load |
-| 8–15      | 128–255    | Lazily, on first block read or write above y=127 |
+| 8–15      | 128–255    | Lazily, on first **write** above y=127 |
+
+**Allocation is write-only.** A `null` subchunk is "implicit open air, fully
+lit": reads against it return block 0 (air), metadata 0, skylight 15 and
+blocklight 0 without allocating. Read-allocation was deliberately rejected —
+`WorldRenderer` scans all 16 slabs per rebuild, so allocating on read would
+materialize the entire top half on the first render pass and defeat laziness.
 
 The flat arrays (`byte blocks[32768]`, `NibbleArray data`, `NibbleArray
 skyLightMap`, `NibbleArray blockLightMap`) are removed from `Chunk` and
-replaced with the subchunk structure.
+replaced with per-subchunk parallel arrays: `byte[16][] blocks`,
+`NibbleArray[16] data / skyLightMap / blockLightMap`.
 
-**Memory:** 8-eager subchunks = 8 × 8 192 B = 65 536 B (blocks + metadata +
-lights), matching today's 65 536 B exactly.  Lazy upper half costs nothing
-until used.
+**Memory:** 8-eager subchunks = 8 × 10 240 B = 81 920 B (blocks + metadata +
+lights) — matching today's single flat chunk exactly.  A fully built 16-subchunk
+column is 163 840 B.  The lazy upper half costs nothing until a block is placed
+there.
 
 ### Three independent vertical systems
 
@@ -83,6 +93,9 @@ yLocal      = y & 15         // y % 16
 Entity segment index (already `entity.posY / 16` at `Chunk.java:482`):
 unchanged — it naturally produces `[0, 15]` for y ∈ `[0, 255]`.
 
+`TILE_Y_SHIFT` stays **10** — `packedTileKey = x + (y << 10) + (z << 10 << 10)`
+is already collision-free for y ∈ `[0, 255]`, so no change is needed there.
+
 ---
 
 ## Performance
@@ -92,31 +105,35 @@ unchanged — it naturally produces `[0, 15]` for y ∈ `[0, 255]`.
 **Goal:** a crop/sapling/grass cell receives `updateTick` at the same
 average rate as today.
 
-|                    | Today        | 16 subchunks, 10 probes/subchunk |
-|--------------------|--------------|----------------------------------|
-| Cells per subchunk | 16 × 16 × 16 = 4 096 | same |
-| Probes per chunk   | 80 (flat)   | 10 × 16 = 160                    |
-| Pick probability   | 80 / 32 768 ≈ 0.244 % | 10 / 4 096 ≈ 0.244 % |
-| Pick rate          | **identical** | **identical** |
+The loop iterates **materialized** subchunks — 8 on fresh terrain — doing 10
+LCG-local probes each, so a fresh chunk still performs exactly 80 probes (the
+historical budget). Building upward materializes more subchunks and the probe
+count scales with them, keeping the per-cell tick rate constant at any height:
 
-The tick loop in `World.updateBlocksAndPlayCaveSounds` iterates subchunks:
-for each non-null subchunk it performs 10 LCG-local probes
-(`x = (lcg>>2) & 15`, `z = (lcg>>6) & 15`, `yLocal = (lcg>>10) & 15`).
-No global budget juggling; the budget scales automatically with the number of
-present subchunks.
+|                    | Today        | Fresh terrain (8 subchunks) | Fully built (16 subchunks) |
+|--------------------|--------------|-----------------------------|----------------------------|
+| Cells per subchunk | 16 × 16 × 16 = 4 096 | 4 096 | 4 096 |
+| Probes per chunk   | 80 (flat)   | 10 × 8 = 80                 | 10 × 16 = 160              |
+| Pick probability   | 80 / 32 768 ≈ 0.244 % | 10 / 4 096 ≈ 0.244 % | 10 / 4 096 ≈ 0.244 % |
+| Pick rate          | **identical** | **identical**            | **identical**              |
+
+The tick loop in `World.updateBlocksAndPlayCaveSounds` iterates subchunks up to
+`chunk.getSubchunkCount()`: for each present subchunk it performs 10 LCG-local
+probes (`x = (lcg>>2) & 15`, `z = (lcg>>6) & 15`, `yLocal = (lcg>>10) & 15`),
+and the world Y is `subchunkIdx * 16 + yLocal`. No global budget juggling.
 
 ### Memory
 
 |                          | Today (128 flat) | 8 eager subchunks | 16 subchunks (fully built) |
 |--------------------------|-------------------|-------------------|---------------------------|
-| Blocks + metadata + lights / chunk | 32 768 + 16 384 + 16 384 + 16 384 = 81 920 B | 65 536 B | 131 072 B |
+| Blocks + metadata + lights / chunk | 32 768 + 16 384 + 16 384 + 16 384 = 81 920 B | 81 920 B | 163 840 B |
 | Entities / chunk         | 8 × List overhead  | 8 × overhead     | 16 × overhead            |
-| 17×17 loaded area        | ~46 MB            | ~18 MB           | ~37 MB                   |
+| 17×17 loaded area        | ~46 MB            | ~46 MB           | ~47 MB                   |
 
-**Result:** new worlds start at ~18 MB (substantially lower than today's
-~46 MB because the metadata nibbles are dropped for the lazy upper half).
-Fully explored worlds return to ~37 MB (well below today).  Memory is never
-worse than today.
+**Result:** a fresh terrain chunk materializes exactly 8 subchunks — the same
+81 920 B it always has — so new worlds cost no more than before. Building upward
+or loading a saved top half adds 10 240 B per subchunk used. Memory is never
+worse than today for equivalent coverage.
 
 ### Rendering
 
@@ -124,12 +141,16 @@ worse than today.
 instances instead of 8, each owning 3 GL call lists.
 
 Mitigations:
-- Subchunks that are entirely air set `skipRenderPass[0] = skipRenderPass[1] = true`
-  on allocation, so the renderer skips GL upload for them entirely.
+- `WorldRenderer`'s existing empty-slab optimisation: a slab that contains no
+  solid blocks compiles to an empty display list, so the all-air top half is
+  cheap even at 16 layers. (A dedicated `skipRenderPass` flag was considered
+  but not added — the empty-list behaviour already covers it.)
 - Frustum culling discards the upper layers of distant chunks when looking
   horizontally.
-- `RenderGlobal.markBlocksForUpdate` computes `chunkY = blockY >> 4` directly
-  (no iteration needed) — the subchunk index maps 1:1 to the renderer index.
+- `RenderGlobal.markBlocksForUpdate` computes `chunkY = blockY >> 4` — the
+  subchunk index maps 1:1 to the renderer index — but the resulting range is
+  clamped into `[0, renderChunksTall - 1]` so neighbour-of-y=0 edits (which pass
+  y = −1) and edits above the top layer cannot index out of bounds.
 
 ---
 
@@ -143,28 +164,38 @@ Mitigations:
 ### `net.minecraft.game.world.chunk.Chunk`
 
 **Constants:**
-- `SECTION_HEIGHT`: `128` → `256`
-- `ENTITY_SEGMENTS`: `8` → `16`
-- `X_SHIFT` / `Z_SHIFT`: removed (replaced by subchunk-local index)
-- `TILE_Y_SHIFT`: `10` → `11` (tile key needs `1 << 11 = 2048` buckets)
+- `SECTION_SIZE`: now `public static final int` = 16.
+- `SECTION_HEIGHT`: `128` → `256` (also `public`, so the world and generators
+  share the constant).
+- `SUBCHUNK_COUNT` = `SECTION_HEIGHT / SECTION_SIZE` = 16.
+- `ENTITY_SEGMENTS`: `8` → `16`.
+- `X_SHIFT` / `Z_SHIFT` (block-plane indexing): replaced by subchunk-local
+  `LOCAL_X_SHIFT` / `LOCAL_Z_SHIFT`.
+- `TILE_Y_SHIFT`: **unchanged at 10** (see Indexing above).
 
 **Fields:**
-- `byte[] blocks` → `byte[][][] blocks` — `[subchunkIdx][x][z*16+yLocal]`
-- `NibbleArray data` → `NibbleArray[][] data` (block metadata, 4 bits per cell)
-- `NibbleArray skyLightMap` → `NibbleArray[][] skyLightMap`
-- `NibbleArray blockLightMap` → `NibbleArray[][] blockLightMap`
-- `heightMap` sentinel: keep `-1` (signed byte; valid range 0–255 unchanged)
+- `byte[] blocks` → `byte[][] blocks` — `[subchunkIdx][x<<8|z<<4|yLocal]`
+- `NibbleArray data` → `NibbleArray[] data` (block metadata, 4 bits per cell)
+- `NibbleArray skyLightMap` → `NibbleArray[] skyLightMap`
+- `NibbleArray blockLightMap` → `NibbleArray[] blockLightMap`
 
 **Methods:**
-- `getBlockID(x, y, z)`: branch on `subchunkIdx = y >> 4`, allocate lazy
-  subchunk on read if `y >= 128 && subchunks[subchunkIdx] == null`.
-- `setBlockID(x, y, z, id)`: same, allocate on write.
-- `generateHeightMap()`: walk `subchunkIdx` from 15 down to 0, then within
-  subchunk from 15 down to 0.
-- `relightBlock(x, y, z)`: walk subchunks.
-- `checkLight(x, y, z)`: unchanged logic, walks subchunks.
+- `getBlockID(x, y, z)`: read-only; a `null` subchunk returns 0 (air). Never
+  allocates.
+- `setBlockID(x, y, z, id)`: allocates the subchunk on first write
+  (`allocateSubchunk`, which also pre-fills a fully-lit skylight plane), then
+  corrects the height/skylight via `relightBlock`.
+- `getBlockMetadata` / `getSavedLightValue` / `getBlockLightValue`: read-only;
+  `null` subchunks return metadata 0 / skylight 15 / blocklight 0.
+- `generateHeightMap()`: still one column at a time over the whole 0–255 span
+  (the walk descends through the empty top half because air has opacity 0); the
+  second cross-feed pass is unchanged.
+- `relightBlock(x, y, z)`: unchanged logic; writes route through `setSkyLight`,
+  which skips subchunks that are still implicit open sky.
 - `addEntity(Entity)` / `removeEntityAtIndex(Entity, int)`: unchanged —
   `entity.posY / 16` already produces `[0, 15]`.
+- `getSubchunkCount()`: number of materialized subchunks counting from the
+  bottom (drives the random-tick loop).
 - `writeChunkNBTData` / `readChunkNBTData`: see Save format below.
 
 ### `net.minecraft.game.world.World`
@@ -187,22 +218,40 @@ Mitigations:
 
 ### `net.minecraft.game.world.biome.BiomeGenInfdev`
 
-- Surface walk: start at `SECTION_HEIGHT - 1` (255).  Ore veins up to
-  `SECTION_HEIGHT` (256).
+- **Unchanged.** The surface walk and ore-vein heights deliberately stay 128.
+  `BiomeGenInfdev` writes into the flat 128-high generation buffer (block index
+  `x<<11|z<<7|127`), so raising `placeOreVein`'s bound would consume extra RNG
+  draws and change the RNG order — and the RNG order is load-bearing for world
+  generation. Terrain is still produced only in the bottom 128 layers; the top
+  half is writable by player action only.
+- `WorldGenTrees` (sapling growth): the collision bound `checkY >= 128` and the
+  ground bound `y >= 128 - trunkHeight - 1` become `SECTION_HEIGHT`-based, so a
+  sapling on a platform at y ≈ 150 can grow its trunk into the new top half.
 
 ### `net.minecraft.game.world.chunk.ChunkProviderGenerate`
 
-- `blocks` buffer stride: `SECTION_SIZE * SECTION_SIZE = 256` per subchunk.
-  Allocate 8 subchunks, fill; leave upper 8 as `null` (air).
+- `provideChunk` keeps its flat 32 768-byte (`new byte[-Short.MIN_VALUE]`)
+  buffer, but the ordering is now explicit: the chunk is built empty (to hold
+  the biome grid), `generateTerrain` / `replaceBlocks` fill the flat buffer
+  (which writes column-major, `x << 11 | z << 7 | y`), and only then is
+  `chunk.loadFlatBlocks(blocks)` called to slice the buffer into the bottom
+  8 eager subchunks. (The first attempt sliced the buffer in the `Chunk`
+  constructor — but that ran *before* the buffer was generated, so every chunk
+  came out empty and the player fell to the lava at the world floor.) The upper
+  8 subchunks stay `null` (air).
 
 ### `net.minecraft.game.world.terrain.ChunkProviderGenerate420`
 
-- `blockIndex += SECTION_HEIGHT` (was literal 128) → `+= SECTION_SIZE`.
+- `blockIndex += 128` → `+= TERRAIN_HEIGHT` (a new `private static final = 128`).
+  This is the terrain generation height — the flat up-sampled buffer is still
+  128 high and its packing scheme (`<< 11` / `<< 7`) is tuned to it. It is
+  unrelated to the new buildable `SECTION_HEIGHT`; the two must not be conflated.
 
 ### `net.minecraft.client.render.RenderGlobal`
 
-- `renderChunksTall = 8` → `16`.  Comment at line 183 updated.
-- `markBlocksForUpdate`: `chunkY = blockY >> 4` (was `blockY % renderChunksTall`).
+- `renderChunksTall = 8` → `16`.  Comment at line 183 updated to 16x256x16.
+- `markBlocksForUpdate`: `chunkY = blockY >> 4` (was `blockY % renderChunksTall`),
+  with min/max Y clamped into `[0, renderChunksTall - 1]`.
 - `maxBlockY = this.renderChunksTall` (line 175): unchanged — derived.
 
 ### `net.minecraft.game.world.MobSpawner`
@@ -232,23 +281,32 @@ Level {
 ```
 
 `SubchunkMask` encodes which subchunks are present (not just eager vs. lazy —
-future-proofed for any sparse subchunk).  All four subchunk lists are
-parallel — same length, same order; index `i` corresponds to subchunk `i`.
+future-proofed for any sparse subchunk).  The four subchunk lists are parallel
+and **mask-ordered**: each list holds exactly one element per set mask bit, in
+ascending subchunk order (so a fresh terrain chunk has 8 entries, subchunks
+0–7). `NBTTagList` cannot hold `null` entries, so the mask carries the
+"present" set and the lists omit absent subchunks rather than leaving holes.
 
 ### Legacy migration
 
-`readChunkNBTData` when `Height` tag is missing or equals 128:
+`readChunkNBTData` detects the format by the `Height` tag: `getInteger("Height")`
+returns **0** when the tag is absent (see `NBTTagCompound.java:93`) and 128 for an
+older save — either maps to the legacy flat path; `256` selects the subchunk
+lists. The legacy path:
 
 1. Read flat `Blocks` (32 768 B), `Data` (16 384 B), `SkyLight` (16 384 B),
-   `BlockLight` (16 384 B) into temporary arrays.
+   `BlockLight` (16 384 B) arrays.
 2. Split each into subchunks 0–7: each subchunk gets its 4 096 / 2 048 B
    slice.
-3. Upper subchunks 8–15 are `null` (air).
-4. If any light map is missing or `isValid()` returns false (existing code
-   path), regenerate via `checkLight`.
+3. Upper subchunks 8–15 are `null` (air, fully lit).
+4. If the height map or any skylight plane is missing (the existing
+   `isValid()` / `hasSkyPlanes` path), regenerate light via `generateHeightMap` —
+   pre-seeding the present subchunks' skylight to full-bright first.
 
-Subsequent saves write the new format.  `Height` tag becomes permanent on
-first re-save.
+Subsequent saves write the new format.  `Height` becomes permanent on first
+re-save, so a world is upgraded in place; a legacy world that has not been
+re-saved since the change still reads as old format (see the level-select
+screen's `(OLD)` marker).
 
 ---
 

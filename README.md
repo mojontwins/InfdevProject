@@ -4,280 +4,6 @@ A RetroMCP (MCP) workspace for the Minecraft **Infdev 20100420** client (`inf-20
 
 ## Diary
 
-### 2026-09-02 — Subtyped block items: `IBlockWithSubtypes` + `ItemBlockWithSubtypes`
-
-Subtyped blocks (flowers, mushrooms, saplings) now display and tint correctly
-in the inventory, the held item, dropped items, and break particles.
-
-- `Item.hasSubTypes` (`false` by default) — when `true`, the durability bar is
-  never drawn and `getIconFromDamage(int)` / `getColorFromDamage(int)` may
-  return different values per metadata. New `getHasSubTypes()` / `setHasSubTypes()`
-  helpers.
-- `Item.getIconFromDamage()` is now `getIconFromDamage(int damage)`, returning
-  `this.iconIndex` by default. `Item.getColorFromDamage(int)` returns `0xFFFFFF`
-  by default.
-- New `IBlockWithSubtypes` marker interface in `net.minecraft.game.world.block`.
-  `Block` already provides the default `getBlockTextureFromSideAndMetadata`, so
-  subclasses only need to add `implements IBlockWithSubtypes`. `BlockFlower`
-  declares it; `BlockMushroom` and `BlockSapling` inherit it via `extends BlockFlower`.
-- New `ItemBlockWithSubtypes extends ItemBlock` (constructed in `Block`'s
-  static init) sets `hasSubTypes=true` and overrides `getIconFromDamage` /
-  `getColorFromDamage` to delegate to the wrapped block's metadata-sensitive
-  methods. Blocks whose class implements the interface are automatically wired
-  to it — no per-block catalogue change needed.
-- `RenderItem` and `ItemRenderer` pass `itemDamage` to `getIconFromDamage` and
-  apply tint via `getColorFromDamage` (preserving the brightness multiplier in
-  the first-person hand). The damage-bar overlay in
-  `RenderItem.renderItemOverlayIntoGUI` is gated on `!getHasSubTypes()`.
-- `EffectRenderer` passes the block's metadata to `EntityDiggingFX`, which now
-  uses `block.getBlockTextureFromSideAndMetadata(2, metadata)` for the crack
-  sprite and `block.getRenderColor(metadata)` for the particle tint (the
-  hard-coded `0.6F` dark gray is gone).
-- `docs/blocks_with_subtypes_interface.md` documents the design.
-
-### 2026-09-02 — BlockSapling: bit 3 (& 8) is the growth-state flag
-
-`BlockSapling.updateTick` no longer increments metadata 0→15. It now uses bit 3
-(`& 8`) as the "ready to grow" state, matching b1.7.3: the first tick that meets
-the growth conditions sets the bit, the next tick attempts to generate the tree.
-The other metadata bits are left untouched so future sapling subtypes (bits 4–7
-in b1.7.3) can keep their type across growth.
-
-The class Javadoc documents the metadata layout and the future-subtype contract:
-`getBlockTextureFromSideAndMetadata` and any other variant-aware method must mask
-out bit 3 once subtypes are introduced (e.g. `metadata & 0xF0` if subtypes live
-in the upper nibble as in b1.7.3).
-
-### 2026-09-02 — Organised static Block and Item lists by id, grouped by tens
-
-`Block.java` and `Item.java` static catalogue sections are now:
-
-- Ordered strictly by id (ascending).
-- Grouped in blocks of 10 with a blank line after every group.
-- `Block.java` has a `// ID NNN` placeholder on its own line for every
-  unoccupied id (0, 21–34, 36, 39–40, 52–53, 63–255), so free slots are
-  obvious at a glance. `Item.java` has no gaps (ids 0–71 are all occupied)
-  and ends with `// ID 72 .. ID 1023: free` to mark the open range.
-
-This makes it easy to scan which ids are free and where to insert new blocks/items.
-
-### 2026-09-02 — Add `ItemBucket` from a1.1.2 (water, lava, milk)
-
-Backported from `minecraft_a1.1.2/src/net/minecraft/src/ItemBucket.java`.
-
-- `ItemBucket extends Item`: the field `isFull` stores the block id to place
-  (0 = empty, 8 = waterMoving, 10 = lavaMoving, -1 = milk).
-  `onItemRightClick` handles all four cases via a single ray trace:
-
-  - Empty bucket + hitting a source block of water / lava → picks it up,
-    clears the cell, plays `liquid.water` / `liquid.lava`, returns the
-    water / lava bucket.
-  - Water / lava bucket + hitting a block face → resolves the neighbour
-    cell using `neighbourAcrossFace` (the same helper used by `ItemBlock`
-    and `ItemFlintAndSteel`), places the fluid if the neighbour is empty
-    or non-solid, plays `liquid.water` / `random.fizz`, returns the empty
-    bucket.
-  - Empty bucket + hitting a cow entity → milks it, returns the milk bucket.
-  - Milk bucket + hitting any block face → consumes the bucket, returns
-    the empty bucket (the milk bucket cannot be refilled from a cow —
-    a1.1.2 semantics preserved).
-
-- `Item.java`: the four bucket fields are now `ItemBucket` instances:
-  `bucketEmpty` (id 68, isFull=0), `bucketWater` (id 70, isFull=8),
-  `bucketLava` (id 71, isFull=10), `bucketMilk` (id 69, isFull=-1).
-  Item ids 67 (leather) and 68–69 are unchanged from the previous commit.
-
-- `EntityCow.interact` updated: the milking path is now handled by
-  `ItemBucket`; the stub is retained but noted as unused.
-
-Full-tree `javac -source 1.8 -target 1.8` EXIT=0, 295 files.
-
-### 2026-09-02 — Backport `EntityCow` from a1.1.2
-
-Cows now exist in the world. Backported from `minecraft_a1.1.2/src/net/minecraft/src/EntityCow.java`.
-
-- `EntityCow extends EntityAnimal`: `texture = "/mob/cow.png"`, `setSize(0.9F, 1.3F)`, `getLivingSound` / `getHurtSound` / `getDeathSound` set to `mob.cow` / `mob.cowhurt` / `mob.cowhurt`. `getDroppedItem()` returns `Item.leather.shiftedIndex` (the existing `EntityLiving.onDeath` scatter is 0-2 drops). The `interact` method is a stub (no right-click handler wired in this codebase yet).
-- `ModelCow extends ModelBase` (not `ModelQuadruped`): the working-src `ModelRenderer.rotationPoint*` fields are private and `ModelQuadruped.render` is final, so the cow's extra parts (horns, udders) cannot piggy-back on the base class. The legs are constructed inline with the same offsets the a1.1.2 reference would have produced via the in-place `--leg1.rotationPointX` mutations.
-- `RenderCow extends RenderLiving`: thin class — `RenderLiving` already does the work; the subclass exists so the renderer registry can name a model and shadow size.
-- `Item.java` adds `leather` (id 67), `bucketEmpty` (id 68), `bucketMilk` (id 69) at the end of the register sequence (so no existing ids shift). These are needed for the cow's drop (`leather`) and the stub milking interaction (`bucketEmpty` / `bucketMilk`).
-- `EntityList` adds `addMapping(EntityCow.class, "Cow")`. The save-format string is new and so does not collide with anything in older worlds.
-- `World.animalSpawner` adds `EntityCow.class` to the spawnable-animals array.
-- `RenderManager` adds `new RenderCow(new ModelCow(), 0.7F)`.
-
-Full-tree `javac -source 1.8 -target 1.8` EXIT=0, 294 files.
-
-### 2026-09-02 — `Block.canBeSubstituted()` and the click-on-flower fix (#2, #7, and a new bug)
-
-Added a virtual method on `Block`:
-```java
-public boolean canBeSubstituted() {
-    return this == Block.fire
-        || this.blockMaterial == Material.water
-        || this.blockMaterial == Material.lava;
-}
-```
-
-A block is *substitutable* when the player meaningfully "puts a block there" — i.e. the cell can take a new block, and the existing one disappears without conflict. The default covers fire, water, lava. `BlockFlower` (covers flowers, mushrooms, saplings, crops via the hierarchy) overrides to return `true`. Solid decorations like cogs default to `false`, so they stay opaque to placement.
-
-Three call sites are routed through it:
-
-- **`BlockSand.canFallBelow`** (proposal #2): the static helper previously listed air, fire, water, lava by id and material. Now `block == null || block.canBeSubstituted()`.
-- **`EntityFallingSand.canBlockBePlacedAt`** (proposal #7): the `instanceof BlockFlower` check and the four water/lava id checks collapse to `existingBlock == null || existingBlock.canBeSubstituted()`.
-- **`ItemBlock.onItemUse`** (new behaviour, this commit): right-clicking a flower (or any substitutable block) with a block item now places the new block **in the clicked cell, replacing the flower**, instead of placing in the cell across the clicked face. Before the fix, the player had to right-click *next to* a flower to place a block on its cell — the bug is in vanilla Infdev 2010 too.
-
-`canPlaceBlockAt` is still called on the new block at the target cell, so the placement rules (e.g. need a plant-supporting block below) are not bypassed. The "where" and the "is the cell clear" questions are now both answered by the same hook, with no enumeration of block ids or materials at the call sites.
-
-Full-tree `javac -source 1.8 -target 1.8` compile passed (`EXIT: 0`).
-
-### 2026-09-02 — Six more de-hardcoding passes (#4, #5, #6, #8, #9, #11)
-
-A batch of small, focused refactors that move id checks onto the block
-hierarchy. Each is byte-for-byte behaviour-preserving and follows the same
-pattern: a virtual method on the base class, an override on the specific
-block(s) that need special behaviour, and a redirect at the call site.
-
-- **#4 `Block.isBurning()`** — default is `blockMaterial == Material.lava`,
-  overridden in `BlockFire` to return `true`. Replaces the
-  3-id OR chain in `EntityQueryService.isBoundingBoxBurning`
-  (`Block.fire`, `Block.lavaMoving`, `Block.lavaStill`) with
-  `block.isBurning()`. Same semantics, one virtual dispatch.
-
-- **#5 `Block.takesLightFromAbove()`** — default `false`, overridden in
-  `BlockStep` (only when `!doubleSlab`) and `BlockFarmland`. Replaces the
-  duplicated `id == stairSingle || id == tilledField` check in
-  `World.getBlockLightValue_do` and `ChunkCache.getLightValueExt` with
-  `block.takesLightFromAbove()`. The two call sites are now identical
-  one-liners.
-
-- **#6 `Block.getAnimalPathBonus()`** — default `0.0F`, overridden in
-  `BlockGrass` to `10.0F`. `EntityAnimal.getBlockPathWeight` now asks the
-  block below instead of checking `Block.grass.blockID`. The 10.0F
-  tuning constant moves to where it belongs (the block that earns it).
-
-- **#8 `BlockFluid.hardenedBlock(int decay)`** — protected method on the
-  fluid base that returns `null` for water and (for lava) the right block:
-  obsidian for source (decay 0), cobblestone for flowing (decay 1-4).
-  `checkForHarden` no longer hardcodes `Block.obsidian.blockID` or
-  `Block.cobblestone.blockID`; it just calls `this.hardenedBlock(decay)`.
-
-- **#9 `BlockOreCoal` / `BlockOreDiamond`** — two new subclasses that
-  override `idDropped` to return `Item.coal.shiftedIndex` and
-  `Item.diamod.shiftedIndex` respectively. `Block.oreCoal` and
-  `Block.oreDiamond` are now declared with the new subclasses; the base
-  `BlockOre.idDropped` simplifies to `return this.blockID`. The
-  `this.blockID == Block.oreCoal.blockID` ternary chain is gone.
-
-- **#11 `RenderBlockRedstoneWire.REDSTONE_WIRE_ID`** — extracted the
-  five occurrences of the magic literal `55` into a single named
-  constant at the top of the file, with a javadoc note explaining
-  it shares the slot with the cog/gears block in this version.
-
-Full-tree `javac -source 1.8 -target 1.8` compile passed (`EXIT: 0`).
-
-### 2026-09-02 — Add `Block.canGrowCrops(int metadata)` hook
-
-De-hardcoded `BlockCrops.updateTick`: the 3×3 neighbourhood scan of farmland used to read `world.getBlockId(tileX, y-1, tileZ) == Block.tilledField.blockID` nine times per random tick and used the metadata inline. Replaced with a virtual method on `Block`:
-```java
-public boolean canGrowCrops(int metadata) { return false; }
-```
-Override `true` on `BlockFarmland` only — distinct from `canGrowPlants` (which is true for dirt/grass) because crops must grow on tilled soil specifically, not on any plant-supporting block.
-
-`BlockCrops.updateTick` now reads:
-```java
-Block below = world.getBlock(tileX, y - 1, tileZ);
-int belowMeta = world.getBlockMetadata(tileX, y - 1, tileZ);
-if(below != null && below.canGrowCrops(belowMeta)) { ... }
-```
-
-Full-tree `javac -source 1.8 -target 1.8` compile passed (`EXIT: 0`).
-
-### 2026-09-02 — Add `Block.getLightValue(int metadata)` hook
-
-Added a per-metadata light-value hook to `Block`, mirroring the r1.2.5 pattern. Default returns `Block.lightValue[blockID]`, so existing blocks keep their behaviour byte-for-byte; subclasses (e.g. a future glowing-mushroom variant reusing `Block.mushrooms` with a reserved metadata) can override it to return a per-metadata brightness.
-
-Direct reads of the static `Block.lightValue[]` array were routed through the new method, with a null check on the looked-up `Block` instance:
-- `MetadataChunkBlock.relightBlock` — now uses `block.getLightValue(world.getBlockMetadata(x, y, z))` with a `Block.blocksList[blockID] != null` guard.
-- `RenderBlockDoor` (3 call sites) — uses the cached `metadata` from the door's own `blockAccess.getBlockMetadata` call.
-- `RenderBlockNormal.neighborBrightness` — calls `block.getLightValue(renderBlocks.blockAccess.getBlockMetadata(...))` per side.
-- `RenderBlockTorch`, `RenderBlockLever`, `RenderBlockRepeater` — use their cached `metadata` directly.
-
-`World.computeLightAt` is intentionally left as `Block.lightValue[blockID]` — it runs in a hot inner loop with only the id in hand, and there is no per-block instance or metadata there. A 256×16 LUT was considered and rejected for now: the static array is already a single load, the shift+or indirection of `(id << 4) | meta` is not a measurable win, and the real value of the hook is the override path, not the lookup. The LUT can be added later if profiling shows it matters.
-
-Full-tree `javac -source 1.8 -target 1.8` compile passed (`EXIT: 0`).
-
-### 2026-09-02 — Add `ItemStack.stackTagCompound` (per-stack NBT payload)
-
-Ported from r1.2.5: `ItemStack` now carries an optional `NBTTagCompound stackTagCompound` field, saved alongside the rest of the stack and read back on load. Behaviour:
-- `writeToNBT` emits the tag under the `"tag"` key only when non-null.
-- The `ItemStack(NBTTagCompound)` constructor and the new in-place `readFromNBT` method both read it back, with the tag field left as `null` if the key is absent.
-- `splitStack` and `copy` clone the tag (deep copy via `NBTTagCompound.copy()`) so the original and the split/copy don't share a mutable payload.
-- `hasTagCompound` / `getTagCompound` / `setTagCompound` helpers mirror r1.2.5.
-
-To support deep copies, `NBTBase` now has an abstract `copy()` method with concrete implementations in every tag type (recursive for `NBTTagList` and `NBTTagCompound`, value copy for byte arrays). The `NBTTagList` tag type is copied correctly so nested lists-of-lists work.
-
-`toString` was updated to include the tag presence. Behaviour is unchanged for stacks that don't set a tag.
-
-### 2026-09-01 — Extract `Block.itemStackDropped(int, Random)`
-
-Extracted the `ItemStack` construction out of `dropBlockAsItemWithChance` into a new overridable `itemStackDropped(int metadata, Random rand)` method on `Block`. The default implementation calls `idDropped` and `damageDropped` — behaviour is byte-for-byte identical for every existing block. The refactor enables subclasses to attach extra data (enchantments, NBT, display name) to their drops without touching the drop-chance or entity-spawning logic. It also correctly handles blocks that randomise their item id on each call: the stack is now built per loop iteration instead of once per block.
-
-### 2026-09-01 — Backport `WorldGenTrees` (small oak-style tree)
-
-Added `WorldGenTrees` — the small oak tree generator from a1.1.2 that was the default tree choice before large variants appeared. The a1.1.2 source used one-letter variable names throughout and had no comments; this backport:
-- Keeps the algorithm byte-for-byte identical (collision column walk, ground conversion, leaf sphere with radius-2 disc bottom, radius-1 disc top, trunk fill).
-- Replaced `var8 == Block.grass.blockID || var8 == Block.dirt.blockID` with `world.canPlantsGrowOn(x, y-1, z)` so any future plantable block is automatically a valid tree base.
-- Renamed every variable to a meaningful name (`trunkHeight`, `canPlace`, `checkX/Y/Z`, `discRadius`, etc.).
-- Added a class-level overview and per-phase inline comments explaining the collision, ground and placement passes.
-
-### 2026-09-01 — Extract plant-support check to a extensible Block hook
-
-Introduced `Block.canGrowPlants(int metadata)` returning `false` by default. `BlockDirt` and `BlockGrass` now override it to return `true`, so any new dirt/grass variants can opt in by doing the same.
-
-Added `World.getBlock(x, y, z)` (null-safe shortcut for `Block.blocksList[id]`) and `World.canPlantsGrowOn(x, y, z)` (true when the block exists and `block.canGrowPlants(metadata)` is true). All plant placement checks in `BlockFlower.canPlaceBlockAt`, `BlockFlower.canBlockStay` and `WorldGenBigTree` now call this single method instead of hard-coding `grass || dirt`. The two subclasses that need different rules override the two methods directly:
-- `BlockMushroom` places on any opaque block (no longer tied to `canGrowPlants`).
-- `BlockCrops` places and stays only on farmland (its own override, unchanged behaviour).
-
-Removing the dead `protected canThisPlantGrowOnThisBlockID` from `BlockFlower` freed `canPlaceBlockAt` to be non-final, so mushroom and crop subclasses can override it.
-
-### 2026-09-01 — Add b1.7.3 mushroom spread
-
-Mushrooms now spread in dim light exactly like b1.7.3: a 1 % chance per random tick tries to clone the mushroom into a random neighbour air cell (±1 xz, ±1 y) that passes `canBlockStay`. The new mushroom inherits the original's metadata so brown stays brown and red stays red. The `canBlockStay` light threshold was tightened from 13 to 12 (`getBlockLightValue ≤ 12`) to match the b1.7.3 reference.
-
-### 2026-09-01 — Consolidate flowers and mushrooms into metadata-driven block ids
-
-- Replaced the four separate block ids (`plantYellow` 37, `plantRed` 38, `mushroomBrown` 39, `mushroomRed` 40) with two consolidated blocks: `Block.flowers` (id 37) and `Block.mushrooms` (id 38). The variant now lives in the block metadata: flower metadata 0 = red / 1 = yellow; mushroom metadata 0 = brown / 1 = red.
-- `BlockFlower` gained a `metadataToTexture` lookup array and `getBlockTextureFromSideAndMetadata` maps metadata → atlas tile: flower `{12, 13}`, mushroom `{29, 28}`. Sapling locks to tile 15. Render type 1 now shows the correct variant in the world and in the inventory (the inventory preview previously passed metadata `-1`).
-- World decoration (`BiomeGenInfdev.decorate`) now spawns plants exactly like the a1.1.2 reference: two patches of yellow flowers, red flowers with 50 % chance, brown mushrooms with 25 %, red mushrooms with 12.5 %, each placing the consolidated block with the right metadata. Added `WorldGenFlowers` (a1.1.2 algorithm: 64 scatter attempts in a 16-block box over an air cell that `canBlockStay` accepts).
-- Crafting: mushroom soup now requires one brown (metadata 0) and one red (metadata 1) mushroom, in either order. `Session.registeredBlocksList` lists the two consolidated blocks instead of the four variants.
-- Drops: added the `Block.damageDropped(int metadata)` hook so consolidated blocks drop an item carrying their variant metadata (base class still drops damage-0); flowers/mushrooms pass metadata through, saplings/crops override back to 0.
-- Removed the `getRenderColor` per-variant tint misuse; the plant tiles already carry baked-in colours, and per-variant selection is purely a texture-index swap.
-
-### 2026-09-01 — Use `ItemStack.itemDamage` as block metadata when placing
-
-- `ItemBlock.onItemUse` now reads the stack's `itemDamage` and writes it to the world as the block's metadata via `World.setBlockAndMetadataWithNotify` (replacing the old `setBlockWithNotify` call), so a damaged block item places with the matching sub-variant — e.g. a damaged cloth item places the matching colour swatch, and a damaged stair item places the matching orientation.
-- The damage-to-metadata translation goes through a new overridable `ItemBlock.getMetadata(int damage)` hook (default: pass-through). Sub-classes can override it to remap damage to a different nibble without changing the public item damage stored in the `ItemStack`. Mirrors the r1.2.5 pattern.
-
-### 2026-09-01 — Wire up a real "Fancy graphics" option
-
-- Added a `FANCY_GRAPHICS` row in the options screen (id 6) that calls `BlockLeavesBase.setGraphicsLevel(boolean)` for every registered leaf block, so toggling the option flips leaves between translucent merged-face "fancy" mode and opaque "fast" mode. The block class already had the two-mode logic; it just had no caller.
-- Toggling also calls `Minecraft.refreshRenderers()` which delegates to `RenderGlobal.updateAllRenderers()`, setting `needsUpdate = true` on every lit chunk renderer. Each chunk rebuilds its compiled OpenGL display list on the next render tick, so the leaf change is visible immediately rather than only on chunks that happen to reload.
-- Apply on load too (`GameSettings` constructor runs `applyFancyGraphics(fancyGraphics)` after `loadOptions()`) so a saved `fancyGraphics:false` in `options.txt` actually takes effect on game start.
-- Fixed the existing `VIEW_BOBBING` row: it was bound to the `fancyGraphics` field (a copy/paste bug from the cleanup), so toggling "View bobbing" did nothing on its own. Gave `viewBobbing` its own `boolean` field and updated the three `EntityRenderer` sites that gate `setupViewBobbing` (lines 381, 560, 574) to check the new field.
-- Renumbered the remaining option ids (`ANAGLYPH=7`, `LIMIT_FRAMERATE=8`, `DIFFICULTY=9`); saves are not affected because `loadOptions` matches by save key.
-
-### 2026-09-01 — Block colour tint hook (`getRenderColor`) and metadata-aware inventory renderer
-
-- Added `Block.getRenderColor(int metadata)` returning `0xFFFFFF` (white / no tint) as the base implementation. Subclasses that need a per-metadata colour (e.g. cloth) can override this; the renderer reads it automatically.
-- Colour is packed as `0xRRGGBB` (R = high byte, B = low byte, matching `Tessellator.setColorOpaque_F` / a1.1.2 convention).
-- Extended `BlockRenderHandler.renderBlockOnInventory` with an `int metadata` parameter, propagated through `RenderBlocks` and all four handlers that produce inventory previews (`RenderBlockNormal`, `RenderBlockCrops`, `RenderBlockPlant`, `RenderBlockTorch`).
-- Updated callers to thread metadata through: `ItemRenderer` and `RenderItem` now extract `itemStack.itemDamage`; `RenderTNT` passes `0`; `RenderFallingSand` passes `0` (the entity has no metadata field in 2010 NBT).
-- The in-world cube renderer (`RenderBlockNormal.renderBlock`) was also updated to apply the `getRenderColor` tint per-face using the block's actual world metadata, so future colour-aware blocks will tint in-world too.
-
-### 2026-08-31 — First-frame lighting flash fix
-
-- Diagnosed the "fully lit for one frame" flash when loading a night-time world: `World.skylightSubtracted` was hard-initialised to `0` in the constructor, so the first rendered frame used daytime ambient brightness; the value only updated to the saved world's correct value when `World.tick()` ran for the first time.
-- Added `World.computeSkylightSubtracted()` which mirrors the day-factor formula from `tick()`, and call it right after `worldTime` is read from `level.dat` (`World.java:167`) so the renderer picks the correct ambient value on the very first frame.
-
 ### 2026-08-27 — Baseline import
 
 - Tracked the original 2010 Java 5 decompiled sources as the working snapshot (`minecraft/src`), byte-identical to the pristine `minecraft/src_original` reference.
@@ -530,7 +256,8 @@ A short diary entry is appended to this section after every code change.
 - New entry point: 
 et.minecraft.client.Start (replaces org.mcphackers.launchwrapper.Launch in conf/version.json and minecraft/Client.launch). The new bootstrap parses the full launchwrapper CLI surface (--username, --session, --uuid, --gameDir, --assetsDir, --assetIndex, --accessToken, --userProperties, --userType, --versionType, --skinProxy, --fullscreen, --server, --port, --loadmap_user, --loadmap_id) into system properties, then constructs a MinecraftApplet and starts the game thread. MinecraftApplet.getAppletParam falls back to those system properties so the applet's argument-parsing works without an HTML container.
 - MinecraftApplet.init() is now NullPointerException-safe: getParameter(name) and getDocumentBase() can both throw when constructed outside a browser; both paths are wrapped in try/catch so the applet starts cleanly via main().
-- ThreadDownloadResources rewritten: walks game/resources/ recursively and registers every real .ogg (>= 512 bytes), then attempts to download any known-missing sound (andom.bow) via HttpURLConnection honouring -Dhttp.proxyHost / -Dhttp.proxyPort. With -Dhttp.proxyHost=betacraft.uk -Dhttp.proxyPort=11702, requests are routed through the betacraft mirror; without it, the direct connection is used. Both modes fall back gracefully on failure (sound silently no-ops, no freeze).
+- ThreadDownloadResources rewritten: walks game/resources/ recursively and registers every real .ogg (>= 512 bytes), then attempts to download any known-missing sound (
+andom.bow) via HttpURLConnection honouring -Dhttp.proxyHost / -Dhttp.proxyPort. With -Dhttp.proxyHost=betacraft.uk -Dhttp.proxyPort=11702, requests are routed through the betacraft mirror; without it, the direct connection is used. Both modes fall back gracefully on failure (sound silently no-ops, no freeze).
 - New SoundPool.hasSound(name) and SoundManager.hasSound(name) accessors let the downloader detect which sounds are missing before attempting a fetch.
 - New minecraft/Start.bat for one-click launch on Windows (locates JDK 8, builds the classpath, runs 
 et.minecraft.client.Start with the same args the launchwrapper used to receive). Commented-out JVM-args block shows how to enable the betacraft proxy.
@@ -542,9 +269,15 @@ et.minecraft.client.Start with the same args the launchwrapper used to receive).
 - **Distance culling in World.levelEntities()**: entities farther than sqrt(ENTITY_VIEW_DISTANCE_SQ) ≈ 45 blocks from the player now skip onUpdate(). This saves the most expensive per-tick work — EntityCreature's 200 random block samples and A* pathfinding — for distant mobs. The check is a single squared-distance comparison (6 flops per entity, negligible overhead).
 - **Timer advancement for distant entities**: to keep despawn timers accurate, 	icksExisted++ is always incremented and, for EntityItem, ge++ is also advanced. Dropped items still despawn at 6000 ticks even when far from the player.
 - **ENTITY_VIEW_DISTANCE_SQ = 2048.0D** is a public static final in World, so the radius can be tuned without code changes. Tile entities (furnaces, chests) are always ticked regardless of distance.
-- **loadedEntityList.removeAll() remains O(N²)**: the emoveAll(entities) call in World.unloadEntities() is unchanged — a future improvement would mark distant entities dead and defer removal to the next levelEntities() pass, eliminating the quadratic scan.
+- **loadedEntityList.removeAll() remains O(N²)**: the 
+emoveAll(entities) call in World.unloadEntities() is unchanged — a future improvement would mark distant entities dead and defer removal to the next levelEntities() pass, eliminating the quadratic scan.
 - New chunk_and_entities.md in the project root documents the full chunk lifecycle (two-layer provider pipeline, the 1024-slot ring cache, eviction via hash collision), the entity management system (loadedEntityList, per-chunk entity buckets, levelEntities() tick loop), the distance-culling design, and the chunk→entity cleanup connection.
 - Compile EXIT=0 (286 classes); pushed to master.
+
+### 2026-08-31 — First-frame lighting flash fix
+
+- Diagnosed the "fully lit for one frame" flash when loading a night-time world: `World.skylightSubtracted` was hard-initialised to `0` in the constructor, so the first rendered frame used daytime ambient brightness; the value only updated to the saved world's correct value when `World.tick()` ran for the first time.
+- Added `World.computeSkylightSubtracted()` which mirrors the day-factor formula from `tick()`, and call it right after `worldTime` is read from `level.dat` (`World.java:167`) so the renderer picks the correct ambient value on the very first frame.
 
 ### 2026-08-31 — Entity migration optimization: entity-side chunk cache + mark-dead unload
 
@@ -590,6 +323,275 @@ et.minecraft.client.Start with the same args the launchwrapper used to receive).
 - `SoundPoolEntry.soundName` was stored as `fullName` (with the original slash: `"random/click"`), and `LibraryLWJGLOpenAL` uses that string as the audio-file identifier for codec lookup. It couldn't find the `.ogg` codec from `"random/click"` because there was no `.` before the extension. Now stores `soundName` (the slash-normalized key: `"random.click"`), so LWJGL can extract `.ogg` and find the codec.
 - `SoundPool.addSound` now appends the real file extension (from `file.getName()`) to the pool key when constructing the `SoundPoolEntry.soundName`. So a file `click.ogg` registered as `"random/click"` ends up with `soundName = "random.ogg"` — LWJGL sees the `.ogg` extension, finds the `CodecJOrbis` codec, and the sound plays. The map key stays `"random"` (the digit-stripped, slash-normalized bare key), so lookups from the engine are unchanged. Compile EXIT=0.
 
+### 2026-09-01 — Extract `Block.itemStackDropped(int, Random)`
+
+Extracted the `ItemStack` construction out of `dropBlockAsItemWithChance` into a new overridable `itemStackDropped(int metadata, Random rand)` method on `Block`. The default implementation calls `idDropped` and `damageDropped` — behaviour is byte-for-byte identical for every existing block. The refactor enables subclasses to attach extra data (enchantments, NBT, display name) to their drops without touching the drop-chance or entity-spawning logic. It also correctly handles blocks that randomise their item id on each call: the stack is now built per loop iteration instead of once per block.
+
+### 2026-09-01 — Backport `WorldGenTrees` (small oak-style tree)
+
+Added `WorldGenTrees` — the small oak tree generator from a1.1.2 that was the default tree choice before large variants appeared. The a1.1.2 source used one-letter variable names throughout and had no comments; this backport:
+- Keeps the algorithm byte-for-byte identical (collision column walk, ground conversion, leaf sphere with radius-2 disc bottom, radius-1 disc top, trunk fill).
+- Replaced `var8 == Block.grass.blockID || var8 == Block.dirt.blockID` with `world.canPlantsGrowOn(x, y-1, z)` so any future plantable block is automatically a valid tree base.
+- Renamed every variable to a meaningful name (`trunkHeight`, `canPlace`, `checkX/Y/Z`, `discRadius`, etc.).
+- Added a class-level overview and per-phase inline comments explaining the collision, ground and placement passes.
+
+### 2026-09-01 — Extract plant-support check to a extensible Block hook
+
+Introduced `Block.canGrowPlants(int metadata)` returning `false` by default. `BlockDirt` and `BlockGrass` now override it to return `true`, so any new dirt/grass variants can opt in by doing the same.
+
+Added `World.getBlock(x, y, z)` (null-safe shortcut for `Block.blocksList[id]`) and `World.canPlantsGrowOn(x, y, z)` (true when the block exists and `block.canGrowPlants(metadata)` is true). All plant placement checks in `BlockFlower.canPlaceBlockAt`, `BlockFlower.canBlockStay` and `WorldGenBigTree` now call this single method instead of hard-coding `grass || dirt`. The two subclasses that need different rules override the two methods directly:
+- `BlockMushroom` places on any opaque block (no longer tied to `canGrowPlants`).
+- `BlockCrops` places and stays only on farmland (its own override, unchanged behaviour).
+
+Removing the dead `protected canThisPlantGrowOnThisBlockID` from `BlockFlower` freed `canPlaceBlockAt` to be non-final, so mushroom and crop subclasses can override it.
+
+### 2026-09-01 — Add b1.7.3 mushroom spread
+
+Mushrooms now spread in dim light exactly like b1.7.3: a 1 % chance per random tick tries to clone the mushroom into a random neighbour air cell (±1 xz, ±1 y) that passes `canBlockStay`. The new mushroom inherits the original's metadata so brown stays brown and red stays red. The `canBlockStay` light threshold was tightened from 13 to 12 (`getBlockLightValue ≤ 12`) to match the b1.7.3 reference.
+
+### 2026-09-01 — Consolidate flowers and mushrooms into metadata-driven block ids
+
+- Replaced the four separate block ids (`plantYellow` 37, `plantRed` 38, `mushroomBrown` 39, `mushroomRed` 40) with two consolidated blocks: `Block.flowers` (id 37) and `Block.mushrooms` (id 38). The variant now lives in the block metadata: flower metadata 0 = red / 1 = yellow; mushroom metadata 0 = brown / 1 = red.
+- `BlockFlower` gained a `metadataToTexture` lookup array and `getBlockTextureFromSideAndMetadata` maps metadata → atlas tile: flower `{12, 13}`, mushroom `{29, 28}`. Sapling locks to tile 15. Render type 1 now shows the correct variant in the world and in the inventory (the inventory preview previously passed metadata `-1`).
+- World decoration (`BiomeGenInfdev.decorate`) now spawns plants exactly like the a1.1.2 reference: two patches of yellow flowers, red flowers with 50 % chance, brown mushrooms with 25 %, red mushrooms with 12.5 %, each placing the consolidated block with the right metadata. Added `WorldGenFlowers` (a1.1.2 algorithm: 64 scatter attempts in a 16-block box over an air cell that `canBlockStay` accepts).
+- Crafting: mushroom soup now requires one brown (metadata 0) and one red (metadata 1) mushroom, in either order. `Session.registeredBlocksList` lists the two consolidated blocks instead of the four variants.
+- Drops: added the `Block.damageDropped(int metadata)` hook so consolidated blocks drop an item carrying their variant metadata (base class still drops damage-0); flowers/mushrooms pass metadata through, saplings/crops override back to 0.
+- Removed the `getRenderColor` per-variant tint misuse; the plant tiles already carry baked-in colours, and per-variant selection is purely a texture-index swap.
+
+### 2026-09-01 — Use `ItemStack.itemDamage` as block metadata when placing
+
+- `ItemBlock.onItemUse` now reads the stack's `itemDamage` and writes it to the world as the block's metadata via `World.setBlockAndMetadataWithNotify` (replacing the old `setBlockWithNotify` call), so a damaged block item places with the matching sub-variant — e.g. a damaged cloth item places the matching colour swatch, and a damaged stair item places the matching orientation.
+- The damage-to-metadata translation goes through a new overridable `ItemBlock.getMetadata(int damage)` hook (default: pass-through). Sub-classes can override it to remap damage to a different nibble without changing the public item damage stored in the `ItemStack`. Mirrors the r1.2.5 pattern.
+
+### 2026-09-01 — Wire up a real "Fancy graphics" option
+
+- Added a `FANCY_GRAPHICS` row in the options screen (id 6) that calls `BlockLeavesBase.setGraphicsLevel(boolean)` for every registered leaf block, so toggling the option flips leaves between translucent merged-face "fancy" mode and opaque "fast" mode. The block class already had the two-mode logic; it just had no caller.
+- Toggling also calls `Minecraft.refreshRenderers()` which delegates to `RenderGlobal.updateAllRenderers()`, setting `needsUpdate = true` on every lit chunk renderer. Each chunk rebuilds its compiled OpenGL display list on the next render tick, so the leaf change is visible immediately rather than only on chunks that happen to reload.
+- Apply on load too (`GameSettings` constructor runs `applyFancyGraphics(fancyGraphics)` after `loadOptions()`) so a saved `fancyGraphics:false` in `options.txt` actually takes effect on game start.
+- Fixed the existing `VIEW_BOBBING` row: it was bound to the `fancyGraphics` field (a copy/paste bug from the cleanup), so toggling "View bobbing" did nothing on its own. Gave `viewBobbing` its own `boolean` field and updated the three `EntityRenderer` sites that gate `setupViewBobbing` (lines 381, 560, 574) to check the new field.
+- Renumbered the remaining option ids (`ANAGLYPH=7`, `LIMIT_FRAMERATE=8`, `DIFFICULTY=9`); saves are not affected because `loadOptions` matches by save key.
+
+### 2026-09-01 — Block colour tint hook (`getRenderColor`) and metadata-aware inventory renderer
+
+- Added `Block.getRenderColor(int metadata)` returning `0xFFFFFF` (white / no tint) as the base implementation. Subclasses that need a per-metadata colour (e.g. cloth) can override this; the renderer reads it automatically.
+- Colour is packed as `0xRRGGBB` (R = high byte, B = low byte, matching `Tessellator.setColorOpaque_F` / a1.1.2 convention).
+- Extended `BlockRenderHandler.renderBlockOnInventory` with an `int metadata` parameter, propagated through `RenderBlocks` and all four handlers that produce inventory previews (`RenderBlockNormal`, `RenderBlockCrops`, `RenderBlockPlant`, `RenderBlockTorch`).
+- Updated callers to thread metadata through: `ItemRenderer` and `RenderItem` now extract `itemStack.itemDamage`; `RenderTNT` passes `0`; `RenderFallingSand` passes `0` (the entity has no metadata field in 2010 NBT).
+- The in-world cube renderer (`RenderBlockNormal.renderBlock`) was also updated to apply the `getRenderColor` tint per-face using the block's actual world metadata, so future colour-aware blocks will tint in-world too.
+
+### 2026-09-02 — Subtyped block items: `IBlockWithSubtypes` + `ItemBlockWithSubtypes`
+
+Subtyped blocks (flowers, mushrooms, saplings) now display and tint correctly
+in the inventory, the held item, dropped items, and break particles.
+
+- `Item.hasSubTypes` (`false` by default) — when `true`, the durability bar is
+  never drawn and `getIconFromDamage(int)` / `getColorFromDamage(int)` may
+  return different values per metadata. New `getHasSubTypes()` / `setHasSubTypes()`
+  helpers.
+- `Item.getIconFromDamage()` is now `getIconFromDamage(int damage)`, returning
+  `this.iconIndex` by default. `Item.getColorFromDamage(int)` returns `0xFFFFFF`
+  by default.
+- New `IBlockWithSubtypes` marker interface in `net.minecraft.game.world.block`.
+  `Block` already provides the default `getBlockTextureFromSideAndMetadata`, so
+  subclasses only need to add `implements IBlockWithSubtypes`. `BlockFlower`
+  declares it; `BlockMushroom` and `BlockSapling` inherit it via `extends BlockFlower`.
+- New `ItemBlockWithSubtypes extends ItemBlock` (constructed in `Block`'s
+  static init) sets `hasSubTypes=true` and overrides `getIconFromDamage` /
+  `getColorFromDamage` to delegate to the wrapped block's metadata-sensitive
+  methods. Blocks whose class implements the interface are automatically wired
+  to it — no per-block catalogue change needed.
+- `RenderItem` and `ItemRenderer` pass `itemDamage` to `getIconFromDamage` and
+  apply tint via `getColorFromDamage` (preserving the brightness multiplier in
+  the first-person hand). The damage-bar overlay in
+  `RenderItem.renderItemOverlayIntoGUI` is gated on `!getHasSubTypes()`.
+- `EffectRenderer` passes the block's metadata to `EntityDiggingFX`, which now
+  uses `block.getBlockTextureFromSideAndMetadata(2, metadata)` for the crack
+  sprite and `block.getRenderColor(metadata)` for the particle tint (the
+  hard-coded `0.6F` dark gray is gone).
+- `docs/blocks_with_subtypes_interface.md` documents the design.
+
+### 2026-09-02 — BlockSapling: bit 3 (& 8) is the growth-state flag
+
+`BlockSapling.updateTick` no longer increments metadata 0→15. It now uses bit 3
+(`& 8`) as the "ready to grow" state, matching b1.7.3: the first tick that meets
+the growth conditions sets the bit, the next tick attempts to generate the tree.
+The other metadata bits are left untouched so future sapling subtypes (bits 4–7
+in b1.7.3) can keep their type across growth.
+
+The class Javadoc documents the metadata layout and the future-subtype contract:
+`getBlockTextureFromSideAndMetadata` and any other variant-aware method must mask
+out bit 3 once subtypes are introduced (e.g. `metadata & 0xF0` if subtypes live
+in the upper nibble as in b1.7.3).
+
+### 2026-09-02 — Organised static Block and Item lists by id, grouped by tens
+
+`Block.java` and `Item.java` static catalogue sections are now:
+
+- Ordered strictly by id (ascending).
+- Grouped in blocks of 10 with a blank line after every group.
+- `Block.java` has a `// ID NNN` placeholder on its own line for every
+  unoccupied id (0, 21–34, 36, 39–40, 52–53, 63–255), so free slots are
+  obvious at a glance. `Item.java` has no gaps (ids 0–71 are all occupied)
+  and ends with `// ID 72 .. ID 1023: free` to mark the open range.
+
+This makes it easy to scan which ids are free and where to insert new blocks/items.
+
+### 2026-09-02 — Add `ItemBucket` from a1.1.2 (water, lava, milk)
+
+Backported from `minecraft_a1.1.2/src/net/minecraft/src/ItemBucket.java`.
+
+- `ItemBucket extends Item`: the field `isFull` stores the block id to place
+  (0 = empty, 8 = waterMoving, 10 = lavaMoving, -1 = milk).
+  `onItemRightClick` handles all four cases via a single ray trace:
+
+  - Empty bucket + hitting a source block of water / lava → picks it up,
+    clears the cell, plays `liquid.water` / `liquid.lava`, returns the
+    water / lava bucket.
+  - Water / lava bucket + hitting a block face → resolves the neighbour
+    cell using `neighbourAcrossFace` (the same helper used by `ItemBlock`
+    and `ItemFlintAndSteel`), places the fluid if the neighbour is empty
+    or non-solid, plays `liquid.water` / `random.fizz`, returns the empty
+    bucket.
+  - Empty bucket + hitting a cow entity → milks it, returns the milk bucket.
+  - Milk bucket + hitting any block face → consumes the bucket, returns
+    the empty bucket (the milk bucket cannot be refilled from a cow —
+    a1.1.2 semantics preserved).
+
+- `Item.java`: the four bucket fields are now `ItemBucket` instances:
+  `bucketEmpty` (id 68, isFull=0), `bucketWater` (id 70, isFull=8),
+  `bucketLava` (id 71, isFull=10), `bucketMilk` (id 69, isFull=-1).
+  Item ids 67 (leather) and 68–69 are unchanged from the previous commit.
+
+- `EntityCow.interact` updated: the milking path is now handled by
+  `ItemBucket`; the stub is retained but noted as unused.
+
+Full-tree `javac -source 1.8 -target 1.8` EXIT=0, 295 files.
+
+### 2026-09-02 — Backport `EntityCow` from a1.1.2
+
+Cows now exist in the world. Backported from `minecraft_a1.1.2/src/net/minecraft/src/EntityCow.java`.
+
+- `EntityCow extends EntityAnimal`: `texture = "/mob/cow.png"`, `setSize(0.9F, 1.3F)`, `getLivingSound` / `getHurtSound` / `getDeathSound` set to `mob.cow` / `mob.cowhurt` / `mob.cowhurt`. `getDroppedItem()` returns `Item.leather.shiftedIndex` (the existing `EntityLiving.onDeath` scatter is 0-2 drops). The `interact` method is a stub (no right-click handler wired in this codebase yet).
+- `ModelCow extends ModelBase` (not `ModelQuadruped`): the working-src `ModelRenderer.rotationPoint*` fields are private and `ModelQuadruped.render` is final, so the cow's extra parts (horns, udders) cannot piggy-back on the base class. The legs are constructed inline with the same offsets the a1.1.2 reference would have produced via the in-place `--leg1.rotationPointX` mutations.
+- `RenderCow extends RenderLiving`: thin class — `RenderLiving` already does the work; the subclass exists so the renderer registry can name a model and shadow size.
+- `Item.java` adds `leather` (id 67), `bucketEmpty` (id 68), `bucketMilk` (id 69) at the end of the register sequence (so no existing ids shift). These are needed for the cow's drop (`leather`) and the stub milking interaction (`bucketEmpty` / `bucketMilk`).
+- `EntityList` adds `addMapping(EntityCow.class, "Cow")`. The save-format string is new and so does not collide with anything in older worlds.
+- `World.animalSpawner` adds `EntityCow.class` to the spawnable-animals array.
+- `RenderManager` adds `new RenderCow(new ModelCow(), 0.7F)`.
+
+Full-tree `javac -source 1.8 -target 1.8` EXIT=0, 294 files.
+
+### 2026-09-02 — `Block.canBeSubstituted()` and the click-on-flower fix (#2, #7, and a new bug)
+
+Added a virtual method on `Block`:
+```java
+public boolean canBeSubstituted() {
+    return this == Block.fire
+        || this.blockMaterial == Material.water
+        || this.blockMaterial == Material.lava;
+}
+```
+
+A block is *substitutable* when the player meaningfully "puts a block there" — i.e. the cell can take a new block, and the existing one disappears without conflict. The default covers fire, water, lava. `BlockFlower` (covers flowers, mushrooms, saplings, crops via the hierarchy) overrides to return `true`. Solid decorations like cogs default to `false`, so they stay opaque to placement.
+
+Three call sites are routed through it:
+
+- **`BlockSand.canFallBelow`** (proposal #2): the static helper previously listed air, fire, water, lava by id and material. Now `block == null || block.canBeSubstituted()`.
+- **`EntityFallingSand.canBlockBePlacedAt`** (proposal #7): the `instanceof BlockFlower` check and the four water/lava id checks collapse to `existingBlock == null || existingBlock.canBeSubstituted()`.
+- **`ItemBlock.onItemUse`** (new behaviour, this commit): right-clicking a flower (or any substitutable block) with a block item now places the new block **in the clicked cell, replacing the flower**, instead of placing in the cell across the clicked face. Before the fix, the player had to right-click *next to* a flower to place a block on its cell — the bug is in vanilla Infdev 2010 too.
+
+`canPlaceBlockAt` is still called on the new block at the target cell, so the placement rules (e.g. need a plant-supporting block below) are not bypassed. The "where" and the "is the cell clear" questions are now both answered by the same hook, with no enumeration of block ids or materials at the call sites.
+
+Full-tree `javac -source 1.8 -target 1.8` compile passed (`EXIT: 0`).
+
+### 2026-09-02 — Six more de-hardcoding passes (#4, #5, #6, #8, #9, #11)
+
+A batch of small, focused refactors that move id checks onto the block
+hierarchy. Each is byte-for-byte behaviour-preserving and follows the same
+pattern: a virtual method on the base class, an override on the specific
+block(s) that need special behaviour, and a redirect at the call site.
+
+- **#4 `Block.isBurning()`** — default is `blockMaterial == Material.lava`,
+  overridden in `BlockFire` to return `true`. Replaces the
+  3-id OR chain in `EntityQueryService.isBoundingBoxBurning`
+  (`Block.fire`, `Block.lavaMoving`, `Block.lavaStill`) with
+  `block.isBurning()`. Same semantics, one virtual dispatch.
+
+- **#5 `Block.takesLightFromAbove()`** — default `false`, overridden in
+  `BlockStep` (only when `!doubleSlab`) and `BlockFarmland`. Replaces the
+  duplicated `id == stairSingle || id == tilledField` check in
+  `World.getBlockLightValue_do` and `ChunkCache.getLightValueExt` with
+  `block.takesLightFromAbove()`. The two call sites are now identical
+  one-liners.
+
+- **#6 `Block.getAnimalPathBonus()`** — default `0.0F`, overridden in
+  `BlockGrass` to `10.0F`. `EntityAnimal.getBlockPathWeight` now asks the
+  block below instead of checking `Block.grass.blockID`. The 10.0F
+  tuning constant moves to where it belongs (the block that earns it).
+
+- **#8 `BlockFluid.hardenedBlock(int decay)`** — protected method on the
+  fluid base that returns `null` for water and (for lava) the right block:
+  obsidian for source (decay 0), cobblestone for flowing (decay 1-4).
+  `checkForHarden` no longer hardcodes `Block.obsidian.blockID` or
+  `Block.cobblestone.blockID`; it just calls `this.hardenedBlock(decay)`.
+
+- **#9 `BlockOreCoal` / `BlockOreDiamond`** — two new subclasses that
+  override `idDropped` to return `Item.coal.shiftedIndex` and
+  `Item.diamod.shiftedIndex` respectively. `Block.oreCoal` and
+  `Block.oreDiamond` are now declared with the new subclasses; the base
+  `BlockOre.idDropped` simplifies to `return this.blockID`. The
+  `this.blockID == Block.oreCoal.blockID` ternary chain is gone.
+
+- **#11 `RenderBlockRedstoneWire.REDSTONE_WIRE_ID`** — extracted the
+  five occurrences of the magic literal `55` into a single named
+  constant at the top of the file, with a javadoc note explaining
+  it shares the slot with the cog/gears block in this version.
+
+Full-tree `javac -source 1.8 -target 1.8` compile passed (`EXIT: 0`).
+
+### 2026-09-02 — Add `Block.canGrowCrops(int metadata)` hook
+
+De-hardcoded `BlockCrops.updateTick`: the 3×3 neighbourhood scan of farmland used to read `world.getBlockId(tileX, y-1, tileZ) == Block.tilledField.blockID` nine times per random tick and used the metadata inline. Replaced with a virtual method on `Block`:
+```java
+public boolean canGrowCrops(int metadata) { return false; }
+```
+Override `true` on `BlockFarmland` only — distinct from `canGrowPlants` (which is true for dirt/grass) because crops must grow on tilled soil specifically, not on any plant-supporting block.
+
+`BlockCrops.updateTick` now reads:
+```java
+Block below = world.getBlock(tileX, y - 1, tileZ);
+int belowMeta = world.getBlockMetadata(tileX, y - 1, tileZ);
+if(below != null && below.canGrowCrops(belowMeta)) { ... }
+```
+
+Full-tree `javac -source 1.8 -target 1.8` compile passed (`EXIT: 0`).
+
+### 2026-09-02 — Add `Block.getLightValue(int metadata)` hook
+
+Added a per-metadata light-value hook to `Block`, mirroring the r1.2.5 pattern. Default returns `Block.lightValue[blockID]`, so existing blocks keep their behaviour byte-for-byte; subclasses (e.g. a future glowing-mushroom variant reusing `Block.mushrooms` with a reserved metadata) can override it to return a per-metadata brightness.
+
+Direct reads of the static `Block.lightValue[]` array were routed through the new method, with a null check on the looked-up `Block` instance:
+- `MetadataChunkBlock.relightBlock` — now uses `block.getLightValue(world.getBlockMetadata(x, y, z))` with a `Block.blocksList[blockID] != null` guard.
+- `RenderBlockDoor` (3 call sites) — uses the cached `metadata` from the door's own `blockAccess.getBlockMetadata` call.
+- `RenderBlockNormal.neighborBrightness` — calls `block.getLightValue(renderBlocks.blockAccess.getBlockMetadata(...))` per side.
+- `RenderBlockTorch`, `RenderBlockLever`, `RenderBlockRepeater` — use their cached `metadata` directly.
+
+`World.computeLightAt` is intentionally left as `Block.lightValue[blockID]` — it runs in a hot inner loop with only the id in hand, and there is no per-block instance or metadata there. A 256×16 LUT was considered and rejected for now: the static array is already a single load, the shift+or indirection of `(id << 4) | meta` is not a measurable win, and the real value of the hook is the override path, not the lookup. The LUT can be added later if profiling shows it matters.
+
+Full-tree `javac -source 1.8 -target 1.8` compile passed (`EXIT: 0`).
+
+### 2026-09-02 — Add `ItemStack.stackTagCompound` (per-stack NBT payload)
+
+Ported from r1.2.5: `ItemStack` now carries an optional `NBTTagCompound stackTagCompound` field, saved alongside the rest of the stack and read back on load. Behaviour:
+- `writeToNBT` emits the tag under the `"tag"` key only when non-null.
+- The `ItemStack(NBTTagCompound)` constructor and the new in-place `readFromNBT` method both read it back, with the tag field left as `null` if the key is absent.
+- `splitStack` and `copy` clone the tag (deep copy via `NBTTagCompound.copy()`) so the original and the split/copy don't share a mutable payload.
+- `hasTagCompound` / `getTagCompound` / `setTagCompound` helpers mirror r1.2.5.
+
+To support deep copies, `NBTBase` now has an abstract `copy()` method with concrete implementations in every tag type (recursive for `NBTTagList` and `NBTTagCompound`, value copy for byte arrays). The `NBTTagList` tag type is copied correctly so nested lists-of-lists work.
+
+`toString` was updated to include the tag presence. Behaviour is unchanged for stacks that don't set a tag.
+
 ### 2026-09-02 — `Block.onSubstituted()` — substituted blocks drop themselves
 
 Added a new virtual method on `Block`:
@@ -619,3 +621,182 @@ Behavioural cross-check (matches modern vanilla expectations):
 | Lava flows onto flower | no (fizz) |
 
 Verified by full-tree `javac -source 1.8 -target 1.8` compile (EXIT=0, 291 files).
+
+### 2026-09-02 — 256-block world height + legacy-aware level select screen
+
+Extended the buildable world height from 128 to 256 blocks (spec in
+`docs/256_blocks_high.md`). Blocks 0–127 stay exactly as before; the top half
+(128–255) starts empty and fills only where the player builds.
+
+- **Lazy subchunk storage.** Each chunk is now 16 subchunks of 16×16×16. The
+  flat `blocks`/`data`/`skyLightMap`/`blockLightMap` arrays were replaced with
+  per-subchunk parallel arrays (`byte[16][]` + `NibbleArray[16]` × 3). The
+  bottom 8 subchunks materialize on chunk load; the top 8 are allocated
+  **write-only** on the first block placed at/above y=128. Reads against a
+  `null` subchunk return "open air, fully lit" (block 0, sky 15, block 0)
+  without allocating — which is what keeps the fresh-world footprint identical
+  to the old 128-high flat chunk (81 920 B).
+- **Save format v2.** New chunks write `Height=256`, a `SubchunkMask` short (one
+  bit per present subchunk) and parallel `SubchunkBlocks/Data/SkyLight/
+  BlockLight` byte-array lists (mask-ordered). Legacy saves (no `Height`, or
+  `Height ≤ 128`) load unchanged: the flat 128-high arrays are sliced into the
+  8 lower subchunks and upgraded on the first re-save. Old builds cannot read
+  the new format.
+- **Lighting & heightmap** walk the full 0–255 span; `setBlockID` clamps the
+  relight step to `SECTION_HEIGHT - 1`; `RenderGlobal.markBlocksForUpdate`
+  clamps the subchunk index into bounds so neighbour-of-y=0 edits (y = −1)
+  and edits above the top slab cannot index out of range.
+- **Random block ticks** keep the historical per-cell rate: the loop probes each
+  *materialized* subchunk 10 times, so fresh terrain still gets 80 probes/chunk
+  and the rate is constant at any height. `blocksToTickPerFrame` became
+  `tickProbesPerSubchunk = 10`.
+- **Generation stays 128.** `ChunkProviderGenerate420` produces terrain only in
+  the bottom 128 layers (`TERRAIN_HEIGHT = 128`, renamed from the magic 128);
+  `BiomeGenInfdev`'s ore/decoration heights are untouched (RNG order
+  load-bearing). `WorldGenTrees` was relaxed to grow into the new top half so a
+  sapling on a platform can grow normally.
+- **Level select screen** now shows the real on-disk folder size of each save
+  (sum of file lengths under `saves/WorldN/`) instead of the never-set
+  `SizeOnDisk` tag, and appends `(OLD)` to worlds still in the legacy 128-high
+  format (no `SubchunkMask` in their chunk files).
+- Full-tree `javac -source 1.8 -target 1.8` compile EXIT=0.
+
+### 2026-09-02 — Fix empty-world/fall-to-lava after the 256-height change
+
+A fresh world came up empty and the player fell straight to the lava at the
+floor. Root-caused to the flat-buffer → subchunk conversion in `Chunk`:
+
+- **Wrong slice timing.** `provideChunk` built the `Chunk` from the flat
+  32 768-byte generator buffer *before* `generateTerrain`/`replaceBlocks` had
+  filled it, so every chunk's subchunks held stale (all-air) data. `provideChunk`
+  now builds the chunk empty, fills the flat buffer, then calls
+  `Chunk.loadFlatBlocks(blocks)` — a dedicated method — after generation.
+- **Wrong layout remap.** The first slicing copied the flat buffer as a
+  contiguous byte slice, but the generator's buffer is *column-major*
+  (`x << 11 | z << 7 | y`, y-contiguous per column), while a subchunk packs
+  cells `x << 8 | z << 4 | yLocal`. `sliceFlatBlockPlane` /
+  `sliceFlatNibblePlane` now re-map every cell value into the subchunk layout.
+  The same correction was applied to the legacy-save path (`readFlatPlanes`),
+  so old 128-high saves both load and re-save correctly.
+- The `Chunk(World, byte[], chunkX, chunkZ)` constructor was replaced by a
+  public empty `Chunk(World, chunkX, chunkZ)` plus `loadFlatBlocks`, so
+  construction no longer couples to the not-yet-generated buffer.
+
+Verified headless: a generated chunk has ~17 245 non-air blocks across the
+bottom four surface bands (sane heights, `getSubchunkCount=8`); placing a block
+at y=200 materializes subchunk 12 and survives an NBT write/read round-trip;
+legacy flat chunks re-map byte-for-byte to the original column-major layout.
+Full-tree `javac -source 1.8 -target 1.8` compile EXIT=0.
+
+### 2026-09-02 — F3 debug HUD with redesigned info
+
+Add an in-game debug overlay toggled by the **F3** key (press again to turn it
+off), wired like the existing F5/F11 toggles and gated on the same `showFPS`
+setting (which itself remains an options-screen toggle, persisted to options.txt).
+
+The overlay was redesigned into a compact read-out:
+
+- **Header / memory** — `Minecraft Infdev (fps, chunk updates)` on the left,
+  `Used: X% (NN MB) of XXXX MB` right-aligned (used = allocated − free).
+- **Entities** — `Entities: A:Animal | M:Mob | O:Other | T:Total`, using the
+  cached monster/animal counters plus the total list size (other = total − A − M).
+- **Position** — `Pos: X Y Z (N 273)`: integer coords plus the compass facing
+  (derived from `rotationYaw * 4 / 360`) and the integer yaw.
+- **Time** — `Time: HH:MM`: 24 virtual hours to the day (24000 ticks) with the
+  +6000 dawn offset, so worldTime 6000 reads 06:00.
+
+Supporting change: `World.getSeed()` now exposes the exact generation seed
+(`randomSeed`), shown right-aligned on the entities line (`Seed: …`).
+Full-tree `javac -source 1.8 -target 1.8` compile EXIT=0.
+
+### 2026-09-02 — Modernized horizontal friction to the a1.1.2/b1.7.3 model
+
+Modernize `EntityLiving` horizontal movement to the per-block **slipperiness**
+model used by a1.1.2/b1.7.3.
+
+- `Block` gains a `slipperiness` field (default `0.6F`, the value used for every
+  current block) — the hook a later ice-like block would use to let the player
+  slide further.
+- `EntityLiving.onLivingUpdate` replaces the legacy fixed-damping pass (hard
+  `0.91`/`0.6` multipliers) with the reference model: `friction =
+  Block.blocksList[block at feet].slipperiness * 0.91F`, ground acceleration
+  `0.1F * (0.16277136F / friction³)`, then `motionX/Z *= friction`. The two
+  models are numerically identical at `slipperiness = 0.6` (both give ~0.546
+  per-tick ground friction and `0.1F` ground accel), so this is a behavior-neutral
+  normalization that also keeps ladder support: added an inert `isOnLadder()`
+  stub (Infdev has no ladder block yet) wired exactly like the reference
+  (fall reset, descent clamp, climb on horizontal collision). `Entity.fallDistance`
+  was widened to `protected` (as in a1.1.2) so the climb block compiles.
+
+Verified with a headless probe against the compiled classes: real block
+`slipperiness` is `0.6F`, the friction/accel equivalence holds within float
+error, and the pillar-cell predicate only matches the feet cell. Full-tree
+`javac -source 1.8 -target 1.8` compile EXIT=0.
+
+### 2026-09-02 — First-frame lighting flash fix (regression, re-applied)
+
+The night-save "fully lit for one frame" flash resurfaced. The 2026-08-31 diary
+entry documented the fix (compute `skylightSubtracted` right after `worldTime`
+is read from `level.dat`), but the actual method no longer existed in the code —
+it was lost during the later `World`-split refactor, so a night-time world again
+rendered one bright frame before `tick()` set the correct ambient value.
+
+- Added `World.computeSkylightSubtracted()` which returns the day-factor
+  derived `skylightSubtracted` for the current `worldTime`, using the exact
+  formula the tick pass uses.
+- `World.tick()` now calls the shared helper instead of duplicating the formula
+  inline (single source of truth).
+- The `World` constructor calls it right after `worldTime` is loaded from
+  `level.dat`, so the very first rendered frame of a night-time save is already
+  dark (e.g. worldTime ≈ 18000 → `skylightSubtracted` 13, instead of the
+  constructor's `0`).
+
+Verified by computing the formula headlessly: day times yield `skylightSubtracted`
+`0` (light 15), night times `13` (light 2), matching the in-game mapping.
+Full-tree `javac -source 1.8 -target 1.8` compile EXIT=0.
+
+### 2026-09-02 — Align sky day/night timing with a1.1.2/b1.7.3
+
+The F3 `Time` read-out, added earlier with a `+6000` clock offset, did not
+correspond to this version's actual sky. Compared across versions:
+
+| Version | celestial offset | sun overhead (noon) | midnight |
+|---|---|---|---|
+| Infdev 20100420 | `0.15` | worldTime ≈ 3600 | ≈ 15600 |
+| a1.1.2 / b1.7.3 | `0.25` | worldTime ≈ 6000 | ≈ 18000 |
+
+The `0.15 -> 0.25` change landed between Infdev and Alpha, so 20100420's sun
+reached its peak 2.4 in-game hours earlier than the later convention (the
+Infdev noon, worldTime 3600, read `09:36` on the `+6000` clock).
+
+- `AtmosphereCalculator.getCelestialAngle` now subtracts `0.25` (was `0.15`)
+  and wraps the result into [0, 1), matching a1.1.2/b1.7.3 exactly. With this
+  the sun is overhead at worldTime 6000 (noon) and opposite at 18000
+  (midnight), so the existing `+6000` F3 clock now lines up with the sky
+  (worldTime 0 = dawn 06:00, 6000 = 12:00, 12000 = 18:00, 18000 = 00:00).
+- `World.computeSkylightSubtracted()` reads the same angle, so the first-frame
+  fix and the whole sky/fog/cloud rendering follow the corrected timing
+  automatically.
+
+Verified headlessly with the new formula: worldTime 6000 → rotation `0°`, sun
+overhead, `skylightSubtracted` `0` (bright); worldTime 18000 → rotation `180°`,
+dark `13`. Full-tree `javac -source 1.8 -target 1.8` compile EXIT=0.
+
+### 2026-09-02 — Stop controller init to silence jinput poll spam
+
+When the game window lost focus, the console was flooded every poll cycle with
+`net.java.games.input.ControllerEnvironment ... Failed to poll device ...` and
+kept printing until the client closed.
+
+- Root cause: startup called `Controllers.create()` (LWJGL's jinput bridge).
+  That spawns jinput's background poll thread, which keeps querying the game
+  controller every ~25 ms even when the window is unfocused. On focus switch the
+  Windows device handle briefly becomes invalid (error `8007000c`), and jinput
+  logs "Failed to poll device" once per cycle — hence the unending spam.
+- The client never reads any controller input (no `Controllers.poll()`/button
+  reads anywhere), so the init existed only to start the noisy poll thread.
+- Removed the `Controllers.create()` call (and its try/catch) plus the now-unused
+  `org.lwjgl.input.Controllers` import. This matches a1.1.2/b1.7.3, which both
+  dropped controller init entirely.
+
+Full-tree `javac -source 1.8 -target 1.8` compile EXIT=0.
