@@ -5,6 +5,7 @@ import java.util.List;
 import net.minecraft.game.IInventory;
 import net.minecraft.game.entity.Entity;
 import net.minecraft.game.entity.EntityLiving;
+import net.minecraft.game.entity.IHuman;
 import net.minecraft.game.entity.misc.EntityItem;
 import net.minecraft.game.entity.monster.EntityMonster;
 import net.minecraft.game.entity.projectile.EntityArrow;
@@ -21,7 +22,7 @@ import util.MathHelper;
  * wiring live in the client subclass; what remains here is shared logic — the
  * camera bob, the armour-tapered damage pipeline and the death sequence.
  */
-public class EntityPlayer extends EntityLiving {
+public class EntityPlayer extends EntityLiving implements IHuman {
 	public InventoryPlayer inventory = new InventoryPlayer(this);
 	public int score = 0;
 	public float prevCameraYaw;

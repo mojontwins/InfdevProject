@@ -21,4 +21,16 @@ public class EntityGiant extends EntityMonster {
 	protected final float getBlockPathWeight(int x, int y, int z) {
 		return this.worldObj.getBrightness(x, y, z) - 0.5F;
 	}
+
+	protected final String getLivingSound() {
+		return "mob.zombie";
+	}
+
+	protected final String getHurtSound() {
+		return "mob.zombiehurt";
+	}
+
+	protected final String getDeathSound() {
+		return "mob.zombiedeath";
+	}
 }

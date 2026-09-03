@@ -299,7 +299,7 @@ this.getLookHelper().onUpdateLook();        // 5. turn head
 
 All creature AI lives in one method. Every tick it:
 
-1. `playerToAttack == null` → call `findPlayerToAttack()` (overridden per
+1. `playerToAttack == null` → call `findEntityToAttack()` (overridden per
    subclass) → if found, build a path with `worldObj.pathFinder.createEntityPathTo(this, playerToAttack, 16.0F)`.
 2. If a target exists and is alive: check line-of-sight and call
    `attackEntity(target, distance)`. `hasAttacked` prevents both attack
@@ -313,7 +313,7 @@ All creature AI lives in one method. Every tick it:
 ### 2.2 `EntityMonster` additions
 
 `EntityMonster extends EntityCreature` overrides:
-- `findPlayerToAttack()` — returns the single player if within 16 m, visible,
+- `findEntityToAttack()` — returns the single player if within 16 m, visible,
   and not a sneaking player in dim light beyond 6 m.
 - `attackEntity()` — melee strike when distance < 2.5 and vertically overlapping.
 - `getBlockPathWeight()` — prefers dark areas (`0.5 - brightness`).
@@ -356,7 +356,7 @@ priority 2 for nearest-attackable-target.
 ### 3.2 `EntityZombie`
 
 **infdev current behaviour:**
-- `findPlayerToAttack()`: within 16 m, visible, respects sneaking dim-light rule.
+- `findEntityToAttack()`: within 16 m, visible, respects sneaking dim-light rule.
 - `attackEntity()`: melee when < 2.5 m and vertically overlapping.
 - `tryBurnInDaylight()`: called in `onLivingUpdate()`.
 - `getBlockPathWeight()`: prefers dark (`0.5 - brightness`).
@@ -407,7 +407,7 @@ targetTasks.addTask(2, new EntityAINearestAttackableTarget(
 
 **infdev current behaviour:**
 - `onLivingUpdate()` calls `tryBurnInDaylight()` first, then the base tick.
-- `findPlayerToAttack()`: same as monster (16 m, visible, respects sneaking rule).
+- `findEntityToAttack()`: same as monster (16 m, visible, respects sneaking rule).
 - `attackEntity()`: ranged arrow every 30 ticks, within 10 m. Keeps aiming at the
   target between shots (`rotationYaw` tracks player). Calls `attackTime = 30`
   as cooldown.
@@ -452,7 +452,7 @@ targetTasks.addTask(2, new EntityAINearestAttackableTarget(
 ### 3.4 `EntitySpider`
 
 **infdev current behaviour:**
-- `findPlayerToAttack()`: hunts only when brightness < 0.5 (dark). Within 16 m,
+- `findEntityToAttack()`: hunts only when brightness < 0.5 (dark). Within 16 m,
   visible.
 - `attackEntity()`: if bright → give up (`playerToAttack = null`). If dark →
   within 2–6 m there is a 1-in-10 chance of a pounce (leap at target) if on
@@ -480,12 +480,12 @@ targetTasks.addTask(2, new EntityAINearestAttackableTarget(
 ```
 
 **Notes:**
-- The `brightness < 0.5` hunt condition from `findPlayerToAttack()` is
+- The `brightness < 0.5` hunt condition from `findEntityToAttack()` is
   replicated by overriding `shouldExecute()` on a custom anonymous task or by
   leaving the base `EntityAINearestAttackableTarget` but adding a
   `EntityAISpiderLightSensor` custom task (priority 2, mutex 1) that sets
   `attackTarget = null` when it is too bright. The cleanest approach for
-  infdev is to keep `findPlayerToAttack()` and let it gate the `attackTarget`
+  infdev is to keep `findEntityToAttack()` and let it gate the `attackTarget`
   field, which `EntityAIAttackOnCollide` reads via `getAttackTarget()`.
   This preserves the exact original behaviour.
 - The pounce (`distance > 2 && distance < 6 && rand.nextInt(10) == 0 && onGround`)
@@ -499,7 +499,7 @@ targetTasks.addTask(2, new EntityAINearestAttackableTarget(
 ### 3.5 `EntityCreeper`
 
 **infdev current behaviour:**
-- No target acquisition (`findPlayerToAttack()` is never called — `playerToAttack`
+- No target acquisition (`findEntityToAttack()` is never called — `playerToAttack`
   stays null). The creeper has no active movement or wandering.
 - `updateEntityActionState()`: manages the fuse state (`fuseState` and
   `timeSinceIgnited`) and calls the parent.
@@ -756,7 +756,7 @@ New package: `net.minecraft.game.entity.ai`.
 |---|---|
 | `EntityLiving.java` | Add fields: `navigator` (`PathNavigate`), `lookHelper` (`EntityLookHelper`), `moveHelper` (`EntityMoveHelper`), `attackTarget` (`EntityLiving`), `entityAge` (already present as `livingSoundTime` — rename). Add getters/setters: `getNavigator()`, `getLookHelper()`, `getMoveHelper()`, `getAttackTarget()`, `setAttackTarget(EntityLiving)`, `getRNG()`. `isAIEnabled()` returns `false` initially (existing `updateEntityActionState()` stays as fallback). In `onLivingUpdate()` add the task/navigation tick calls. |
 | `EntityCreature.java` | Add `tasks` and `targetTasks`. Override `isAIEnabled()` returning `true`. `EntityCreature` opts into the new AI. The existing `updateEntityActionState()` runs only when `!isAIEnabled()`. `getNavigator()` returns the new navigator. `getAttackTarget()`/`setAttackTarget()` delegating to the living field. |
-| `EntityMonster.java` | Remove `findPlayerToAttack()` (replaced by `EntityAINearestAttackableTarget`). Remove `playerToAttack` field (replaced by `attackTarget` on `EntityLiving`). Keep `attackEntity()`, `getBlockPathWeight()`, `tryBurnInDaylight()`, `onLivingUpdate()` burn timer, `getCanSpawnHere()`. |
+| `EntityMonster.java` | Remove `findEntityToAttack()` (replaced by `EntityAINearestAttackableTarget`). Remove `playerToAttack` field (replaced by `attackTarget` on `EntityLiving`). Keep `attackEntity()`, `getBlockPathWeight()`, `tryBurnInDaylight()`, `onLivingUpdate()` burn timer, `getCanSpawnHere()`. |
 | `EntityZombie.java` | Strip all inline AI. Add task registrations in the constructor (see §3.2). |
 
 ---
@@ -776,7 +776,7 @@ Verify movement and idle behaviour unchanged from the baseline.
 
 **Stage 3 — Attack tasks** (`EntityAIAttackOnCollide`,
 `EntityAIHurtByTarget`, `EntityAINearestAttackableTarget`). Register in
-`EntityZombie`'s constructor. Remove `findPlayerToAttack()` override from
+`EntityZombie`'s constructor. Remove `findEntityToAttack()` override from
 `EntityMonster`.
 
 **Stage 4 — Remaining mobs**: Skeleton (`EntityAIArrowAttack`),
@@ -917,7 +917,7 @@ The old methods that override `updateEntityActionState` in infdev are:
 | `EntityLiving` (base) | Idle random strafe/walk for non-creatures | No — `EntityPlayer` needs it (player drives `moveForward`/`moveStrafing` directly; `isAIEnabled()` stays `false` for `EntityPlayer`). |
 | `EntityCreature` | Inline creature AI: target, attack, path-follow, wander | **Yes** once all `EntityCreature` subclasses (zombie, skeleton, spider, creeper, giant) register their tasks. The method body becomes dead code under `isAIEnabled() == true`. Mark `@Deprecated` with javadoc: *"Only runs when `isAIEnabled() == false`; set to `true` in the constructor to use the task framework instead."* |
 | `EntityCreeper` | Fuse state (`fuseState`, `timeSinceIgnited`) management | **Yes** — the fuse state machine stays in the entity (called from `onLivingUpdate`); the `updateEntityActionState` body becomes a no-op stub. |
-| `EntityMonster` | **No override** of `updateEntityActionState` — it only overrides `findPlayerToAttack`, `attackEntity`, `getBlockPathWeight`, `tryBurnInDaylight`. Those methods are replaced by tasks or stay as entity-level methods. No deprecation needed here. |
+| `EntityMonster` | **No override** of `updateEntityActionState` — it only overrides `findEntityToAttack` (checks `instanceof IHuman`), `attackEntity`, `getBlockPathWeight`, `tryBurnInDaylight`. Those methods are replaced by tasks or stay as entity-level helpers. `EntityPlayer implements IHuman` is the sole human target today. No deprecation needed here. |
 
 The deprecation pattern for `EntityCreature` and `EntityCreeper` after migration:
 
@@ -938,6 +938,8 @@ protected void updateEntityActionState() {
 and relies on `updateEntityActionState()` for the base idle strafe when no input
 is being given.
 
+#---
+
 ### 7.5 Summary
 
 - The new `EntityAITasks` framework is **self-contained** and drives all AI without
@@ -950,6 +952,106 @@ is being given.
 - `EntityLiving.updateEntityActionState()` stays **un-deprecated** because
   `EntityPlayer` depends on it.
 - `EntityMonster` has no `updateEntityActionState` override and needs none;
-  its AI methods (`findPlayerToAttack`, `attackEntity`, etc.) are replaced by
+  its AI methods (`findEntityToAttack`, `attackEntity`, etc.) are replaced by
+  task wiring or stay as entity-level helpers.
+
+---
+
+## 8. The `IHuman` interface and sound overrides (implemented)
+
+### 8.1 `IHuman` marker interface
+
+The `IHuman` interface (`net.minecraft.game.entity.IHuman`) marks sentient,
+living, intelligent creatures that hostile mobs target. It is a pure marker
+interface with no methods — any entity that implements it is a valid target for
+`EntityMonster.findEntityToAttack()`.
+
+Currently only `EntityPlayer` implements `IHuman`. Future human entities (e.g.
+`EntityVillager` when added) can implement the interface and will automatically
+be targeted by monsters without any change to `EntityMonster`'s code.
+
+```java
+package net.minecraft.game.entity;
+
+public interface IHuman {
+    // Marker interface — no methods needed
+}
+```
+
+### 8.2 `EntityPlayer implements IHuman`
+
+`EntityPlayer` now explicitly declares `implements IHuman` alongside its existing
+`extends EntityLiving`. This is purely documentary — the player's behaviour is
+unchanged.
+
+### 8.3 `EntityMonster.findEntityToAttack()` and `IHuman`
+
+The monster's targeting logic was updated to express the design intent:
+
+```java
+protected Entity findEntityToAttack() {
+    Entity potentialTarget = this.worldObj.playerEntity;
+    if(potentialTarget instanceof IHuman) {
+        double distanceSq = potentialTarget.getDistanceSqToEntity(this);
+        if(distanceSq < 256.0D && this.canEntityBeSeen(potentialTarget)) {
+            if(potentialTarget.isSneaking() && distanceSq > 36.0D
+                && this.worldObj.getBlockLightValue(...) < 7) {
+                return null;
+            }
+            return potentialTarget;
+        }
+    }
+    return null;
+}
+```
+
+The `instanceof IHuman` guard replaces the previous direct assumption that
+`playerEntity` is always targetable. Behaviour is byte-identical — the player
+is the only `IHuman` in the world today.
+
+When the r1.2.5 `EntityAINearestAttackableTarget` task is wired in (Stage 3 of
+the implementation plan), it will also use `instanceof IHuman` as its class
+filter.
+
+### 8.4 Sound overrides (a1.1.2 reference)
+
+All mobs and passive animals now carry proper ambient / hurt / death sounds
+from the a1.1.2 reference. The base `EntityLiving` defaults are:
+
+| Method | Default |
+|---|---|
+| `getLivingSound()` | `null` (silent) |
+| `getHurtSound()` | `"random.hurt"` |
+| `getDeathSound()` | `"random.hurt"` |
+
+Each mob overrides all three:
+
+| Entity | `getLivingSound()` | `getHurtSound()` | `getDeathSound()` |
+|---|---|---|---|
+| `EntityZombie` | `"mob.zombie"` | `"mob.zombiehurt"` | `"mob.zombiedeath"` |
+| `EntitySkeleton` | `"mob.skeleton"` | `"mob.skeletonhurt"` | `"mob.skeletonhurt"` |
+| `EntitySpider` | `"mob.spider"` | `"mob.spider"` | `"mob.spiderdeath"` |
+| `EntityCreeper` | *(inherited null)* | `"mob.creeper"` | `"mob.creeperdeath"` |
+| `EntityGiant` | `"mob.zombie"` | `"mob.zombiehurt"` | `"mob.zombiedeath"` |
+| `EntityCow` | `"mob.cow"` | `"mob.cowhurt"` | `"mob.cowhurt"` |
+| `EntityPig` | `"mob.pig"` | `"mob.pig"` | `"mob.pigdeath"` |
+| `EntitySheep` | `"mob.sheep"` | `"mob.sheep"` | `"mob.sheep"` |
+
+`EntityCreeper` has no living sound (creepers are silent when alive); the
+fuse hiss is handled separately in `attackEntity`. `EntityGiant` uses the zombie
+sounds at the giant's scale — appropriate since it is a scaled zombie.
+
+
+- The new `EntityAITasks` framework is **self-contained** and drives all AI without
+  any call to `updateEntityActionState()`.
+- `isAIEnabled()` is the gate: `true` → new framework runs; `false` → old
+  inline method runs. Both are never active simultaneously.
+- After full migration, `EntityCreature.updateEntityActionState()` and
+  `EntityCreeper.updateEntityActionState()` can be marked `@Deprecated` and made
+  into empty stubs — their behaviour is now in tasks.
+- `EntityLiving.updateEntityActionState()` stays **un-deprecated** because
+  `EntityPlayer` depends on it.
+- `EntityMonster` has no `updateEntityActionState` override and needs none;
+  its AI methods (`findEntityToAttack`, `attackEntity`, etc.) are replaced by
   task wiring or stay as entity-level helpers.
 

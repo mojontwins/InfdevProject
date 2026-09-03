@@ -76,4 +76,12 @@ public class EntityCreeper extends EntityMonster {
 	protected final int getDroppedItem() {
 		return Item.gunpowder.shiftedIndex;
 	}
+
+	protected final String getHurtSound() {
+		return "mob.creeper";
+	}
+
+	protected final String getDeathSound() {
+		return "mob.creeperdeath";
+	}
 }

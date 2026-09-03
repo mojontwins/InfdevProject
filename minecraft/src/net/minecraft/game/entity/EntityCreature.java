@@ -36,7 +36,7 @@ public class EntityCreature extends EntityLiving {
 	protected void updateEntityActionState() {
 		this.hasAttacked = false;
 		if(this.playerToAttack == null) {
-			this.playerToAttack = this.findPlayerToAttack();
+			this.playerToAttack = this.findEntityToAttack();
 			if(this.playerToAttack != null) {
 				this.pathToEntity = this.worldObj.pathFinder.createEntityPathTo(this, this.playerToAttack, 16.0F);
 			}
@@ -153,7 +153,7 @@ public class EntityCreature extends EntityLiving {
 		return 0.0F;
 	}
 
-	protected Entity findPlayerToAttack() {
+	protected Entity findEntityToAttack() {
 		return null;
 	}
 

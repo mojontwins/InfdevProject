@@ -1048,3 +1048,17 @@ sites touched across 4 files:
 `docs/ai_system_port_plan.md` updated to use the new name throughout
 (14 references swept, plus §7.1 now documents the rename as part of the
 broader naming-alignment effort). Full-tree javac 1.8 compile EXIT=0.
+
+### 2026-09-02 — IHuman interface, sound overrides, findEntityToAttack
+
+- Created `IHuman` marker interface (`minecraft/src/net/minecraft/game/entity/IHuman`) for sentient living creatures that mobs would target. `EntityPlayer` now implements it.
+- Renamed `findPlayerToAttack()` → `findEntityToAttack()` across: `EntityCreature`, `EntitySpider`, `EntityMonster` — all monsters now look for any `IHuman` (i.e. `EntityPlayer`).
+- `EntityMonster.findEntityToAttack()` checks `instanceof IHuman` instead of directly referencing `EntityPlayer`, enabling future non-player humans.
+- Added `getLivingSound()`, `getHurtSound()`, `getDeathSound()` overrides to:
+  - `EntityZombie` → `"mob.zombie"`, `"mob.zombiehurt"`, `"mob.zombiedeath"`
+  - `EntitySkeleton` → `"mob.skeleton"`, `"mob.skeletonhurt"`, `"mob.skeletonhurt"`
+  - `EntitySpider` → `"mob.spider"`, `"mob.spider"`, `"mob.spiderdeath"`
+  - `EntityCreeper` → `"mob.creeper"`, `"mob.creeperdeath"`
+  - `EntityGiant` → `"mob.zombie"`, `"mob.zombiehurt"`, `"mob.zombiedeath"`
+  - `EntityCow`, `EntityPig`, `EntitySheep` already had overrides from earlier backports.
+- Full-tree javac 1.8 compile EXIT=0.

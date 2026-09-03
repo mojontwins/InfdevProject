@@ -18,7 +18,7 @@ public class EntitySpider extends EntityMonster {
 	}
 
 	/** Spiders only hunt while it is dark enough. */
-	protected final Entity findPlayerToAttack() {
+	protected final Entity findEntityToAttack() {
 		float brightness = this.getEntityBrightness(1.0F);
 		if(brightness < 0.5F) {
 			double distanceSq = this.worldObj.playerEntity.getDistanceSqToEntity(this);
@@ -58,10 +58,7 @@ public class EntitySpider extends EntityMonster {
 			}
 
 		}
-	}
 
-	protected final int getDroppedItem() {
-		return Item.silk.shiftedIndex;
 	}
 
 	/**
@@ -74,5 +71,21 @@ public class EntitySpider extends EntityMonster {
 	@Override
 	public boolean isOnLadder() {
 		return this.isCollidedHorizontally;
+	}
+
+	protected final int getDroppedItem() {
+		return Item.silk.shiftedIndex;
+	}
+
+	protected final String getLivingSound() {
+		return "mob.spider";
+	}
+
+	protected final String getHurtSound() {
+		return "mob.spider";
+	}
+
+	protected final String getDeathSound() {
+		return "mob.spiderdeath";
 	}
 }

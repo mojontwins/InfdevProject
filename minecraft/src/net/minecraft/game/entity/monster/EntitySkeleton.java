@@ -21,6 +21,18 @@ public class EntitySkeleton extends EntityMonster {
 		super.onLivingUpdate();
 	}
 
+	protected final String getLivingSound() {
+		return "mob.skeleton";
+	}
+
+	protected final String getHurtSound() {
+		return "mob.skeletonhurt";
+	}
+
+	protected final String getDeathSound() {
+		return "mob.skeletonhurt";
+	}
+
 	protected final void attackEntity(Entity target, float distance) {
 		if(distance < 10.0F) {
 			double deltaX = target.posX - this.posX;
