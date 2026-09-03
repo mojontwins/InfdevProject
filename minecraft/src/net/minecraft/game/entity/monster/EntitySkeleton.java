@@ -1,10 +1,15 @@
 package net.minecraft.game.entity.monster;
 
-import net.minecraft.game.entity.Entity;
-import net.minecraft.game.entity.projectile.EntityArrow;
+import net.minecraft.game.entity.ai.EntityAIArrowAttack;
+import net.minecraft.game.entity.ai.EntityAIHurtByTarget;
+import net.minecraft.game.entity.ai.EntityAINearestAttackableTarget;
+import net.minecraft.game.entity.ai.EntityAISwimming;
+import net.minecraft.game.entity.ai.EntityAIWander;
+import net.minecraft.game.entity.ai.EntityAIWatchClosest;
+import net.minecraft.game.entity.ai.EntityAILookIdle;
+import net.minecraft.game.entity.player.EntityPlayer;
 import net.minecraft.game.item.Item;
 import net.minecraft.game.world.World;
-import util.MathHelper;
 
 /**
  * The undead archer: tracks the target up to 10 m away and looses a
@@ -14,6 +19,14 @@ public class EntitySkeleton extends EntityMonster {
 	public EntitySkeleton(World world) {
 		super(world);
 		this.texture = "/mob/skeleton.png";
+
+		this.tasks.addTask(0, new EntityAISwimming(this));
+		this.tasks.addTask(1, new EntityAIArrowAttack(this, this.moveSpeed, 1, 30));
+		this.tasks.addTask(2, new EntityAIWander(this, this.moveSpeed));
+		this.tasks.addTask(3, new EntityAIWatchClosest(this, EntityPlayer.class, 8.0F));
+		this.tasks.addTask(4, new EntityAILookIdle(this));
+		this.targetTasks.addTask(1, new EntityAIHurtByTarget(this, false));
+		this.targetTasks.addTask(2, new EntityAINearestAttackableTarget(this, EntityPlayer.class, 16.0F, 0, true));
 	}
 
 	public final void onLivingUpdate() {
@@ -31,29 +44,6 @@ public class EntitySkeleton extends EntityMonster {
 
 	protected final String getDeathSound() {
 		return "mob.skeletonhurt";
-	}
-
-	protected final void attackEntity(Entity target, float distance) {
-		if(distance < 10.0F) {
-			double deltaX = target.posX - this.posX;
-			double deltaZ = target.posZ - this.posZ;
-			if(this.attackTime == 0) {
-				System.out.println ("About to shoot arrow");
-				EntityArrow arrow = new EntityArrow(this.worldObj, this);
-				arrow.posY += (double)1.4F;
-				double deltaY = target.posY - (double)0.2F - arrow.posY;
-				float drop = MathHelper.sqrt_double(deltaX * deltaX + deltaZ * deltaZ) * 0.2F;
-				this.worldObj.playSoundAtEntity(this, "random.bow", 1.0F, 1.0F / (this.rand.nextFloat() * 0.4F + 0.8F));
-				this.worldObj.spawnEntityInWorld(arrow);
-				arrow.setArrowHeading(deltaX, deltaY + (double)drop, deltaZ, 0.6F, 12.0F);
-				this.attackTime = 30;
-			}
-
-			// Keep aiming at the target even between shots.
-			this.rotationYaw = (float)(Math.atan2(deltaZ, deltaX) * 180.0D / (double)((float)Math.PI)) - 90.0F;
-			this.hasAttacked = true;
-		}
-
 	}
 
 	protected final int getDroppedItem() {

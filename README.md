@@ -1062,3 +1062,195 @@ broader naming-alignment effort). Full-tree javac 1.8 compile EXIT=0.
   - `EntityGiant` → `"mob.zombie"`, `"mob.zombiehurt"`, `"mob.zombiedeath"`
   - `EntityCow`, `EntityPig`, `EntitySheep` already had overrides from earlier backports.
 - Full-tree javac 1.8 compile EXIT=0.
+
+### 2026-09-03 — ModelRenderer/ModelBox port (r1.2.5 child-renderer framework)
+
+Ported the r1.2.5 child-renderer + `ModelBox` system into the infdev
+20100420 model package, end-to-end. The plan in
+`docs/model_renderer_port_plan.md` is the design reference.
+
+- **New files** (3): `ModelBox` (a named sub-box holding six textured
+  quads with built-in mirror support), `TextureOffset` (named texture
+  coordinate, registered on the model), `GLAllocation` (the LWJGL display
+  list / texture allocation tracker moved into its own render-side class
+  so model compilation can use it directly).
+- **TexturedQuad extended** with a 6-arg ctor (uv-min, uv-max,
+  textureWidth, textureHeight), a `draw(Tessellator, scale)` method, and
+  `flipFace()` for mirrored boxes. The 4-arg ctor is unchanged so the
+  existing 64×32 inset behavior is preserved.
+- **ModelRenderer rewritten** as a list of `ModelBox`es plus child
+  renderers, with the 6-arg `ModelRenderer(ModelBase, String, int, int)`
+  constructor, `addChild`, `compileDisplayList(float)`, `render(float)`,
+  `renderWithRotation(float)`, and `postRender(float)`. The legacy
+  `ModelRenderer(int, int)` 2-arg ctor is kept as a compatibility shim so
+  every existing model class compiles unchanged. Display-list compile is
+  deferred until first render and then cached.
+- **ModelBase extended** with `boxList`, `modelTextureMap`,
+  `textureWidth`/`textureHeight`, and `setTextureOffset` /
+  `getTextureOffset` for named UV lookup.
+- **ModelBiped** gains `bipedEars` and `bipedCloak` renderers; the
+  headwear is now a child of the head (the zombie sets
+  `bipedHeadwear.showModel = false` to hide the second-skin layer).
+  `renderEars` / `renderCloak` are exposed for future use.
+- **ModelZombie** no longer manually renders the headwear at the end of
+  its render call — the biped's child wiring handles it, and the
+  showModel flag is the single switch.
+- All model classes still compile against the existing 2-arg ctor
+  (compatibility shim), so no model construction code outside `Biped`
+  had to change. `RenderLiving` already calls
+  `mainModel.render(6-arg)` — no signature change was needed there.
+- Full-tree javac 1.8 compile EXIT=0.
+
+### 2026-09-03 — Modern AI task-scheduler port (r1.2.5 framework)
+
+Ported the r1.2.5 task-based AI system into infdev 20100420, replacing the
+inline `updateEntityActionState()` steering of every mob and animal with a
+composable set of `EntityAIBase` tasks. The analysis and per-mob task plan
+is `docs/ai_system_port_plan.md`.
+
+- **New package** `net.minecraft.game.entity.ai`:
+  - Core framework: `EntityAIBase` (mutex bits, `shouldExecute` /
+    `continueExecuting` / `startExecuting` / `resetTask` / `updateTask`),
+    `EntityAITaskEntry`, `EntityAITasks` (mutex-aware priority scheduler).
+  - Targeting: `EntityAITarget`, `EntityAIHurtByTarget`,
+    `EntityAINearestAttackableTarget`, `EntityAISpiderTarget` (dark-only).
+  - Navigation: `PathNavigate` (wraps the existing `World.pathFinder`),
+    `EntityMoveHelper`, `EntityLookHelper`, `RandomPositionGenerator`.
+  - Movement/action tasks: `EntityAISwimming`, `EntityAIWander`,
+    `EntityAIWatchClosest`, `EntityAILookIdle`, `EntityAIAttackOnCollide`,
+    `EntityAIArrowAttack`.
+- **`EntityLiving`** now hosts the AI surface: `tasks` / `targetTasks`
+  schedulers, `navigator`, `lookHelper`, `moveHelper`, `attackTarget`,
+  `aiTarget`, `rotationYawHead`, plus `getAttackTarget` / `setAttackTarget`,
+  `getAITarget` / `setAITarget`, `getNavigator` / `getLookHelper` /
+  `getMoveHelper`, `getRNG`, `isInWater` / `isInLava`, `attackEntityAsMob`,
+  and `canEntityBeSeen`. `isAIEnabled()` defaults to `false` (the player
+  keeps the inline AI); `EntityCreature` overrides it to `true` and the
+  `onLivingUpdate()` tick now runs the task schedulers when enabled.
+- **Visibility alignment with r1.2.5**: the movement/AI fields that mob
+  tasks must drive (`moveForward`, `moveStrafing`, `isJumping`, `moveSpeed`,
+  `entityAge`) and the `worldObj` / `rand` fields were widened from
+  `protected` to `public`, matching upstream and letting the `ai` package
+  drive them directly.
+- **Per-mob task wiring** in each constructor: Zombie, Skeleton, Creeper,
+  Spider, Giant, Pig, Cow and Sheep each register their own swim→attack→
+  wander→watch→idle list, plus `EntityAIHurtByTarget` /
+  `EntityAINearestAttackableTarget` targeting for the hostiles. Hostile
+  melee still routes through the existing `attackEntity(Entity, float)`
+  override (via `attackEntityAsMob`), so Skeleton's arrow, Spider's pounce
+  and Creeper's fuse all behave as before.
+- **`EntityMonster`** dropped its inline `findEntityToAttack()` and now
+  records the last aggressor via `setAITarget` for `EntityAIHurtByTarget`
+  to pick up. `EntityCreeper`'s fuse state machine moved into
+  `onLivingUpdate()` and plants the creeper in place once lit.
+- Full-tree javac 1.8 compile EXIT=0 (no warnings).
+
+### 2026-09-03 — Ambient-light shading for flat dropped-item sprites
+
+Dropped `EntityItem`s that render as flat billboard sprites (e.g. flowers,
+non-3D block items) showed fully lit regardless of their surroundings,
+because the flat icon path never applied the block/ambient light.
+
+- `RenderItem.doRender` flat-sprite branch now multiplies the item's tint
+  colour by `entity.getEntityBrightness(partialTick)`, matching how the 3D
+  block branch and every living entity are already shaded.
+- Full-tree javac 1.8 compile EXIT=0 (no warnings).
+
+### 2026-09-03 — Fix one-frame oversized UI flash on launch
+
+On launch the first GUI frame rendered oversized, then re-fit to the window —
+a scale-mismatch caused by calculating the UI size before knowing the real
+GL buffer size.
+
+- In applet/Canvas-launch mode the actual display buffer is the laid-out
+  client area, which is smaller than the outer Frame (title bar and borders
+  shrink it). The game used the applet's default dimensions (e.g. 1280×720)
+  for the first `ScaledResolution`, so the menu drew bigger than 1:1 and only
+  corrected once the render loop synced to the canvas size.
+- `Minecraft.run()` now syncs `displayWidth`/`displayHeight` to the real
+  Canvas client area before setting the viewport and building the first GUI,
+  so the scale factor and viewport agree from frame one.
+- Full-tree javac 1.8 compile EXIT=0 (no warnings).
+
+### 2026-09-03 — Fix entity-model extra boxes, cow orientation, face lighting and stuck AI jumps
+
+- **Biped extra boxes**: the r1.2.5 child-renderer port had added `bipedEars`
+  and `bipedCloak` as children of the head/body in `ModelBiped`. Neither
+  exists in the original infdev model, so every biped (notably Zombie and
+  Skeleton) gained a stray flat sheet on the chest ("plexus box") and thin
+  flaps at the head ("extra thin arms"). Removed the fields, their box
+  construction and child attachments, and the now-dead `renderEars` /
+  `renderCloak` methods — restoring the faithful head/body/arms/legs/+ headwear
+  render.
+- **Cow body upright**: `ModelCow` is a standalone re-creation of the a1.1.2
+  quadraped-based cow but was missing `body.rotateAngleX = PI/2`. Without it
+  the body box (12 wide × 18 tall × 10 deep) rendered standing on end, taller
+  than deep. Added the body x-rotation so it lies horizontal and long, matching
+  a1.1.2 exactly (leg and head pivots already matched).
+- **Face lighting inverted**: `TexturedQuad.draw` computed the face normal but
+  passed it sign-unchanged to the tessellator, whereas the original `ModelRenderer`
+  negates it — so lit top faces rendered dark and bottom faces light. Restored
+  the negation in `TexturedQuad.draw` (and dropped the now-dead `invertNormal`
+  flag).
+- **Stuck jump**: `PathNavigate.followPath` set `isJumping = true` when the
+  next path node sat above `stepHeight`, but nothing ever cleared it, so an AI
+  mob that once needed to climb jumped forever. `EntityLiving.onLivingUpdate`
+  now resets `isJumping = false` at the top of the AI-tasks branch each tick, so
+  tasks/navigation re-derive it fresh (and the player path is untouched).
+- Full-tree javac 1.8 compile EXIT=0 (no new warnings).
+
+### 2026-09-03 - Fix mob/animal head tracking and look pitch
+
+- Head yaw was driven by the body: the r1.2.5-derived look helper wrote the
+  tracked target heading to rotationYawHead, but RenderLiving still built
+  the head yaw from rotationYaw (the body yaw), so heads never swivelled to
+  follow the player. The renderer now interpolates and reads
+  rotationYawHead - renderYawOffset for the head, matching r1.2.5.
+- Look pitch ignored distance: EntityLookHelper computed head pitch with a
+  hard-coded horizontal distance of 1.0 instead of the real distance to the
+  target, so a nearby player drove the head into a steep, unnatural pitch
+  (more so as you closed in). It now uses the actual horizontal distance.
+- Head bookkeeping restored: EntityLiving now initializes rotationYawHead
+  from rotationYaw, snapshots prevRotationYawHead, and unwraps it for clean
+  interpolation, and the look helper eases the head back to body-aligned when
+  idle and clamps its swivel to +/-75 deg while pathing.
+- Full-tree javac 1.8 compile EXIT=0 (no new warnings).### 2026-09-03 - Make mobs turn as a whole instead of spinning their heads
+
+- The previous head-tracking fix read rotationYawHead in the renderer, but the
+  body yaw (renderYawOffset) was still driven by rotationYaw, so a watched mob
+  could keep its head locked on you and rotate through a full 360 degrees as
+  you circled it. Ported EntityBodyHelper (from the r1.2.5 AI set) to make the
+  body rotate to follow the head.
+- EntityLiving.onUpdate now splits the body animation: AI creatures use
+  bodyHelper.onUpdateBody() - which runs the body with the travel heading while
+  moving (head free up to +/-75 deg) and, when idle, eases renderYawOffset
+  toward the head so the whole creature turns to watch; non-AI entities (the
+  player) keep the previous travel-yaw easing.
+- Added the bodyHelper field, its construction in the EntityLiving ctor, and
+  kept rotationYawHead/prevRotationYawHead interpolation and unwrapping. Heads
+  now swivel within a natural arc and no longer stick at odd body-relative
+  offsets.
+- Full-tree javac 1.8 compile EXIT=0 (no new warnings).### 2026-09-03 - Rework mob spawning: local eligible-chunks caps
+
+- The old MobSpawner compared a world-wide mob count against a fixed global cap
+  (100 monsters / 50 animals), so once 100 monsters existed anywhere in the
+  world it stopped spawning everywhere, even right next to the player, and the
+  counter stayed jammed at 100. Rewrote MobSpawner (name kept) on the b1.7.3
+  eligible-chunks model.
+- performSpawning(world) collects the 9x9 chunk square (+/-4 chunks = 81)
+  around the player, caps each creature type by baseCap * eligibleChunks / 256
+  (~22 monsters / ~4 animals near the player), and issues ~3 spawn attempts per
+  type per tick rate-limited to 1-in-10 per chunk. Density is local and the cap
+  grows with the loaded area instead of freezing globally.
+- attemptSpawn picks a random cell in a random eligible chunk, validates the
+  surface (solid below / air above / no liquid), requires 24+ blocks from the
+  player and >= 24 from world spawn, then reflectively instantiates, checks and
+  spawns one creature. Reflective creation, the surface rule and armor rolling
+  are carried over from the old spawner.
+- EntityLiving.getCanSpawnHere was a side-effecting test: it teleported the
+  not-yet-spawned entity via setPosition (mutating its position and bounding
+  box). It now snapshots and restores position/box so the probe is pure.
+- World.tick() now calls the static MobSpawner.performSpawning(this); the
+  monsterSpawner/animalSpawner fields, their constructor init, and the now
+  unused entity imports in World were removed.
+- Full-tree javac 1.8 compile EXIT=0 (no new warnings).

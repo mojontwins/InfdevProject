@@ -324,6 +324,20 @@ public final class Minecraft implements Runnable {
 			intBuffer = BufferUtils.createIntBuffer(256);
 			intBuffer.clear().limit(256);
 			this.renderGlobal = new RenderGlobal(this, this.renderEngine);
+			// When hosted inside a Canvas (applet/desktop launcher) the actual GL
+			// buffer is the laid-out client area, which is smaller than the outer
+			// Frame (title bar and borders shrink it). Sync to the real size now,
+			// before the first GUI is built, so the scale factor and viewport agree
+			// from frame one instead of flashing an oversized UI that then re-fits.
+			if(this.mcCanvas != null) {
+				int realWidth = this.mcCanvas.getWidth();
+				int realHeight = this.mcCanvas.getHeight();
+				if(realWidth > 0 && realHeight > 0) {
+					this.displayWidth = realWidth;
+					this.displayHeight = realHeight;
+					System.out.println("Canvas size: " + this.displayWidth + ", " + this.displayHeight);
+				}
+			}
 			GL11.glViewport(0, 0, this.displayWidth, this.displayHeight);
 			if(this.server != null && this.session != null) {
 				// Multiplayer startup: go straight into an empty world.

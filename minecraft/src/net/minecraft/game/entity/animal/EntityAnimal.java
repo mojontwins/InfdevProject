@@ -15,7 +15,8 @@ public abstract class EntityAnimal extends EntityCreature {
 	}
 
 	/** Grass below the spot scores a full 10 points; otherwise a spot's appeal tracks its daylight. */
-	protected final float getBlockPathWeight(int x, int y, int z) {
+	@Override
+	public final float getBlockPathWeight(int x, int y, int z) {
 		Block below = this.worldObj.getBlock(x, y - 1, z);
 		float bonus = below == null ? 0.0F : below.getAnimalPathBonus();
 		return bonus > 0.0F ? bonus : this.worldObj.getBrightness(x, y, z) - 0.5F;

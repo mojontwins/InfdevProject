@@ -1,225 +1,260 @@
 package net.minecraft.game.world;
 
+import java.util.HashSet;
+import java.util.Random;
 import net.minecraft.game.entity.Entity;
 import net.minecraft.game.entity.EntityLiving;
-import net.minecraft.game.world.chunk.Chunk;
+import net.minecraft.game.entity.animal.EntityAnimal;
+import net.minecraft.game.entity.animal.EntityCow;
+import net.minecraft.game.entity.animal.EntityPig;
+import net.minecraft.game.entity.animal.EntitySheep;
+import net.minecraft.game.entity.monster.EntityCreeper;
+import net.minecraft.game.entity.monster.EntityMonster;
+import net.minecraft.game.entity.monster.EntitySkeleton;
+import net.minecraft.game.entity.monster.EntitySpider;
+import net.minecraft.game.entity.monster.EntityZombie;
 import net.minecraft.game.world.material.Material;
 import util.MathHelper;
 
 /**
- * Spawns creatures of a given type around the player, keeping the population
- * within a configurable cap. Used for both monster and animal spawning:
- * one instance for {@link EntityMonster} (max 100) and one for
- * {@link EntityAnimal} (max 50), both owned by {@code PlayerControllerSP}.
+ * Spawns hostile and passive creatures around the player, keeping each
+ * population under a cap that scales with the size of the loaded area.
  *
- * <p>The spawning algorithm picks a random position near the player, searches
- * for a valid surface (solid below, air above, no liquid), validates that it
- * is far enough from the player, then instantiates and spawns the entity.
- *
- * <p>Two independent search loops try up to {@link #SURFACE_ATTEMPTS} surface
- * positions, each jittered {@link #JITTER_ATTEMPTS} times for variety.
+ * <p>The old spawner (see project history) compared a world-wide count against
+ * a fixed global cap, so once 100 monsters existed <em>anywhere</em> the world
+ * it stopped spawning <em>everywhere</em>. This rework keys the whole thing to
+ * the player's loaded region: it collects the 9x9 chunk square (±4 chunks)
+ * around each player, caps each creature type by
+ * {@code baseCap * eligibleChunks / 256}, and tries a handful of spawns per
+ * tick inside those chunks — so density is local and the cap grows with the
+ * explored area instead of jamming at a global 100.</p>
  */
 public final class MobSpawner {
 
-    /** Half-width of the spawn area; entities spawn within ±128 blocks of the player. */
-    private static final int SPAWN_HORIZONTAL_SPREAD = 128;
+	/** Half-width, in chunks, of the spawnable region around each player. */
+	private static final int SPAWN_RADIUS_CHUNKS = 4;
 
-    /** Vertical range for spawn attempts (0 to world height). */
-    private static final int SPAWN_VERTICAL_RANGE = Chunk.SECTION_HEIGHT;
+	/** Monster cap multiplier, normalised over 256 eligible chunks. */
+	private static final int MAX_MONSTERS_BASE = 70;
 
-    /** Squared exclusion radius: no spawn within 16 blocks of the player/spawn point. */
-    private static final double MIN_SPAWN_DISTANCE_SQ = 256.0D;
+	/** Animal cap multiplier, normalised over 256 eligible chunks. */
+	private static final int MAX_ANIMALS_BASE = 15;
 
-    /** Maximum horizontal jitter applied to a candidate position (±5 blocks). */
-    private static final int MAX_JITTER_HORIZONTAL = 5;
+	/** Spawn attempts issued per creature type per world tick. */
+	private static final int SPAWN_ATTEMPTS_PER_TICK = 3;
 
-    /** Maximum vertical jitter applied to a candidate position (±1 block). */
-    private static final int MAX_JITTER_VERTICAL = 1;
+	/** 1-in-N per chunk per tick chance of even trying (rate limiting). */
+	private static final int CHUNK_RATE_LIMIT = 10;
 
-    /** Number of distinct surface candidates to try before giving up. */
-    private static final int SURFACE_ATTEMPTS = 6;
+	/** No spawn within this distance of any player (blocks). */
+	private static final float MIN_PLAYER_DISTANCE = 24.0F;
 
-    /** Number of jitter iterations per surface candidate. */
-    private static final int JITTER_ATTEMPTS = 6;
+	/** Squared exclusion radius around the world spawn point. */
+	private static final float MIN_WORLD_SPAWN_DISTANCE_SQ = 576.0F;
 
-    private final World world;
-    private final int maxSpawns;
-    private final Class<? extends EntityLiving> entityType;
-    private final Class<?>[] entityClasses;
+	/** Vertical range searched for a spawn cell (world height cap). */
+	private static final int WORLD_HEIGHT = 128;
 
-    /**
-     * Creates a spawner.
-     *
-     * @param world          The world this spawner operates in (stored for use in {@link #tick})
-     * @param maxSpawns     Maximum number of live entities of {@code entityType} allowed
-     * @param entityType    Base class to count against the cap (e.g. {@link EntityMonster})
-     * @param entityClasses Pool of concrete entity classes to pick from randomly
-     */
-    public MobSpawner(World world, int maxSpawns, Class<? extends EntityLiving> entityType, Class<?>[] entityClasses) {
-        this.world = world;
-        this.maxSpawns = maxSpawns;
-        this.entityType = entityType;
-        this.entityClasses = entityClasses;
-    }
+	/** Maximum horizontal jitter applied to a candidate position (±5 blocks). */
+	private static final int MAX_JITTER_HORIZONTAL = 5;
 
-    /**
-     * Called every world tick from {@link World#tick()}. If the current population is
-     * below {@link #maxSpawns}, attempts to spawn up to one entity.
-     */
-    public final void tick() {
-        int currentCount = this.world.getCachedEntityCount(this.entityType);
-        if (currentCount < this.maxSpawns) {
-            this.findSpawns(this.world.playerEntity);
-        }
-    }
+	/** Maximum vertical jitter applied to a candidate position (±1 block). */
+	private static final int MAX_JITTER_VERTICAL = 1;
 
-    /**
-     * Attempts to find and spawn an entity near {@code anchor}.
-     *
-     * @param anchor The entity to stay 16+ blocks away from (may be null;
-     *               in that case the world spawn point is used as the exclusion center)
-     * @return Number of entities successfully spawned
-     */
-    private int findSpawns(Entity anchor) {
-        int spawnedCount = 0;
+	/** Number of distinct surface candidates to try before giving up. */
+	private static final int SURFACE_ATTEMPTS = 6;
 
-        int anchorChunkX = MathHelper.floor_double(anchor.posX);
-        int anchorChunkZ = MathHelper.floor_double(anchor.posZ);
+	/** Number of jitter iterations per surface candidate. */
+	private static final int JITTER_ATTEMPTS = 6;
 
-        int[] spawnPos = this.findSpawnPosition(anchorChunkX, anchorChunkZ);
+	/** Hostile mobs the spawner can pick from, chosen at random. */
+	private static final Class<?>[] MONSTER_CLASSES = new Class<?>[]{
+		EntityZombie.class, EntitySkeleton.class, EntityCreeper.class, EntitySpider.class};
 
-        if (spawnPos != null) {
-            float entityX = spawnPos[0] + 0.5F;
-            float entityY = spawnPos[1] + 1.0F;
-            float entityZ = spawnPos[2] + 0.5F;
+	/** Passive mobs the spawner can pick from, chosen at random. */
+	private static final Class<?>[] ANIMAL_CLASSES = new Class<?>[]{
+		EntitySheep.class, EntityPig.class, EntityCow.class};
 
-            if (this.trySpawn(anchor, entityX, entityY, entityZ) != null) {
-                spawnedCount++;
-            }
-        }
+	private MobSpawner() {
+	}
 
-        return spawnedCount;
-    }
+	/**
+	 * The single entry point called from {@link World#tick()}. Re-populates
+	 * both the monster and the animal pool, subject to their local caps.
+	 */
+	public static void performSpawning(World world) {
+		Entity player = world.playerEntity;
+		if(player == null) {
+			return;
+		}
 
-    /**
-     * Searches for a valid spawn surface near the player's chunk. Tries up to
-     * {@link #SURFACE_ATTEMPTS} surface positions, each jittered up to
-     * {@link #JITTER_ATTEMPTS} times.
-     *
-     * @param anchorChunkX Player's chunk X (used as spawn area center)
-     * @param anchorChunkZ Player's chunk Z (used as spawn area center)
-     * @return int[3] with {x, y, z} of a valid surface, or null if none found
-     */
-    private int[] findSpawnPosition(int anchorChunkX, int anchorChunkZ) {
-        int baseX = anchorChunkX + this.world.rand.nextInt(SPAWN_HORIZONTAL_SPREAD * 2) - SPAWN_HORIZONTAL_SPREAD;
-        int baseY = this.world.rand.nextInt(SPAWN_VERTICAL_RANGE);
-        int baseZ = anchorChunkZ + this.world.rand.nextInt(SPAWN_HORIZONTAL_SPREAD * 2) - SPAWN_HORIZONTAL_SPREAD;
+		Random rand = world.rand;
+		long[] eligibleChunks = buildEligibleChunks(player);
+		int monsterChunks = eligibleChunks.length;
+		int maxMonsters = MAX_MONSTERS_BASE * monsterChunks / 256;
+		int maxAnimals = MAX_ANIMALS_BASE * monsterChunks / 256;
 
-        if (this.world.isSolid(baseX, baseY, baseZ) || this.world.getBlockMaterial(baseX, baseY, baseZ) != Material.air) {
-            return null;
-        }
+		if(world.getCachedEntityCount(EntityMonster.class) < maxMonsters) {
+			spawnCreatures(world, player, rand, eligibleChunks, MONSTER_CLASSES);
+		}
 
-        for (int surfaceAttempt = 0; surfaceAttempt < SURFACE_ATTEMPTS; surfaceAttempt++) {
-            int x = baseX;
-            int y = baseY;
-            int z = baseZ;
+		if(world.getCachedEntityCount(EntityAnimal.class) < maxAnimals) {
+			spawnCreatures(world, player, rand, eligibleChunks, ANIMAL_CLASSES);
+		}
+	}
 
-            for (int jitterAttempt = 0; jitterAttempt < JITTER_ATTEMPTS; jitterAttempt++) {
-                x += this.jitter(MAX_JITTER_HORIZONTAL);
-                y += this.jitter(MAX_JITTER_VERTICAL);
-                z += this.jitter(MAX_JITTER_HORIZONTAL);
+	/**
+	 * Builds the deduplicated list of chunk coordinates (±4 chunks around the
+	 * player) that creatures may spawn in. Coordinates are packed into a single
+	 * {@code long} ({@code x} in the high 32 bits, {@code z} in the low 32).
+	 */
+	private static long[] buildEligibleChunks(Entity player) {
+		int centerX = MathHelper.floor_double(player.posX / 16.0D);
+		int centerZ = MathHelper.floor_double(player.posZ / 16.0D);
+		HashSet<Long> seen = new HashSet<>();
+		int radius = SPAWN_RADIUS_CHUNKS;
+		for(int dx = -radius; dx <= radius; ++dx) {
+			for(int dz = -radius; dz <= radius; ++dz) {
+				seen.add(packChunk(centerX + dx, centerZ + dz));
+			}
+		}
 
-                if (this.isValidSurface(x, y, z)) {
-                    return new int[]{x, y, z};
-                }
-            }
-        }
+		long[] chunks = new long[seen.size()];
+		int index = 0;
+		for(Long key : seen) {
+			chunks[index++] = key.longValue();
+		}
 
-        return null;
-    }
+		return chunks;
+	}
 
-    /**
-     * Returns a random offset in the range [-range, +range] using the world's RNG.
-     * Uses {@code rand.nextInt(range + 1) - rand.nextInt(range + 1)} so that zero is
-     * possible and the distribution is triangular (values near zero are more likely
-     * than ±range).
-     */
-    private int jitter(int range) {
-        return this.world.rand.nextInt(range + 1) - this.world.rand.nextInt(range + 1);
-    }
+	private static long packChunk(int x, int z) {
+		return ((long)x << 32) | (z & 0xFFFFFFFFL);
+	}
 
-    /**
-     * Returns true when the block at (x, y, z) is a valid spawn surface:
-     * solid below, air above, and no liquid in the spawn cell.
-     */
-    private boolean isValidSurface(int x, int y, int z) {
-        return this.world.isSolid(x, y - 1, z)
-            && !this.world.isSolid(x, y, z)
-            && !this.world.getBlockMaterial(x, y, z).getIsLiquid()
-            && !this.world.isSolid(x, y + 1, z);
-    }
+	private static int unpackChunkX(long key) {
+		return (int)(key >> 32);
+	}
 
-    /**
-     * Checks that the spawn position is at least 16 blocks away from
-     * {@code anchor}. When anchor is null the world's spawn point is used.
-     */
-    private boolean isFarEnoughFrom(Entity anchor, float x, float y, float z) {
-        if (anchor != null) {
-            double dx = x - (float) anchor.posX;
-            double dy = y - (float) anchor.posY;
-            double dz = z - (float) anchor.posZ;
-            return (dx * dx + dy * dy + dz * dz) >= MIN_SPAWN_DISTANCE_SQ;
-        } else {
-            float dx = x - (float) this.world.spawnX;
-            float dy = y - (float) this.world.spawnY;
-            float dz = z - (float) this.world.spawnZ;
-            return (dx * dx + dy * dy + dz * dz) >= (float) MIN_SPAWN_DISTANCE_SQ;
-        }
-    }
+	private static int unpackChunkZ(long key) {
+		return (int)(key & 0xFFFFFFFFL);
+	}
 
-    /**
-     * Attempts to instantiate a random entity from {@link #entityClasses}
-     * using the World-only constructor via reflection.
-     *
-     * @return The new entity instance, or null if instantiation failed
-     */
-    private EntityLiving createEntity() {
-        int entityIndex = this.world.rand.nextInt(this.entityClasses.length);
-        try {
-            return (EntityLiving) this.entityClasses[entityIndex]
-                .getConstructor(World.class)
-                .newInstance(this.world);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return null;
-        }
-    }
+	/**
+	 * Issues up to {@link #SPAWN_ATTEMPTS_PER_TICK} roll attempts inside random
+	 * eligible chunks, rate-limited to {@link #CHUNK_RATE_LIMIT}. Each attempt
+	 * spawns at most one entity.
+	 */
+	private static void spawnCreatures(World world, Entity player, Random rand, long[] chunks, Class<?>[] pool) {
+		for(int attempt = 0; attempt < SPAWN_ATTEMPTS_PER_TICK; ++attempt) {
+			if(rand.nextInt(CHUNK_RATE_LIMIT) != 0) {
+				continue;
+			}
 
-    /**
-     * Validates and spawns an entity at the given position.
-     * Returns the spawned entity on success, null otherwise.
-     */
-    private EntityLiving trySpawn(Entity anchor, float x, float y, float z) {
-        if (!this.isFarEnoughFrom(anchor, x, y, z)) {
-            return null;
-        }
+			long chunk = chunks[rand.nextInt(chunks.length)];
+			attemptSpawn(world, player, rand, chunk, pool);
+		}
+	}
 
-        EntityLiving entity = this.createEntity();
-        if (entity == null) {
-            return null;
-        }
+	/**
+	 * Picks a random cell inside the chunk's column and, once a valid surface
+	 * is found far enough from player and world spawn, instantiates and spawns
+	 * a random creature from {@code pool}. Returns true on success.
+	 */
+	private static boolean attemptSpawn(World world, Entity player, Random rand, long chunk, Class<?>[] pool) {
+		int baseX = unpackChunkX(chunk) * 16 + rand.nextInt(16);
+		int baseY = rand.nextInt(WORLD_HEIGHT);
+		int baseZ = unpackChunkZ(chunk) * 16 + rand.nextInt(16);
 
-        entity.setLocationAndAngles(x, y, z, this.world.rand.nextFloat() * 360.0F, 0.0F);
+		if(world.isSolid(baseX, baseY, baseZ) || world.getBlockMaterial(baseX, baseY, baseZ) != Material.air) {
+			return false;
+		}
 
-        if (!entity.getCanSpawnHere(x, y, z)) {
-            return null;
-        }
+		for(int surfaceAttempt = 0; surfaceAttempt < SURFACE_ATTEMPTS; ++surfaceAttempt) {
+			int x = baseX;
+			int y = baseY;
+			int z = baseZ;
 
-        if (entity.mightSpawnArmored()) {
-            entity.addRandomArmor();
-        }
+			for(int jitterAttempt = 0; jitterAttempt < JITTER_ATTEMPTS; ++jitterAttempt) {
+				x += jitter(rand, MAX_JITTER_HORIZONTAL);
+				y += jitter(rand, MAX_JITTER_VERTICAL);
+				z += jitter(rand, MAX_JITTER_HORIZONTAL);
 
-        this.world.spawnEntityInWorld(entity);
-        return entity;
-    }
+				if(!isValidSurface(world, x, y, z)) {
+					continue;
+				}
+
+				float posX = x + 0.5F;
+				float posY = y + 1.0F;
+				float posZ = z + 0.5F;
+				if(distanceTo(player, posX, posY, posZ) <= MIN_PLAYER_DISTANCE) {
+					continue;
+				}
+
+				float worldX = posX - (float)world.spawnX;
+				float worldY = posY - (float)world.spawnY;
+				float worldZ = posZ - (float)world.spawnZ;
+				if(worldX * worldX + worldY * worldY + worldZ * worldZ < MIN_WORLD_SPAWN_DISTANCE_SQ) {
+					continue;
+				}
+
+				if(spawnEntity(world, rand, pool, posX, posY, posZ)) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	private static boolean isValidSurface(World world, int x, int y, int z) {
+		return world.isSolid(x, y - 1, z)
+			&& !world.isSolid(x, y, z)
+			&& !world.getBlockMaterial(x, y, z).getIsLiquid()
+			&& !world.isSolid(x, y + 1, z);
+	}
+
+	/**
+	 * Returns a random offset in the range [-range, +range] using the supplied
+	 * RNG. Uses {@code nextInt(range + 1) - nextInt(range + 1)} so zero is
+	 * possible and the distribution is triangular.
+	 */
+	private static int jitter(Random rand, int range) {
+		return rand.nextInt(range + 1) - rand.nextInt(range + 1);
+	}
+
+	private static float distanceTo(Entity from, float x, float y, float z) {
+		float dx = x - (float)from.posX;
+		float dy = y - (float)from.posY;
+		float dz = z - (float)from.posZ;
+		return MathHelper.sqrt_float(dx * dx + dy * dy + dz * dz);
+	}
+
+	/**
+	 * Instantiates a random entity from {@code pool} via its World-constructor,
+	 * validates the cell with {@link EntityLiving#getCanSpawnHere} (which is
+	 * side-effect free) and, if all checks pass, adds it to the world.
+	 */
+	private static boolean spawnEntity(World world, Random rand, Class<?>[] pool, float x, float y, float z) {
+		EntityLiving entity;
+		try {
+			int entityIndex = rand.nextInt(pool.length);
+			entity = (EntityLiving)pool[entityIndex].getConstructor(World.class).newInstance(world);
+		} catch(Exception e) {
+			e.printStackTrace();
+			return false;
+		}
+
+		entity.setLocationAndAngles(x, y, z, rand.nextFloat() * 360.0F, 0.0F);
+		if(!entity.getCanSpawnHere(x, y, z)) {
+			return false;
+		}
+
+		if(entity.mightSpawnArmored()) {
+			entity.addRandomArmor();
+		}
+
+		world.spawnEntityInWorld(entity);
+		return true;
+	}
 }

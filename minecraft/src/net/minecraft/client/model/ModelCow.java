@@ -81,6 +81,8 @@ public final class ModelCow extends ModelBase {
 		this.horn2.rotateAngleY = this.head.rotateAngleY;
 		this.horn2.rotateAngleX = this.head.rotateAngleX;
 
+		this.body.rotateAngleX = (float) Math.PI * 0.5F;
+
 		this.leg1.rotateAngleX = MathHelper.cos(limbSwing * 0.6662F) * 1.4F * limbSwingAmount;
 		this.leg2.rotateAngleX = MathHelper.cos(limbSwing * 0.6662F + (float) Math.PI) * 1.4F * limbSwingAmount;
 		this.leg3.rotateAngleX = MathHelper.cos(limbSwing * 0.6662F + (float) Math.PI) * 1.4F * limbSwingAmount;

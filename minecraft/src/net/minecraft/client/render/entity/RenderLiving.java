@@ -32,7 +32,7 @@ public class RenderLiving extends Render {
 
 		try {
 			yaw = entity.prevRenderYawOffset + (entity.renderYawOffset - entity.prevRenderYawOffset) * partialTick;
-			float interpolatedYaw = entity.prevRotationYaw + (entity.rotationYaw - entity.prevRotationYaw) * partialTick;
+			float interpolatedYawHead = entity.prevRotationYawHead + (entity.rotationYawHead - entity.prevRotationYawHead) * partialTick;
 			float interpolatedPitch = entity.prevRotationPitch + (entity.rotationPitch - entity.prevRotationPitch) * partialTick;
 			GL11.glTranslatef((float)x, (float)y, (float)z);
 			float ticks = (float)entity.ticksExisted + partialTick;
@@ -60,11 +60,11 @@ public class RenderLiving extends Render {
 
 			this.loadDownloadableImageTexture(entity.skinUrl, entity.getEntityTexture());
 			GL11.glEnable(GL11.GL_ALPHA_TEST);
-			this.mainModel.render(headPitch, limbSwingProgress, ticks, interpolatedYaw - yaw, interpolatedPitch, 1.0F);
+			this.mainModel.render(headPitch, limbSwingProgress, ticks, interpolatedYawHead - yaw, interpolatedPitch, 1.0F);
 
 			for(int pass = 0; pass < 4; ++pass) {
 				if(this.shouldRenderPass(entity, pass)) {
-					this.renderPassModel.render(headPitch, limbSwingProgress, ticks, interpolatedYaw - yaw, interpolatedPitch, 1.0F);
+					this.renderPassModel.render(headPitch, limbSwingProgress, ticks, interpolatedYawHead - yaw, interpolatedPitch, 1.0F);
 					GL11.glDisable(GL11.GL_BLEND);
 					GL11.glEnable(GL11.GL_ALPHA_TEST);
 				}
@@ -80,12 +80,12 @@ public class RenderLiving extends Render {
 				GL11.glDepthFunc(GL11.GL_EQUAL);
 				if(entity.hurtTime > 0 || entity.deathTime > 0) {
 					GL11.glColor4f(brightness, 0.0F, 0.0F, 0.4F);
-					this.mainModel.render(headPitch, limbSwingProgress, ticks, interpolatedYaw - yaw, interpolatedPitch, 1.0F);
+					this.mainModel.render(headPitch, limbSwingProgress, ticks, interpolatedYawHead - yaw, interpolatedPitch, 1.0F);
 
 					for(int pass = 0; pass < 4; ++pass) {
 						if(this.shouldRenderPass(entity, pass)) {
 							GL11.glColor4f(brightness, 0.0F, 0.0F, 0.4F);
-							this.renderPassModel.render(headPitch, limbSwingProgress, ticks, interpolatedYaw - yaw, interpolatedPitch, 1.0F);
+							this.renderPassModel.render(headPitch, limbSwingProgress, ticks, interpolatedYawHead - yaw, interpolatedPitch, 1.0F);
 						}
 					}
 				}
@@ -96,12 +96,12 @@ public class RenderLiving extends Render {
 					float blue = (float)(colorMultiplier & 255) / 255.0F;
 					float alpha = (float)(colorMultiplier >>> 24) / 255.0F;
 					GL11.glColor4f(red, green, blue, alpha);
-					this.mainModel.render(headPitch, limbSwingProgress, ticks, interpolatedYaw - yaw, interpolatedPitch, 1.0F);
+					this.mainModel.render(headPitch, limbSwingProgress, ticks, interpolatedYawHead - yaw, interpolatedPitch, 1.0F);
 
 					for(int pass = 0; pass < 4; ++pass) {
 						if(this.shouldRenderPass(entity, pass)) {
 							GL11.glColor4f(red, green, blue, alpha);
-							this.renderPassModel.render(headPitch, limbSwingProgress, ticks, interpolatedYaw - yaw, interpolatedPitch, 1.0F);
+							this.renderPassModel.render(headPitch, limbSwingProgress, ticks, interpolatedYawHead - yaw, interpolatedPitch, 1.0F);
 						}
 					}
 				}

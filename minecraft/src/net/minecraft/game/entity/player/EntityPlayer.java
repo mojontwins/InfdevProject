@@ -169,7 +169,8 @@ public class EntityPlayer extends EntityLiving implements IHuman {
 	public void onItemPickup(Entity item) {
 	}
 
-	protected final float getEyeHeight() {
+	@Override
+	public float getEyeHeight() {
 		return 0.12F;
 	}
 

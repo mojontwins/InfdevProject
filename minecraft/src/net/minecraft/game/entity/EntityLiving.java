@@ -3,6 +3,11 @@ package net.minecraft.game.entity;
 import com.mojang.nbt.NBTTagCompound;
 import com.mojang.nbt.NBTTagList;
 import java.util.List;
+import net.minecraft.game.entity.ai.EntityBodyHelper;
+import net.minecraft.game.entity.ai.EntityLookHelper;
+import net.minecraft.game.entity.ai.EntityMoveHelper;
+import net.minecraft.game.entity.ai.EntityAITasks;
+import net.minecraft.game.entity.ai.PathNavigate;
 import net.minecraft.game.entity.misc.EntityItem;
 import net.minecraft.game.item.Item;
 import net.minecraft.game.item.ItemArmor;
@@ -53,18 +58,40 @@ public class EntityLiving extends Entity {
 	/** Persistently growing limb travel, fed to the model as the swing pitch. */
 	public float limbSwingPitch;
 	/** Ticks since this creature came into being; also the far-distance despawn timer. */
-	protected int entityAge;
-	protected float moveStrafing;
-	protected float moveForward;
+	public int entityAge;
+	public float moveStrafing;
+	public float moveForward;
 	/** Random turn rate injected while idling. */
 	private float randomYawVelocity;
-	protected boolean isJumping;
-	protected float moveSpeed;
+	public boolean isJumping;
+	public float moveSpeed;
 
 	/** Armour worn on the four body slots (index 0 = boots, 3 = helmet; see {@link ItemArmor#armorType}). */
 	protected ItemStack[] armorInventory = new ItemStack[4];
 	/** The part of a blow the armour hopper could not divide evenly; banked for the next {@link #attackEntityFrom}. */
 	protected int armorDamageCarryover = 0;
+
+	// AI framework fields — populated by {@link EntityCreature} and subclasses.
+	/** The entity this creature is currently trying to attack. */
+	private EntityLiving attackTarget;
+	/** The last entity that attacked this one, used by {@link net.minecraft.game.entity.ai.EntityAIHurtByTarget}. */
+	private EntityLiving aiTarget;
+	/** Movement task scheduler. */
+	public EntityAITasks tasks = new EntityAITasks();
+	/** Targeting task scheduler. */
+	public EntityAITasks targetTasks = new EntityAITasks();
+	/** Wraps the world's Pathfinder for the task system. */
+	public PathNavigate navigator;
+	/** Smooth head-tracking helper. */
+	public EntityLookHelper lookHelper;
+	/** Smooth yaw/move helper. */
+	public EntityMoveHelper moveHelper;
+	/** Eases the body yaw to follow the head so creatures turn as a whole. */
+	public EntityBodyHelper bodyHelper;
+	/** Head yaw that renderers read; updated by the look helper. */
+	public float rotationYawHead;
+	/** Head pitch that renderers read; updated by the look helper. */
+	public float prevRotationYawHead;
 
 	public EntityLiving(World world) {
 		super(world);
@@ -80,7 +107,13 @@ public class EntityLiving extends Entity {
 		this.setPosition(this.posX, this.posY, this.posZ);
 		Math.random();
 		this.rotationYaw = (float)(Math.random() * (double)((float)Math.PI) * 2.0D);
+		this.rotationYawHead = this.rotationYaw;
 		this.stepHeight = 0.5F;
+
+		this.navigator = new PathNavigate(this, world);
+		this.lookHelper = new EntityLookHelper(this);
+		this.moveHelper = new EntityMoveHelper(this);
+		this.bodyHelper = new EntityBodyHelper(this);
 	}
 
 	public final String getEntityTexture() {
@@ -95,7 +128,7 @@ public class EntityLiving extends Entity {
 		return !this.isDead;
 	}
 
-	protected float getEyeHeight() {
+	public float getEyeHeight() {
 		return this.height * 0.85F;
 	}
 
@@ -153,38 +186,46 @@ public class EntityLiving extends Entity {
 		}
 
 		this.prevRenderYawOffset = this.renderYawOffset;
+		this.prevRotationYawHead = this.rotationYawHead;
 		this.prevRotationYaw = this.rotationYaw;
 		this.prevRotationPitch = this.rotationPitch;
 		this.onLivingUpdate();
 
-		// Body animation. The torso yaw is eased toward either the direction the
-		// creature is travelling, or its last heading, so the body follows the
-		// head instead of snapping around.
-		double travelledX = this.posX - this.prevPosX;
-		double travelledZ = this.posZ - this.prevPosZ;
-		float distanceTravelled = MathHelper.sqrt_double(travelledX * travelledX + travelledZ * travelledZ);
-		float travelYaw = this.renderYawOffset;
-		if(distanceTravelled > 0.05F) {
-			travelYaw = (float)Math.atan2(travelledZ, travelledX) * 180.0F / (float)Math.PI - 90.0F;
-		}
+		// Body animation. AI creatures keep their torso yaw (renderYawOffset)
+		// in step with the head via the body helper, so a watched mob turns as
+		// a whole instead of craning its neck through 360 degrees. Everybody
+		// else (notably the player) eases the torso toward the travel heading
+		// while keeping the head within a bounded arc of it.
+		if(this.isAIEnabled()) {
+			this.bodyHelper.onUpdateBody();
+		} else {
+			double travelledX = this.posX - this.prevPosX;
+			double travelledZ = this.posZ - this.prevPosZ;
+			float distanceTravelled = MathHelper.sqrt_double(travelledX * travelledX + travelledZ * travelledZ);
+			float travelYaw = this.renderYawOffset;
+			if(distanceTravelled > 0.05F) {
+				travelYaw = (float)Math.atan2(travelledZ, travelledX) * 180.0F / (float)Math.PI - 90.0F;
+			}
 
-		float yawTwist = wrapAngleTo180(travelYaw - this.renderYawOffset);
-		this.renderYawOffset += yawTwist * 0.1F;
-		float headTurn = wrapAngleTo180(this.rotationYaw - this.renderYawOffset);
-		if(headTurn < -75.0F) {
-			headTurn = -75.0F;
-		}
+			float yawTwist = wrapAngleTo180(travelYaw - this.renderYawOffset);
+			this.renderYawOffset += yawTwist * 0.1F;
+			float headTurn = wrapAngleTo180(this.rotationYaw - this.renderYawOffset);
+			if(headTurn < -75.0F) {
+				headTurn = -75.0F;
+			}
 
-		if(headTurn >= 75.0F) {
-			headTurn = 75.0F;
-		}
+			if(headTurn >= 75.0F) {
+				headTurn = 75.0F;
+			}
 
-		this.renderYawOffset = this.rotationYaw - headTurn;
-		this.renderYawOffset += headTurn * 0.1F;
+			this.renderYawOffset = this.rotationYaw - headTurn;
+			this.renderYawOffset += headTurn * 0.1F;
+		}
 
 		// Keep every interpolated angle on the same side of a 360° wrap so the
 		// renderers never sweep a model the long way around a full turn.
 		this.unwrapPrevAngle(this.rotationYaw, this.prevRotationYaw, false);
+		this.unwrapPrevAngle(this.rotationYawHead, this.prevRotationYawHead, false);
 		this.unwrapPrevAngle(this.renderYawOffset, this.prevRenderYawOffset, false);
 		this.unwrapPrevAngle(this.rotationPitch, this.prevRotationPitch, true);
 	}
@@ -555,8 +596,18 @@ public class EntityLiving extends Entity {
 			this.moveForward = 0.0F;
 			this.randomYawVelocity = 0.0F;
 		} else {
-			this.updateEntityActionState();
+			if(this.isAIEnabled()) {
+				this.isJumping = false;
+				this.targetTasks.onUpdateTasks();
+				this.tasks.onUpdateTasks();
+				this.navigator.onUpdateNavigation();
+			} else {
+				this.updateEntityActionState();
+			}
 		}
+
+		this.moveHelper.onUpdateMoveHelper();
+		this.lookHelper.onUpdateLook();
 
 		boolean inWater = this.handleWaterMovement();
 		boolean inLava = this.handleLavaMovement();
@@ -692,7 +743,86 @@ public class EntityLiving extends Entity {
 
 	/** True when the given cell is open, dry and reachable — the spawn check used by all creatures. */
 	public boolean getCanSpawnHere(float x, float y, float z) {
+		double prevX = this.posX;
+		double prevY = this.posY;
+		double prevZ = this.posZ;
 		this.setPosition((double)x, (double)(y + this.height / 2.0F), (double)z);
-		return this.worldObj.checkIfAABBIsClear1(this.boundingBox) && this.worldObj.getCollidingBoundingBoxes(this.boundingBox).size() == 0 && !this.worldObj.getIsAnyLiquid(this.boundingBox);
+		boolean canSpawn = this.worldObj.checkIfAABBIsClear1(this.boundingBox)
+			&& this.worldObj.getCollidingBoundingBoxes(this.boundingBox).size() == 0
+			&& !this.worldObj.getIsAnyLiquid(this.boundingBox);
+		// Restore position (and the derived bounding box) so the probe is a pure
+		// side-effect-free test rather than teleporting the not-yet-spawned entity.
+		this.setPosition(prevX, prevY, prevZ);
+		return canSpawn;
+	}
+
+	/** Whether this entity uses the task-based AI system.  False for the player. */
+	public boolean isAIEnabled() {
+		return false;
+	}
+
+	public EntityLiving getAttackTarget() {
+		return this.attackTarget;
+	}
+
+	public void setAttackTarget(EntityLiving target) {
+		this.attackTarget = target;
+	}
+
+	/** The last entity that struck this one — used by {@link net.minecraft.game.entity.ai.EntityAIHurtByTarget}. */
+	public EntityLiving getAITarget() {
+		return this.aiTarget;
+	}
+
+	public void setAITarget(EntityLiving target) {
+		this.aiTarget = target;
+	}
+
+	/** Convenience accessor for the underlying RNG. */
+	public java.util.Random getRNG() {
+		return this.rand;
+	}
+
+	public PathNavigate getNavigator() {
+		return this.navigator;
+	}
+
+	public EntityLookHelper getLookHelper() {
+		return this.lookHelper;
+	}
+
+	public EntityMoveHelper getMoveHelper() {
+		return this.moveHelper;
+	}
+
+	/** True when the entity is currently submerged in water. */
+	public boolean isInWater() {
+		return this.handleWaterMovement();
+	}
+
+	/** True when the entity is currently submerged in lava. */
+	public boolean isInLava() {
+		return this.handleLavaMovement();
+	}
+
+	/** Gives the subclass the chance to land a hit when the target is within reach. */
+	public void attackEntity(Entity target, float distance) {
+	}
+
+	/** The melee entry point used by the task system; computes distance and strikes. */
+	public void attackEntityAsMob(Entity target) {
+		float deltaX = (float)(target.posX - this.posX);
+		float deltaY = (float)(target.posY - this.posY);
+		float deltaZ = (float)(target.posZ - this.posZ);
+		float distance = MathHelper.sqrt_float(deltaX * deltaX + deltaY * deltaY + deltaZ * deltaZ);
+		this.attackEntity(target, distance);
+	}
+
+	/** True when the entity can be seen from the given position by a ray trace. */
+	public boolean canEntityBeSeen(Entity target) {
+		return this.worldObj.rayTraceBlocks(
+			new net.minecraft.game.physics.Vec3D(this.posX, this.posY + (double)this.getEyeHeight(), this.posZ),
+			new net.minecraft.game.physics.Vec3D(target.posX, target.posY + (double)target.getEyeHeight(), target.posZ)
+		) == null;
 	}
 }

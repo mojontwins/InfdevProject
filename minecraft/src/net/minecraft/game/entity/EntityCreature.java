@@ -9,6 +9,11 @@ import util.MathHelper;
  * A creature that can chase a target along a precomputed path or, left to its
  * own devices, wander toward the spot with the best "block weight". This is
  * the base of both the passive animals and the hostile monsters.
+ *
+ * <p>Subclasses of EntityCreature use the task-based AI system
+ * ({@link net.minecraft.game.entity.ai.EntityAITasks}).  The inline
+ * {@link #updateEntityActionState()} method is kept as a fallback that only
+ * runs when {@link #isAIEnabled()} returns {@code false}.</p>
  */
 public class EntityCreature extends EntityLiving {
 	/** The current path toward the target; (re)computed whenever the target or goal changes. */
@@ -22,8 +27,15 @@ public class EntityCreature extends EntityLiving {
 		super(world);
 	}
 
+	/** EntityCreature uses the new task-based AI system. */
+	@Override
+	public boolean isAIEnabled() {
+		return true;
+	}
+
 	/** True when a straight ray from this creature's eye to the target's eye passes through no block. */
-	protected final boolean canEntityBeSeen(Entity target) {
+	@Override
+	public final boolean canEntityBeSeen(Entity target) {
 		return this.worldObj.rayTraceBlocks(new Vec3D(this.posX, this.posY + (double)this.getEyeHeight(), this.posZ), new Vec3D(target.posX, target.posY + (double)target.getEyeHeight(), target.posZ)) == null;
 	}
 
@@ -142,14 +154,15 @@ public class EntityCreature extends EntityLiving {
 	 * Gives the subclass the chance to land a hit when the target is within
 	 * reach; {@code distance} is the centre-to-centre distance to the target.
 	 */
-	protected void attackEntity(Entity target, float distance) {
+	@Override
+	public void attackEntity(Entity target, float distance) {
 	}
 
 	/**
 	 * How attractive a block is as a walk/drop goal. Creatures prefer higher
 	 * weights while wandering and require a non-negative one to spawn here.
 	 */
-	protected float getBlockPathWeight(int x, int y, int z) {
+	public float getBlockPathWeight(int x, int y, int z) {
 		return 0.0F;
 	}
 

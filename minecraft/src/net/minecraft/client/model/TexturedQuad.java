@@ -22,11 +22,9 @@ import net.minecraft.game.physics.Vec3D;
 public final class TexturedQuad {
 	public PositionTextureVertex[] vertexPositions;
 	public int nVertices;
-	private boolean invertNormal;
 
 	private TexturedQuad(PositionTextureVertex[] vertices) {
 		this.nVertices = 0;
-		this.invertNormal = false;
 		this.vertexPositions = vertices;
 		this.nVertices = vertices.length;
 	}
@@ -91,13 +89,9 @@ public final class TexturedQuad {
 		Vec3D normal = new Vec3D(
 			edgeA.yCoord * edgeB.zCoord - edgeA.zCoord * edgeB.yCoord,
 			edgeA.zCoord * edgeB.xCoord - edgeA.xCoord * edgeB.zCoord,
-			edgeA.xCoord * edgeB.yCoord - edgeA.yCoord * edgeB.xCoord).normalize();
+			edgeA.xCoord * edgeB.yCoord - edgeA.yCoord * edgeB.zCoord).normalize();
 		tessellator.startDrawingQuads();
-		if(this.invertNormal) {
-			tessellator.setNormal(-(float)normal.xCoord, -(float)normal.yCoord, -(float)normal.zCoord);
-		} else {
-			tessellator.setNormal((float)normal.xCoord, (float)normal.yCoord, (float)normal.zCoord);
-		}
+		tessellator.setNormal(-(float)normal.xCoord, -(float)normal.yCoord, -(float)normal.zCoord);
 
 		for(int i = 0; i < 4; ++i) {
 			PositionTextureVertex vertex = this.vertexPositions[i];

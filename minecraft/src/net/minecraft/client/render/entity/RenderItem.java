@@ -161,9 +161,12 @@ public final class RenderItem extends Render {
 			GL11.glScalef(0.5F, 0.5F, 0.5F);
 			int icon = itemStack.getItem().getIconFromDamage(itemStack.itemDamage);
 			int tintColor = itemStack.getItem().getColorFromDamage(itemStack.itemDamage);
-			float tr = ((tintColor >> 16) & 0xFF) / 255.0F;
-			float tg = ((tintColor >> 8) & 0xFF) / 255.0F;
-			float tb = (tintColor & 0xFF) / 255.0F;
+			// Shade the flat sprite by the block/ambient light like any other entity,
+			// so dropped flowers and such dim with the surroundings.
+			float brightness = item.getEntityBrightness(partialTick);
+			float tr = ((tintColor >> 16) & 0xFF) / 255.0F * brightness;
+			float tg = ((tintColor >> 8) & 0xFF) / 255.0F * brightness;
+			float tb = (tintColor & 0xFF) / 255.0F * brightness;
 			if(itemStack.itemID < 256) {
 				this.loadTexture("/terrain.png");
 			} else {
