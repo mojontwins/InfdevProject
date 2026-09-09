@@ -37,6 +37,10 @@ public class PathNavigate {
 	public void setCanSwim(boolean can) {
 		this.canSwim = can;
 	}
+	
+	public boolean getCanSwim() {
+		return this.canSwim;
+	}
 
 	/** Builds a path to a static world position. */
 	public PathEntity getPathToXYZ(double x, double y, double z) {

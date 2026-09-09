@@ -74,4 +74,24 @@ public abstract class EntityAITarget extends EntityAIBase {
 		}
 		return true;
 	}
+
+	public int getCanTargetCountdown() {
+		return canTargetCountdown;
+	}
+
+	public void setCanTargetCountdown(int canTargetCountdown) {
+		this.canTargetCountdown = canTargetCountdown;
+	}
+
+	public int getReachabilityCheckCooldown() {
+		return reachabilityCheckCooldown;
+	}
+
+	public void setReachabilityCheckCooldown(int reachabilityCheckCooldown) {
+		this.reachabilityCheckCooldown = reachabilityCheckCooldown;
+	}
+
+	public boolean isNearbyOnly() {
+		return nearbyOnly;
+	}
 }

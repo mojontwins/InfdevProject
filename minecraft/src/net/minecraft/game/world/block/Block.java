@@ -16,6 +16,7 @@ import net.minecraft.game.physics.MovingObjectPosition;
 import net.minecraft.game.physics.Vec3D;
 import net.minecraft.game.world.IBlockAccess;
 import net.minecraft.game.world.World;
+import net.minecraft.game.world.block.tileentity.TileEntitySign;
 import net.minecraft.game.world.material.Material;
 
 public class Block {
@@ -109,7 +110,17 @@ public class Block {
 	public static final Block tilledField = (new BlockFarmland(60)).setHardness(0.6F).setStepSound(soundGravelFootstep);
 	public static final Block stoneOvenIdle = (new BlockFurnace(61, false)).setHardness(3.5F).setStepSound(soundStoneFootstep);
 	public static final Block stoneOvenActive = (new BlockFurnace(62, true)).setHardness(3.5F).setStepSound(soundStoneFootstep).setLightValue(14.0F / 16.0F);
-	// ID 63 .. ID 255: free
+	public static final Block signStanding = (new BlockSign(63, TileEntitySign.class, true)).setHardness(1.0F).setStepSound(soundWoodFootstep);
+	public static final Block doorWood = (new BlockDoor(64, Material.wood)).setHardness(3.0F).setStepSound(soundWoodFootstep);
+	public static final Block ladder = (new BlockLadder(65, 83)).setHardness(0.4F).setStepSound(soundWoodFootstep);
+	// ID 66
+	// ID 67
+	public static final Block signWall = (new BlockSign(68, TileEntitySign.class, false)).setHardness(1.0F).setStepSound(soundWoodFootstep);
+	// ID 69
+	
+	// ID 70
+	public static final Block doorSteel = (new BlockDoor(71, Material.iron)).setHardness(5.0F).setStepSound(soundMetalFootstep);	
+	// ID 72 .. ID 255: free
 
 	public int blockIndexInTexture;
 	public final int blockID;
@@ -223,7 +234,7 @@ public class Block {
 		return this.blockIndexInTexture;
 	}
 
-	public final AxisAlignedBB getSelectedBoundingBoxFromPool(int x, int y, int z) {
+	public AxisAlignedBB getSelectedBoundingBoxFromPool(int x, int y, int z) {
 		return new AxisAlignedBB((double)x + this.minX, (double)y + this.minY, (double)z + this.minZ, (double)x + this.maxX, (double)y + this.maxY, (double)z + this.maxZ);
 	}
 

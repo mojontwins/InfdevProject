@@ -1,6 +1,5 @@
 package net.minecraft.game.entity.ai;
 
-import net.minecraft.game.entity.Entity;
 import net.minecraft.game.entity.EntityLiving;
 import net.minecraft.game.world.path.PathEntity;
 

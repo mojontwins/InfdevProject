@@ -1,7 +1,9 @@
 package net.minecraft.game.entity.player;
 
-import com.mojang.nbt.NBTTagCompound;
 import java.util.List;
+
+import com.mojang.nbt.NBTTagCompound;
+
 import net.minecraft.game.IInventory;
 import net.minecraft.game.entity.Entity;
 import net.minecraft.game.entity.EntityLiving;
@@ -14,6 +16,7 @@ import net.minecraft.game.item.ItemStack;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.Block;
 import net.minecraft.game.world.block.tileentity.TileEntityFurnace;
+import net.minecraft.game.world.block.tileentity.TileEntitySign;
 import net.minecraft.game.world.material.Material;
 import util.MathHelper;
 
@@ -242,5 +245,8 @@ public class EntityPlayer extends EntityLiving implements IHuman {
 	}
 
 	public void displayFurnaceGUI(TileEntityFurnace tileEntityFurnace) {
+	}
+	
+	public void displayGUIEditSign(TileEntitySign tileEntitySign) {
 	}
 }

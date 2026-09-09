@@ -1,7 +1,6 @@
 package net.minecraft.game.entity.ai;
 
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 
 /**

@@ -91,7 +91,7 @@ public final class TexturedQuad {
 			edgeA.zCoord * edgeB.xCoord - edgeA.xCoord * edgeB.zCoord,
 			edgeA.xCoord * edgeB.yCoord - edgeA.yCoord * edgeB.zCoord).normalize();
 		tessellator.startDrawingQuads();
-		tessellator.setNormal(-(float)normal.xCoord, -(float)normal.yCoord, -(float)normal.zCoord);
+		Tessellator.setNormal(-(float)normal.xCoord, -(float)normal.yCoord, -(float)normal.zCoord);
 
 		for(int i = 0; i < 4; ++i) {
 			PositionTextureVertex vertex = this.vertexPositions[i];

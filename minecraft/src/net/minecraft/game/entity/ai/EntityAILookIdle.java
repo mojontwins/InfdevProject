@@ -30,8 +30,8 @@ public class EntityAILookIdle extends EntityAIBase {
 	@Override
 	public void startExecuting() {
 		double maxOffset = 6.283185307179586D;
-		this.xPosition = this.theEntity.posX + Math.cos(this.theEntity.rotationYaw) * 6.283185307179586D;
-		this.zPosition = this.theEntity.posZ + Math.sin(this.theEntity.rotationYaw) * 6.283185307179586D;
+		this.xPosition = this.theEntity.posX + Math.cos(this.theEntity.rotationYaw) * maxOffset;
+		this.zPosition = this.theEntity.posZ + Math.sin(this.theEntity.rotationYaw) * maxOffset;
 		this.idleCountdown = 20 + this.theEntity.getRNG().nextInt(20);
 	}
 

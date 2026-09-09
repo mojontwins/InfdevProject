@@ -59,7 +59,15 @@ public class RandomPositionGenerator {
 		if (bestX >= 0) {
 			found = new Vec3D((double)((float)bestX + 0.5F), (double)((float)bestY + 0.5F), (double)((float)bestZ + 0.5F));
 		}
-		randomPosition = found;
+		setRandomPosition(found);
 		return found;
+	}
+
+	public static Vec3D getRandomPosition() {
+		return randomPosition;
+	}
+
+	public static void setRandomPosition(Vec3D randomPosition) {
+		RandomPositionGenerator.randomPosition = randomPosition;
 	}
 }

@@ -29,4 +29,8 @@ public class EntityAIHurtByTarget extends EntityAITarget {
 		this.taskOwner.setAttackTarget(this.taskOwner.getAITarget());
 		super.startExecuting();
 	}
+
+	public boolean isCallsForHelp() {
+		return callsForHelp;
+	}
 }

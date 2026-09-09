@@ -85,7 +85,6 @@ public class ModelRenderer {
 	 * winding is flipped so it still faces outward.
 	 */
 	public void addBox(String partName, float x, float y, float z, int width, int height, int depth, float expansion) {
-		partName = partName;
 		this.cubeList.add(new ModelBox(this, this.textureOffsetX, this.textureOffsetY, x, y, z, width, height, depth, expansion));
 	}
 

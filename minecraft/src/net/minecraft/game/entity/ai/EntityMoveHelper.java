@@ -30,7 +30,7 @@ public class EntityMoveHelper {
 		if (this.hasPath) {
 			this.hasPath = false;
 			double dx = this.posX - this.entity.posX;
-			double dy = this.posY - this.entity.posY;
+			//double dy = this.posY - this.entity.posY;
 			double dz = this.posZ - this.entity.posZ;
 			double dist = Math.sqrt(dx * dx + dz * dz);
 			if (dist > 0.0D) {

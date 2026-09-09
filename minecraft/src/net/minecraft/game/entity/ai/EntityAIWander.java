@@ -1,7 +1,6 @@
 package net.minecraft.game.entity.ai;
 
 import net.minecraft.game.entity.EntityCreature;
-import net.minecraft.game.entity.EntityLiving;
 import net.minecraft.game.physics.Vec3D;
 
 /**

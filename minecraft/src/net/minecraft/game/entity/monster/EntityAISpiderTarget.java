@@ -1,8 +1,6 @@
 package net.minecraft.game.entity.monster;
 
-import net.minecraft.game.entity.EntityLiving;
 import net.minecraft.game.entity.ai.EntityAINearestAttackableTarget;
-import net.minecraft.game.entity.player.EntityPlayer;
 
 /**
  * Spider-specific targeting: only hunts while it is dark enough
