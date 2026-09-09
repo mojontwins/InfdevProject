@@ -1,6 +1,12 @@
 package net.minecraft.game.entity.monster;
 
 import net.minecraft.game.entity.Entity;
+import net.minecraft.game.entity.ai.EntityAIAttackOnCollide;
+import net.minecraft.game.entity.ai.EntityAISwimming;
+import net.minecraft.game.entity.ai.EntityAIWander;
+import net.minecraft.game.entity.ai.EntityAIWatchClosest;
+import net.minecraft.game.entity.ai.EntityAILookIdle;
+import net.minecraft.game.entity.player.EntityPlayer;
 import net.minecraft.game.item.Item;
 import net.minecraft.game.world.World;
 import util.MathHelper;
@@ -15,19 +21,13 @@ public class EntitySpider extends EntityMonster {
 		this.texture = "/mob/spider.png";
 		this.setSize(1.4F, 0.9F);
 		this.moveSpeed = 0.8F;
-	}
 
-	/** Spiders only hunt while it is dark enough. */
-	protected final Entity findEntityToAttack() {
-		float brightness = this.getEntityBrightness(1.0F);
-		if(brightness < 0.5F) {
-			double distanceSq = this.worldObj.playerEntity.getDistanceSqToEntity(this);
-			if(distanceSq < 256.0D) {
-				return this.worldObj.playerEntity;
-			}
-		}
-
-		return null;
+		this.tasks.addTask(0, new EntityAISwimming(this));
+		this.tasks.addTask(1, new EntityAIAttackOnCollide(this, EntityPlayer.class, this.moveSpeed, false));
+		this.tasks.addTask(2, new EntityAIWander(this, this.moveSpeed));
+		this.tasks.addTask(3, new EntityAIWatchClosest(this, EntityPlayer.class, 8.0F));
+		this.tasks.addTask(4, new EntityAILookIdle(this));
+		this.targetTasks.addTask(2, new EntityAISpiderTarget(this, EntityPlayer.class, 16.0F, 0, false));
 	}
 
 	/**
@@ -35,10 +35,11 @@ public class EntitySpider extends EntityMonster {
 	 * in the dark, a nearby spider occasionally pounces, then falls back to
 	 * the plain bite.
 	 */
-	protected final void attackEntity(Entity target, float distance) {
+	@Override
+	public void attackEntity(Entity target, float distance) {
 		float brightness = this.getEntityBrightness(1.0F);
 		if(brightness > 0.5F && this.rand.nextInt(100) == 0) {
-			this.playerToAttack = null;
+			this.setAttackTarget(null);
 		} else {
 			// The pounce: within 2-6 m there is a 1-in-10 chance of a leap,
 			// but only from the ground — an airborne roll at that range simply

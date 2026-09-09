@@ -3,7 +3,12 @@ package net.minecraft.game.entity.animal;
 import com.mojang.nbt.NBTTagCompound;
 import net.minecraft.game.entity.Entity;
 import net.minecraft.game.entity.EntityLiving;
+import net.minecraft.game.entity.ai.EntityAISwimming;
+import net.minecraft.game.entity.ai.EntityAIWander;
+import net.minecraft.game.entity.ai.EntityAIWatchClosest;
+import net.minecraft.game.entity.ai.EntityAILookIdle;
 import net.minecraft.game.entity.misc.EntityItem;
+import net.minecraft.game.entity.player.EntityPlayer;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.Block;
 
@@ -19,6 +24,11 @@ public class EntitySheep extends EntityAnimal {
 		super(world);
 		this.texture = "/mob/sheep.png";
 		this.setSize(0.9F, 1.3F);
+
+		this.tasks.addTask(0, new EntityAISwimming(this));
+		this.tasks.addTask(1, new EntityAIWander(this, 0.23F));
+		this.tasks.addTask(2, new EntityAIWatchClosest(this, EntityPlayer.class, 6.0F));
+		this.tasks.addTask(3, new EntityAILookIdle(this));
 	}
 
 	public final boolean attackEntityFrom(Entity attacker, int damage) {

@@ -1,9 +1,11 @@
 package net.minecraft.game.item;
 
 import java.util.Random;
+
 import net.minecraft.game.entity.player.EntityPlayer;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.Block;
+import net.minecraft.game.world.material.Material;
 
 /**
  * The base class of every stackable, usable thing that is not a terrain block,
@@ -95,13 +97,21 @@ public class Item {
 	public static Item porkCooked = (new ItemFood(64, 8)).setIconIndex(88);
 	public static Item painting = (new ItemPainting(65)).setIconIndex(26);
 	public static Item appleGold = (new ItemFood(66, 42)).setIconIndex(11);
-	public static Item leather = (new Item(67)).setIconIndex(103);
+	public static Item sign = (new ItemSign(67)).setIconIndex(42);
+	public static Item doorWood = (new ItemDoor(68, Material.wood)).setIconIndex(43);
 	public static Item bucketEmpty = (new ItemBucket(68, 0)).setIconIndex(74);
 	public static Item bucketMilk = (new ItemBucket(69, -1)).setIconIndex(77);
 
 	public static Item bucketWater = (new ItemBucket(70, Block.waterMoving.blockID)).setIconIndex(75);
 	public static Item bucketLava = (new ItemBucket(71, Block.lavaMoving.blockID)).setIconIndex(76);
-	// ID 72 .. ID 1023: free
+	// ID 72 
+	// ID 73
+	public static Item doorSteel = (new ItemDoor(74, Material.iron)).setIconIndex(44);
+	// ID 75
+	// ID 76
+	// ID 77
+	public static Item leather = (new Item(78)).setIconIndex(103);
+	// ID 79 .. ID 1023: free
 
 	/** The item's id in {@link #itemsList} (= the register order plus the 256 shift). */
 	public final int shiftedIndex;

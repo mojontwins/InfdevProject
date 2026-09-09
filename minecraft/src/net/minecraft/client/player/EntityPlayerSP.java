@@ -2,9 +2,11 @@ package net.minecraft.client.player;
 
 import com.mojang.nbt.NBTTagCompound;
 import com.mojang.nbt.NBTTagList;
+
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Session;
 import net.minecraft.client.effect.EntityPickupFX;
+import net.minecraft.client.gui.GuiEditSign;
 import net.minecraft.client.gui.container.GuiChest;
 import net.minecraft.client.gui.container.GuiCrafting;
 import net.minecraft.client.gui.container.GuiFurnace;
@@ -14,6 +16,7 @@ import net.minecraft.game.entity.player.EntityPlayer;
 import net.minecraft.game.item.ItemStack;
 import net.minecraft.game.world.World;
 import net.minecraft.game.world.block.tileentity.TileEntityFurnace;
+import net.minecraft.game.world.block.tileentity.TileEntitySign;
 
 /**
  * The client's own player: wired to the keyboard and mouse through
@@ -120,6 +123,10 @@ public class EntityPlayerSP extends EntityPlayer {
 
 	public final void displayFurnaceGUI(TileEntityFurnace tileEntityFurnace) {
 		this.mc.displayGuiScreen(new GuiFurnace(this.inventory, tileEntityFurnace));
+	}
+	
+	public void displayGUIEditSign(TileEntitySign tileEntitySign) {
+		this.mc.displayGuiScreen(new GuiEditSign(tileEntitySign));
 	}
 
 	public final void displayInventoryGUI() {

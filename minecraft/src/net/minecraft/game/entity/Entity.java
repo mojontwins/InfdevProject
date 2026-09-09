@@ -32,7 +32,7 @@ import util.MathHelper;
 public abstract class Entity {
 	/** This entity blocks others from spawning inside it while it is pushed along. */
 	public boolean preventEntitySpawning = false;
-	protected World worldObj;
+	public World worldObj;
 
 	// --- position & look -------------------------------------------------------
 	public double prevPosX;
@@ -83,7 +83,7 @@ public abstract class Entity {
 	/** How high an automatic step-up may climb (0 disables stepping). */
 	public float stepHeight = 0.0F;
 	public boolean noClip = false;
-	protected Random rand = new Random();
+	public Random rand = new Random();
 	public int ticksExisted = 0;
 	public int fireResistance = 1;
 	/** Remaining fire ticks; becomes negative while fire is being resisted/extinguished. */
@@ -448,7 +448,7 @@ public abstract class Entity {
 		return blockId != 0 ? Block.blocksList[blockId].blockMaterial == Material.water : false;
 	}
 
-	protected float getEyeHeight() {
+	public float getEyeHeight() {
 		return 0.0F;
 	}
 

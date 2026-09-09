@@ -2,14 +2,13 @@ package net.minecraft.game.entity.monster;
 
 import net.minecraft.game.entity.Entity;
 import net.minecraft.game.entity.EntityCreature;
-import net.minecraft.game.entity.IHuman;
 import net.minecraft.game.world.World;
 import util.MathHelper;
 
 /**
- * A hostile creature: chases {@link IHuman} entities up to 16 m away, strikes
- * on contact and only spawns in dark places. Zombies and skeletons catch fire
- * at dawn (see {@link #tryBurnInDaylight()}).
+ * A hostile creature: chases the player up to 16 m away, strikes on contact
+ * and only spawns in dark places. Zombies and skeletons catch fire at dawn
+ * (see {@link #tryBurnInDaylight()}).
  */
 public class EntityMonster extends EntityCreature {
 	protected int attackStrength = 2;
@@ -39,30 +38,14 @@ public class EntityMonster extends EntityCreature {
 	}
 
 	protected Entity findEntityToAttack() {
-		Entity potentialTarget = this.worldObj.playerEntity;
-		if(potentialTarget instanceof IHuman) {
-			double distanceSq = potentialTarget.getDistanceSqToEntity(this);
-			if(distanceSq < 256.0D && this.canEntityBeSeen(potentialTarget)) {
-				// A sneaking player in a dim spot (light < 7) is invisible to the
-				// monster's eye beyond six blocks — only detected up close.
-				if(potentialTarget.isSneaking() && distanceSq > 36.0D && this.worldObj.getBlockLightValue(MathHelper.floor_double(potentialTarget.posX), MathHelper.floor_double(potentialTarget.posY), MathHelper.floor_double(potentialTarget.posZ)) < 7) {
-					return null;
-				}
-
-				return potentialTarget;
-			} else {
-				return null;
-			}
-		} else {
-			return null;
-		}
+		return null;
 	}
 
 	/** A monster that is struck turns on whoever dealt the blow. */
 	public final boolean attackEntityFrom(Entity attacker, int damage) {
 		if(super.attackEntityFrom(attacker, damage)) {
-			if(attacker != this) {
-				this.playerToAttack = attacker;
+			if(attacker != this && attacker instanceof net.minecraft.game.entity.EntityLiving) {
+				this.setAITarget((net.minecraft.game.entity.EntityLiving)attacker);
 			}
 
 			return true;
@@ -72,7 +55,8 @@ public class EntityMonster extends EntityCreature {
 	}
 
 	/** Plain contact bite: close enough and vertically overlapping the target's body. */
-	protected void attackEntity(Entity target, float distance) {
+	@Override
+	public void attackEntity(Entity target, float distance) {
 		if((double)distance < 2.5D && target.boundingBox.maxY > this.boundingBox.minY && target.boundingBox.minY < this.boundingBox.maxY) {
 			this.attackTime = 20;
 			target.attackEntityFrom(this, this.attackStrength);
@@ -81,7 +65,8 @@ public class EntityMonster extends EntityCreature {
 	}
 
 	/** Monsters avoid bright, open spots when picking a wander goal. */
-	protected float getBlockPathWeight(int x, int y, int z) {
+	@Override
+	public float getBlockPathWeight(int x, int y, int z) {
 		return 0.5F - this.worldObj.getBrightness(x, y, z);
 	}
 
